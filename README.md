@@ -88,9 +88,13 @@ Early-stage research prototype.
 The repository now contains:
 
 - a Swift Package with core composition, preview coordination, and fixture-backed demo modules
-- a generated Xcode project workflow driven by `project.yml`
+- an Xcode project workflow driven by `project.yml`
 - developer scripts for local install and internal package generation
 - a minimal InputMethodKit shell for the Mode 1 demo path
+
+The canonical project definition is `project.yml`.
+
+Generated artifacts such as `BilineIME.xcodeproj` and generated support plists are intentionally ignored and should be regenerated locally instead of committed.
 
 ## Development
 
@@ -100,6 +104,7 @@ The repository now contains:
 - `make build-ime` builds the input method app
 - `make install-ime` installs the app into `/Library/Input Methods`
 - `make package-internal` builds an unsigned internal `.pkg` for trusted testers
+- `make verify` runs package tests and a full Xcode build
 
 # Roadmap
 

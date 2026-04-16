@@ -29,3 +29,4 @@ An entry here does **not** mean the code is bundled in BilineIME.
 - If code is adapted from an upstream permissive project, the relevant implementation area must identify the upstream source and preserve the required copyright/license notice.
 - If BilineIME ever chooses to incorporate GPL-licensed code, that decision must be explicit and accompanied by a repository-level licensing review.
 - If an entry is later removed from the project, its status in this file should be updated rather than silently deleted.
+- Generated artifacts from tooling listed here, such as `BilineIME.xcodeproj`, are not source of truth and should not be committed unless the repository policy changes explicitly.

@@ -8,6 +8,7 @@ Instead of treating input methods as pure text entry tools, BilineIME explores a
 - second line: translated preview in a target language
 
 The goal is to support bilingual writing, language learning, and multilingual drafting with minimal context switching.
+<img width="1536" height="1024" alt="a5151a4e-c91c-4dde-9089-f1fa39920189" src="https://github.com/user-attachments/assets/241accd9-2a5b-4707-9f55-18b92fd9c95c" />
 
 ## Current Scope
 - macOS only

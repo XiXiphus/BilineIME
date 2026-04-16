@@ -3,16 +3,16 @@ import Foundation
 
 struct DefaultSettingsStore: SettingsStore {
     let targetLanguage: TargetLanguage
-    let annotationEnabled: Bool
+    let previewEnabled: Bool
     let pageSize: Int
 
     init(
         targetLanguage: TargetLanguage = .english,
-        annotationEnabled: Bool = true,
+        previewEnabled: Bool = true,
         pageSize: Int = 5
     ) {
         self.targetLanguage = targetLanguage
-        self.annotationEnabled = annotationEnabled
+        self.previewEnabled = previewEnabled
         self.pageSize = pageSize
     }
 }

@@ -95,10 +95,13 @@ Mode 1 is the right first move because it:
 
 - macOS only
 - Chinese input first
-- preview translation for the currently selected candidate
+- a custom bilingual candidate panel with two rows per visible candidate
+- `Shift` toggles the active layer between Chinese and English for the selected candidate
+- confirming a candidate commits the active layer only
 - translation must never block typing
 - debounce, caching, and stale-result suppression
 - target language setting
+- English preview never changes Chinese candidate ordering, paging, or ranking
 - architecture ready for future expansion, but still centered on Mode 1
 
 ## 🚫 v1 Non-Goals
@@ -106,8 +109,7 @@ Mode 1 is the right first move because it:
 - sentence-level reversible translation
 - the `=` transform operator
 - `Backspace`-driven reversion logic
-- bilingual commit mode
-- a custom candidate window before the stock IME path is validated
+- simultaneous Chinese-and-English pair commit
 - locking the project to one translation provider forever
 
 ## 🏗️ Current Repo State
@@ -172,7 +174,7 @@ The high-level architecture direction is:
 - keep composition and preview logic in testable Swift Package modules
 - start with a thin local engine
 - keep a clean path toward a future `librime` adapter
-- use stock `IMKCandidates` + annotation before building custom candidate UI
+- use a custom AppKit bilingual candidate panel for Mode 1
 
 ## 🤝 Open-Source Policy
 
@@ -195,15 +197,16 @@ If you care about open-source hygiene, this repo does too.
 - [ ] Register and enable the input method
 - [ ] Handle basic key events
 - [ ] Show marked text and commit selected text
-- [ ] Prove the stock candidate UI loop works end to end
+- [ ] Prove the custom candidate panel loop works end to end
 
 ### Phase 1 — Mode 1 Vertical Slice
 
 - [ ] Produce simple Chinese candidates from a small local engine or mock engine
-- [ ] Display the current candidate with the system candidate UI
-- [ ] Trigger translation preview for the selected candidate
+- [ ] Display each visible candidate as a Chinese row plus an English row
+- [ ] Toggle the active commit layer with `Shift`
+- [ ] Trigger English preview loading for the visible candidate page
 - [ ] Keep translation requests fully asynchronous
-- [ ] Ignore stale translation results when selection changes
+- [ ] Ignore stale translation results when the visible page changes
 - [ ] Add target-language configuration
 
 ### Phase 2 — Mode 1 Hardening
@@ -212,12 +215,12 @@ If you care about open-source hygiene, this repo does too.
 - [ ] Add debounce and memory cache for previews
 - [ ] Improve failure handling and fallback behavior
 - [ ] Test cross-app compatibility on common macOS editors
-- [ ] Evaluate whether the stock annotation UI is good enough or a custom bilingual panel is needed
+- [ ] Refine custom panel layout and long-translation behavior
 
 ### Later
 
 - [ ] Revisit Mode 2 as a separate architecture track
-- [ ] Add bilingual commit mode
+- [ ] Add simultaneous bilingual pair commit mode
 - [ ] Add custom glossary and user phrases
 - [ ] Improve cross-app compatibility and settings UX
 

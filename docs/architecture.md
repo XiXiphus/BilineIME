@@ -7,7 +7,8 @@ This document turns the current product idea into a concrete implementation plan
 It intentionally treats **Mode 1** as the only first-phase target:
 
 - Chinese composition remains the primary workflow
-- the currently selected Chinese candidate gets a translation preview
+- each visible candidate is rendered as a Chinese row plus an English row
+- `Shift` toggles the active commit layer between Chinese and English
 - translation never blocks typing
 
 Mode 2 remains a later extension and is documented here only as a deferred architecture concern.
@@ -18,7 +19,9 @@ Mode 2 remains a later extension and is documented here only as a deferred archi
 
 - a macOS input method built on InputMethodKit
 - Chinese composition with marked text and candidate selection
-- preview translation for the currently selected candidate
+- a custom bilingual candidate panel for the current candidate page
+- English preview for each visible candidate
+- active-layer commit between Chinese and English
 - asynchronous translation requests
 - caching and stale-result suppression
 - a settings surface for target language and preview behavior
@@ -28,23 +31,22 @@ Mode 2 remains a later extension and is documented here only as a deferred archi
 - reversible sentence-level translation triggered by `=`
 - tracking committed document ranges after composition ends
 - backspace-driven restoration of earlier source text
-- rich bilingual commit formats
+- simultaneous bilingual pair commit formats
 - shipping a production-grade Chinese IME on day one
 
 ## Facts That Shape The Design
 
 The following are platform facts, not project guesses:
 
-1. Apple's `InputMethodKit` provides the core macOS IME integration points through `IMKServer`, `IMKInputController`, and `IMKCandidates`.
+1. Apple's `InputMethodKit` provides the core macOS IME integration points through `IMKServer` and `IMKInputController`.
 2. `IMKServer` creates an `IMKInputController` for each input session, so composition state is naturally session-scoped.
-3. `IMKCandidates` is optional, but when used it notifies the input controller through `candidateSelectionChanged:` and `candidateSelected:`.
-4. Apple QA1644 shows that the stock `IMKCandidates` flow can display per-candidate annotation strings as `NSAttributedString`.
-5. The client side of composition is still based on marked-text semantics through `NSTextInputClient`, where marked text and committed text are separate states.
+3. The client side of composition is still based on marked-text semantics through `NSTextInputClient`, where marked text and committed text are separate states.
+4. `NSTextInputClient` exposes caret geometry, so a custom candidate panel can be anchored near the active insertion point.
 
 These facts lead to three immediate design conclusions:
 
 - Mode 1 should stay inside the normal composition lifecycle rather than edit already committed document text.
-- The first prototype should use the stock IME candidate path before attempting a custom bilingual candidate window.
+- Mode 1 should own its bilingual candidate presentation explicitly rather than approximate it through annotation.
 - Session-local composition state and app-wide shared services should be separated from the start.
 
 ## Decision Summary
@@ -52,7 +54,7 @@ These facts lead to three immediate design conclusions:
 | Area | Decision For First Blueprint | Why |
 | --- | --- | --- |
 | IME host | Native macOS `InputMethodKit` app in Swift/AppKit | This is the canonical integration path on macOS. |
-| Candidate UI | System `IMKCandidates` plus annotation preview first | Fastest way to validate the interaction with real IME behavior. |
+| Candidate UI | Custom bilingual AppKit candidate panel | Required to render both rows for every visible candidate and support layer switching. |
 | Chinese engine | Use a pluggable engine interface; start with a simple local engine or mock, but leave a clean path to a mature backend | The interaction can be validated before solving full Chinese IME quality. |
 | Durable engine target | Prefer a mature adapter such as `librime` if the goal becomes daily-usable Chinese input | Avoids rebuilding a full Chinese IME from scratch. |
 | Translation provider | Protocol-based async provider with cache and cancellation | Keeps preview logic independent from vendor or transport. |
@@ -155,38 +157,25 @@ This keeps the first milestone small while preserving a serious long-term path.
 
 ### 2. How To Show The Translation Preview
 
-#### Option A: Use `IMKCandidates` And Candidate Annotation
+#### Option A: Use A Custom Bilingual Candidate Panel
 
 Pros:
 
-- aligns with the stock IME composition loop
-- low implementation risk
-- selected-candidate updates already map well to translation preview updates
-- enough to validate whether previewing the selected candidate is helpful
-
-Cons:
-
-- may not look exactly like a custom two-line bilingual list
-- annotation layout and polish are constrained by system UI
-
-#### Option B: Build A Custom Candidate Panel Immediately
-
-Pros:
-
-- exact control over two-line layout, typography, hierarchy, and motion
-- easier to represent candidate plus translation as a single designed unit
+- exact control over two-line layout for every visible candidate
+- explicit active-layer highlighting for Chinese and English
+- matches the commit behavior required by Mode 1
 
 Cons:
 
 - significantly higher UI and positioning complexity
 - more chances of app-specific compatibility problems
-- risks spending effort on presentation before proving the interaction
+- requires the app shell to own more rendering code
 
 #### Recommendation
 
-Start with **Option A**.
+Use **Option A**.
 
-If the stock annotation path proves too visually weak or too detached from the selected row, then move to a custom bilingual panel in a later phase. The first blueprint should not assume that custom UI is mandatory.
+The required interaction already assumes a custom panel, so the system candidate window is no longer the product baseline.
 
 ### 3. How To Execute Translation Requests
 
@@ -229,11 +218,11 @@ Start with **Option A**, but keep translation behind a protocol and coordinator 
 InputMethod App Bundle
   AppDelegate / Bootstrap
   SessionController (IMKInputController)
-  CandidateUIAdapter (IMKCandidates + annotation)
+  CandidatePanelController (custom bilingual panel)
   Menu / Preferences bridge
 
 Core Domain
-  CompositionSession
+  BilingualInputSession
   CandidateEngine protocol
   PreviewCoordinator
   TranslationProvider protocol
@@ -242,7 +231,6 @@ Core Domain
 
 Future Optional Layer
   TranslationHelperXPC
-  CustomBilingualPanel
   Real engine adapter (for example librime)
 ```
 
@@ -253,13 +241,15 @@ Future Optional Layer
 - owns one active composition session per IME session
 - receives key events and composition callbacks
 - updates marked text and candidate UI
-- commits the selected candidate
-- forwards selection changes to the preview coordinator
+- toggles the active layer on `Shift`
+- commits the selected candidate in the current layer
+- forwards visible-page changes to the preview coordinator
 
-#### `CompositionSession`
+#### `BilingualInputSession`
 
 - stores raw input buffer
-- stores current candidate list and selected index
+- stores current page candidate list, selected index, and active layer
+- stores English preview state for the visible page
 - knows whether marked text is active
 - exposes state transitions for typing, paging, selection, commit, and cancel
 
@@ -278,11 +268,12 @@ The session controller should not know whether candidates came from a mock engin
 #### `PreviewCoordinator`
 
 - listens to candidate selection changes
+- listens to visible-page changes
 - computes preview request keys
-- debounces rapid selection movement
+- debounces rapid candidate-page refreshes
 - checks cache first
 - launches async translation tasks
-- drops late results if the session token or selection token has changed
+- drops late results if the session token or visible-page token has changed
 
 #### `TranslationProvider`
 
@@ -303,16 +294,16 @@ The session controller should not know whether candidates came from a mock engin
 1. The user types phonetic input.
 2. `SessionController` forwards input to `CompositionSession`.
 3. `CompositionSession` asks the active `CandidateEngine` for candidates.
-4. `SessionController` updates marked text and refreshes `IMKCandidates`.
-5. The selected candidate becomes the preview source.
-6. `PreviewCoordinator` checks cache and schedules an async translation if needed.
-7. When translation returns, the preview is shown as the annotation for the currently selected candidate.
-8. If the user changes selection before the translation returns, the old result is ignored.
+4. `SessionController` updates marked text and refreshes the custom bilingual panel.
+5. The current visible page becomes the preview source set.
+6. `PreviewCoordinator` checks cache and schedules async translation for visible candidates as needed.
+7. When translation returns, the matching English row is updated in place.
+8. If the user changes pages or input before the translation returns, the old result is ignored.
 
 ### Commit
 
 1. The user confirms a candidate.
-2. The Chinese candidate is committed to the client document.
+2. The active layer text for the selected candidate is committed to the client document.
 3. Marked text is cleared.
 4. Candidate UI and preview UI are dismissed.
 5. The preview session state is reset.
@@ -333,9 +324,10 @@ Suggested fields:
 
 - `rawInput`
 - `markedText`
-- `candidates`
+- `items`
 - `selectedIndex`
 - `pageIndex`
+- `activeLayer`
 - `isComposing`
 
 ### Preview State
@@ -352,7 +344,7 @@ Suggested states:
 Every async translation request must carry:
 
 - session identifier
-- selection version
+- visible-page version
 - request key
 
 A result may update UI only if all three still match current state.
@@ -377,13 +369,14 @@ The input method works like a real IME even without translation.
 
 - add `PreviewCoordinator`
 - add async `TranslationProvider`
-- show selected-candidate preview through annotation
+- show a custom bilingual candidate panel for the visible page
+- support `Shift`-based layer switching and active-layer commit
 - ignore stale results
 - add target language setting
 
 Success condition:
 
-Typing and candidate navigation stay responsive while the selected candidate gains a preview translation.
+Typing and candidate navigation stay responsive while visible candidates gain English preview rows.
 
 ### Milestone 3: Hardening
 
@@ -391,7 +384,7 @@ Typing and candidate navigation stay responsive while the selected candidate gai
 - improve failure handling
 - add test coverage for state transitions
 - run cross-app manual verification
-- decide whether stock annotation UI is sufficient
+- refine custom panel behavior for long translations and loading states
 
 Success condition:
 
@@ -426,7 +419,7 @@ At minimum test:
 - Xcode or VS Code
 - one terminal app
 
-The goal is to catch marked-text and candidate-window behavior differences across client apps early.
+The goal is to catch marked-text and custom candidate-panel behavior differences across client apps early.
 
 ## Why Mode 2 Is Deferred
 
@@ -459,7 +452,6 @@ The correct blueprint is to finish Mode 1 first, then decide whether Mode 2 belo
 These are intentionally left open until implementation begins:
 
 - Should the first real engine target simplified Chinese only, or simplified and traditional from the start?
-- Is the selected-candidate preview enough, or does the user really need a visually integrated two-line candidate row?
 - Which translation backend should be used first: mock glossary, local model, or remote API?
 - What latency threshold still feels acceptable for preview usefulness?
 - Does the first settings surface live inside the IME menu only, or should it have a separate preferences window?
@@ -470,9 +462,7 @@ Primary platform references:
 
 - Apple InputMethodKit overview: <https://developer.apple.com/documentation/inputmethodkit>
 - Apple `IMKInputController`: <https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller>
-- Apple `IMKCandidates`: <https://developer.apple.com/documentation/inputmethodkit/imkcandidates>
 - Apple `NSTextInputClient`: <https://developer.apple.com/documentation/appkit/nstextinputclient>
-- Apple QA1644 on candidate annotations: <https://developer.apple.com/library/archive/qa/qa1644/_index.html>
 
 Project and ecosystem references used for option analysis:
 

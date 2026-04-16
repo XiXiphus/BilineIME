@@ -9,14 +9,15 @@
 ## Preview
 
 - Cached previews return without re-requesting the provider.
-- Late preview results never replace a newer selection.
+- Late preview results never replace a newer visible-page state.
 - Failure to resolve preview never blocks text entry or commit.
 
 ## App shell
 
-- The candidate window can render the current page of candidates.
-- Annotation text follows the selected candidate.
-- Committing a candidate inserts Chinese text and clears composition.
+- The custom candidate panel renders the current page as vertically stacked Chinese and English rows.
+- `Shift` toggles the active layer without changing the selected candidate index.
+- Committing a candidate inserts the active layer text and clears composition.
+- English preview state never changes Chinese candidate order or paging.
 
 ## Delivery
 

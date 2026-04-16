@@ -1,6 +1,7 @@
 import BilineCore
 import BilineMocks
 import BilinePreview
+import BilineSession
 import Foundation
 
 public enum DemoFixtures {
@@ -10,6 +11,19 @@ public enum DemoFixtures {
 
     public static func makeSession(pageSize: Int = 9) -> any CandidateEngineSession {
         makeEngineFactory().makeSession(config: EngineConfig(pageSize: pageSize))
+    }
+
+    public static func makeBilingualSession(
+        pageSize: Int = 5,
+        delay: Duration = .zero,
+        failures: Set<String> = [],
+        previewEnabled: Bool = true
+    ) -> BilingualInputSession {
+        BilingualInputSession(
+            settingsStore: DemoSettingsStore(previewEnabled: previewEnabled, pageSize: pageSize),
+            engineFactory: makeEngineFactory(),
+            previewCoordinator: makeCoordinator(delay: delay, failures: failures)
+        )
     }
 
     public static func makeProvider(
@@ -29,4 +43,10 @@ public enum DemoFixtures {
             debounce: debounce
         )
     }
+}
+
+private struct DemoSettingsStore: SettingsStore {
+    let targetLanguage: TargetLanguage = .english
+    let previewEnabled: Bool
+    let pageSize: Int
 }

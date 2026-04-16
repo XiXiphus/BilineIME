@@ -32,6 +32,8 @@ targets:
       - package: BilineModules
         product: BilinePreview
       - package: BilineModules
+        product: BilineSession
+      - package: BilineModules
         product: BilineMocks
     info:
       path: App/Support/Info.plist

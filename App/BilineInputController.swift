@@ -1,6 +1,7 @@
 import BilineCore
 import BilineMocks
 import BilinePreview
+import BilineSession
 import Cocoa
 @preconcurrency import InputMethodKit
 import OSLog
@@ -11,10 +12,11 @@ final class BilineInputController: IMKInputController {
         subsystem: "io.github.xixiphus.inputmethod.BilineIME",
         category: "input-controller"
     )
-    private let inputSession: BilineInputSession
-    private var candidatesWindow: IMKCandidates?
+    private let inputSession: BilingualInputSession
+    private let candidatePanel = BilineCandidatePanelController()
 
     private weak var activeClient: AnyObject?
+    private var isShiftPressed = false
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let settingsStore = DefaultSettingsStore()
@@ -22,16 +24,23 @@ final class BilineInputController: IMKInputController {
             provider: MockTranslationProvider(),
             debounce: .milliseconds(100)
         )
-        self.inputSession = BilineInputSession(
+        self.inputSession = BilingualInputSession(
             settingsStore: settingsStore,
-            engineFactory: .demo(),
+            engineFactory: FixtureCandidateEngineFactory.demo(),
             previewCoordinator: previewCoordinator
         )
         super.init(server: server, delegate: delegate, client: inputClient)
 
-        inputSession.onPreviewUpdate = { [weak self] previewText in
-            self?.updateAnnotation(previewText)
+        inputSession.onSnapshotUpdate = { [weak self] snapshot in
+            guard let self, let client = self.activeClient as? IMKTextInput else {
+                return
+            }
+            self.render(client: client, snapshot: snapshot)
         }
+    }
+
+    override func recognizedEvents(_ sender: Any!) -> Int {
+        Int(NSEvent.EventTypeMask.keyDown.rawValue | NSEvent.EventTypeMask.flagsChanged.rawValue)
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
@@ -40,6 +49,10 @@ final class BilineInputController: IMKInputController {
         }
 
         activeClient = client as AnyObject
+
+        if event.type == .flagsChanged {
+            return handleFlagsChanged(event, client: client)
+        }
 
         if event.modifierFlags.contains(.command) {
             return false
@@ -76,7 +89,7 @@ final class BilineInputController: IMKInputController {
             break
         }
 
-        if let digitIndex = candidateIndex(from: event), !inputSession.candidateStrings.isEmpty {
+        if let digitIndex = candidateIndex(from: event), !inputSession.snapshot.items.isEmpty {
             inputSession.selectCandidate(at: digitIndex)
             return commitSelection(using: client)
         }
@@ -95,28 +108,10 @@ final class BilineInputController: IMKInputController {
         return true
     }
 
-    override func candidates(_ sender: Any!) -> [Any]! {
-        inputSession.candidateStrings
-    }
-
-    override func candidateSelectionChanged(_ candidateString: NSAttributedString!) {
-        guard let surface = candidateString?.string else { return }
-        inputSession.updateSelection(for: surface)
-
-        if let client = activeClient as? IMKTextInput {
-            render(client: client)
-        } else {
-            updateAnnotation(inputSession.previewText)
-        }
-    }
-
-    override func candidateSelected(_ candidateString: NSAttributedString!) {
-        guard let surface = candidateString?.string else { return }
-        inputSession.updateSelection(for: surface)
-
-        if let client = activeClient as? IMKTextInput {
-            _ = commitSelection(using: client)
-        }
+    override func deactivateServer(_ sender: Any!) {
+        candidatePanel.hide()
+        isShiftPressed = false
+        super.deactivateServer(sender)
     }
 
     override func commitComposition(_ sender: Any!) {
@@ -124,12 +119,14 @@ final class BilineInputController: IMKInputController {
             _ = commitSelection(using: client)
         } else {
             inputSession.cancel()
+            candidatePanel.hide()
         }
     }
 
     private func commitSelection(using client: IMKTextInput) -> Bool {
         guard let committedText = inputSession.commitSelection() else {
-            return false
+            render(client: client)
+            return inputSession.snapshot.isComposing
         }
 
         client.insertText(
@@ -140,9 +137,11 @@ final class BilineInputController: IMKInputController {
         return true
     }
 
-    private func render(client: IMKTextInput) {
-        let candidatesWindow = resolveCandidatesWindow()
-        let snapshot = inputSession.snapshot
+    private func render(
+        client: IMKTextInput,
+        snapshot: BilingualCompositionSnapshot? = nil
+    ) {
+        let snapshot = snapshot ?? inputSession.snapshot
 
         if snapshot.isComposing {
             client.setMarkedText(
@@ -158,37 +157,48 @@ final class BilineInputController: IMKInputController {
             )
         }
 
-        if snapshot.candidates.isEmpty {
-            candidatesWindow.hide()
-            updateAnnotation(nil)
+        if snapshot.items.isEmpty {
+            candidatePanel.hide()
             return
         }
 
-        candidatesWindow.update()
-        candidatesWindow.show()
-        candidatesWindow.perform(
-            #selector(IMKCandidates.selectCandidate(_:)),
-            with: NSNumber(value: snapshot.selectedIndex))
-        updateAnnotation(inputSession.previewText)
+        candidatePanel.render(snapshot: snapshot, anchorRect: candidateAnchorRect(for: client))
     }
 
-    private func updateAnnotation(_ previewText: String?) {
-        let candidatesWindow = resolveCandidatesWindow()
-        let annotation = NSAttributedString(string: previewText ?? "")
-        _ = candidatesWindow.perform(#selector(IMKCandidates.showAnnotation(_:)), with: annotation)
-    }
-
-    private func resolveCandidatesWindow() -> IMKCandidates {
-        if let candidatesWindow {
-            return candidatesWindow
+    private func handleFlagsChanged(_ event: NSEvent, client: IMKTextInput) -> Bool {
+        guard event.keyCode == 56 || event.keyCode == 60 else {
+            return false
         }
 
-        let window: IMKCandidates = IMKCandidates(
-            server: server(),
-            panelType: kIMKSingleColumnScrollingCandidatePanel
+        guard inputSession.snapshot.isComposing else {
+            isShiftPressed = event.modifierFlags.contains(.shift)
+            return false
+        }
+
+        let isShiftDown = event.modifierFlags.contains(.shift)
+        defer { isShiftPressed = isShiftDown }
+
+        guard isShiftDown, !isShiftPressed else {
+            return true
+        }
+
+        inputSession.toggleActiveLayer()
+        render(client: client)
+        return true
+    }
+
+    private func candidateAnchorRect(for client: IMKTextInput) -> NSRect? {
+        guard let textClient = client as? NSTextInputClient else {
+            return nil
+        }
+
+        var actualRange = NSRange(location: NSNotFound, length: 0)
+        let selectedRange = textClient.selectedRange()
+        let rect = textClient.firstRect(
+            forCharacterRange: selectedRange,
+            actualRange: &actualRange
         )
-        candidatesWindow = window
-        return window
+        return rect.isEmpty ? nil : rect
     }
 
     private func candidateIndex(from event: NSEvent) -> Int? {
@@ -205,6 +215,6 @@ final class BilineInputController: IMKInputController {
         }
 
         let localIndex = value - 1
-        return localIndex < inputSession.candidateStrings.count ? localIndex : nil
+        return localIndex < inputSession.snapshot.items.count ? localIndex : nil
     }
 }

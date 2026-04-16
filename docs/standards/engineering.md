@@ -10,9 +10,10 @@
 
 - `BilineCore` owns composition state, candidates, paging, commit behavior, and engine protocols.
 - `BilinePreview` owns translation provider contracts, cache behavior, and stale-result suppression.
+- `BilineSession` owns bilingual composition snapshots, active-layer state, and visible-page preview orchestration.
 - `BilineMocks` owns fixture-driven demo implementations and demo resources.
 - `BilineTestSupport` owns reusable test fixtures and test helpers.
-- `App/` adapts platform events to package APIs and renders current state into `IMKInputController` / `IMKCandidates`.
+- `App/` adapts platform events to package APIs and renders current state into `IMKInputController` plus the custom AppKit candidate panel.
 
 ## Naming
 

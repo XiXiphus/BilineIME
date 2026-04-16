@@ -12,7 +12,7 @@ public protocol TranslationProvider: Sendable {
 
 public protocol SettingsStore: Sendable {
     var targetLanguage: TargetLanguage { get }
-    var annotationEnabled: Bool { get }
+    var previewEnabled: Bool { get }
     var pageSize: Int { get }
 }
 
@@ -56,11 +56,16 @@ private struct ActivePreview: Sendable, Equatable {
     let requestKey: PreviewRequestKey
 }
 
+private struct ActivePreviewID: Sendable, Equatable, Hashable {
+    let sessionID: UUID
+    let requestID: String
+}
+
 public actor PreviewCoordinator {
     private let provider: any TranslationProvider
     private let debounce: Duration
     private var cache: PreviewCache
-    private var activeRequests: [UUID: ActivePreview]
+    private var activeRequests: [ActivePreviewID: ActivePreview]
 
     public init(
         provider: any TranslationProvider,
@@ -79,8 +84,25 @@ public actor PreviewCoordinator {
         candidate: Candidate?,
         targetLanguage: TargetLanguage
     ) -> PreviewState {
+        startPreview(
+            sessionID: sessionID,
+            requestID: "__selected__",
+            selectionRevision: selectionRevision,
+            candidate: candidate,
+            targetLanguage: targetLanguage
+        )
+    }
+
+    public func startPreview(
+        sessionID: UUID,
+        requestID: String,
+        selectionRevision: Int,
+        candidate: Candidate?,
+        targetLanguage: TargetLanguage
+    ) -> PreviewState {
+        let activePreviewID = ActivePreviewID(sessionID: sessionID, requestID: requestID)
         guard let candidate else {
-            activeRequests.removeValue(forKey: sessionID)
+            activeRequests.removeValue(forKey: activePreviewID)
             return .idle
         }
 
@@ -90,7 +112,7 @@ public actor PreviewCoordinator {
             requestKey: requestKey
         )
 
-        activeRequests[sessionID] = activePreview
+        activeRequests[activePreviewID] = activePreview
 
         if let cached = cache.value(for: requestKey) {
             return .ready(requestKey, cached)
@@ -105,8 +127,25 @@ public actor PreviewCoordinator {
         candidate: Candidate?,
         targetLanguage: TargetLanguage
     ) async -> PreviewState {
+        await resolvePreview(
+            sessionID: sessionID,
+            requestID: "__selected__",
+            selectionRevision: selectionRevision,
+            candidate: candidate,
+            targetLanguage: targetLanguage
+        )
+    }
+
+    public func resolvePreview(
+        sessionID: UUID,
+        requestID: String,
+        selectionRevision: Int,
+        candidate: Candidate?,
+        targetLanguage: TargetLanguage
+    ) async -> PreviewState {
+        let activePreviewID = ActivePreviewID(sessionID: sessionID, requestID: requestID)
         guard let candidate else {
-            activeRequests.removeValue(forKey: sessionID)
+            activeRequests.removeValue(forKey: activePreviewID)
             return .idle
         }
 
@@ -116,41 +155,47 @@ public actor PreviewCoordinator {
             requestKey: requestKey
         )
 
-        guard activeRequests[sessionID] == activePreview else {
+        guard activeRequests[activePreviewID] == activePreview else {
             return .idle
         }
 
         if let cached = cache.value(for: requestKey) {
-            activeRequests.removeValue(forKey: sessionID)
+            activeRequests.removeValue(forKey: activePreviewID)
             return .ready(requestKey, cached)
         }
 
         if debounce > .zero {
             try? await Task.sleep(for: debounce)
-            guard activeRequests[sessionID] == activePreview else {
+            guard activeRequests[activePreviewID] == activePreview else {
                 return .idle
             }
         }
 
         do {
             let preview = try await provider.translate(candidate.surface, target: targetLanguage)
-            guard activeRequests[sessionID] == activePreview else {
+            guard activeRequests[activePreviewID] == activePreview else {
                 return .idle
             }
             cache.insert(preview, for: requestKey)
-            activeRequests.removeValue(forKey: sessionID)
+            activeRequests.removeValue(forKey: activePreviewID)
             return .ready(requestKey, preview)
         } catch {
-            guard activeRequests[sessionID] == activePreview else {
+            guard activeRequests[activePreviewID] == activePreview else {
                 return .idle
             }
-            activeRequests.removeValue(forKey: sessionID)
+            activeRequests.removeValue(forKey: activePreviewID)
             return .failed(requestKey)
         }
     }
 
     public func cancel(sessionID: UUID) {
-        activeRequests.removeValue(forKey: sessionID)
+        activeRequests = activeRequests.filter { $0.key.sessionID != sessionID }
+    }
+
+    public func cancel(sessionID: UUID, requestID: String) {
+        activeRequests.removeValue(
+            forKey: ActivePreviewID(sessionID: sessionID, requestID: requestID)
+        )
     }
 
     private func makeRequestKey(

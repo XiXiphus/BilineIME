@@ -85,7 +85,21 @@ At the moment this repository contains no vendored third-party code yet; the not
 
 Early-stage research prototype.
 
-There is currently no implementation in this repository yet; the immediate goal is to turn the product idea into a concrete build plan for Mode 1.
+The repository now contains:
+
+- a Swift Package with core composition, preview coordination, and fixture-backed demo modules
+- a generated Xcode project workflow driven by `project.yml`
+- developer scripts for local install and internal package generation
+- a minimal InputMethodKit shell for the Mode 1 demo path
+
+## Development
+
+- `make bootstrap` installs developer tools used by this repo
+- `make project` regenerates `BilineIME.xcodeproj`
+- `make test` runs package tests
+- `make build-ime` builds the input method app
+- `make install-ime` installs the app into `/Library/Input Methods`
+- `make package-internal` builds an unsigned internal `.pkg` for trusted testers
 
 # Roadmap
 

@@ -1,0 +1,22 @@
+[
+  { "surface": "你", "reading": "ni", "score": 980, "previewTranslation": "you" },
+  { "surface": "呢", "reading": "ni", "score": 760, "previewTranslation": "ne" },
+  { "surface": "妮", "reading": "ni", "score": 650, "previewTranslation": "girl" },
+  { "surface": "好", "reading": "hao", "score": 970, "previewTranslation": "good" },
+  { "surface": "号", "reading": "hao", "score": 800, "previewTranslation": "number" },
+  { "surface": "你好", "reading": "ni hao", "score": 1500, "previewTranslation": "hello" },
+  { "surface": "是", "reading": "shi", "score": 1500, "previewTranslation": "is" },
+  { "surface": "时", "reading": "shi", "score": 1400, "previewTranslation": "time" },
+  { "surface": "事", "reading": "shi", "score": 1300, "previewTranslation": "matter" },
+  { "surface": "市", "reading": "shi", "score": 1200, "previewTranslation": "city" },
+  { "surface": "使", "reading": "shi", "score": 1100, "previewTranslation": "make" },
+  { "surface": "世界", "reading": "shi jie", "score": 1400, "previewTranslation": "world" },
+  { "surface": "时间", "reading": "shi jian", "score": 1350, "previewTranslation": "time" },
+  { "surface": "中国", "reading": "zhong guo", "score": 1500, "previewTranslation": "China" },
+  { "surface": "我们", "reading": "wo men", "score": 1450, "previewTranslation": "we" },
+  { "surface": "翻译", "reading": "fan yi", "score": 1300, "previewTranslation": "translate" },
+  { "surface": "输入法", "reading": "shu ru fa", "score": 1250, "previewTranslation": "input method" },
+  { "surface": "双语", "reading": "shuang yu", "score": 1200, "previewTranslation": "bilingual" },
+  { "surface": "编写", "reading": "bian xie", "score": 1100, "previewTranslation": "write" },
+  { "surface": "测试", "reading": "ce shi", "score": 1000, "previewTranslation": "test" }
+]

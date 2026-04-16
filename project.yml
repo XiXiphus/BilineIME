@@ -1,0 +1,59 @@
+name: BilineIME
+
+options:
+  localPackagesGroup: ""
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: 6.0
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 0.1.0
+    CODE_SIGN_STYLE: Automatic
+    PRODUCT_NAME: BilineIME
+
+packages:
+  BilineModules:
+    path: .
+
+targets:
+  BilineIME:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - App
+    dependencies:
+      - sdk: InputMethodKit.framework
+      - package: BilineModules
+        product: BilineCore
+      - package: BilineModules
+        product: BilinePreview
+      - package: BilineModules
+        product: BilineMocks
+    info:
+      path: App/Support/Info.plist
+      properties:
+        NSPrincipalClass: "$(PRODUCT_MODULE_NAME).BilineManualApplication"
+        LSBackgroundOnly: true
+        InputMethodConnectionName: "$(PRODUCT_BUNDLE_IDENTIFIER)_Connection"
+        InputMethodServerControllerClass: "$(PRODUCT_MODULE_NAME).BilineInputController"
+        tsInputMethodCharacterRepertoireKey:
+          - Latn
+    entitlements:
+      path: App/Support/BilineIME.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.temporary-exception.mach-register.global-name: "$(PRODUCT_BUNDLE_IDENTIFIER)_Connection"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.xixiphus.inputmethod.BilineIME
+        SWIFT_STRICT_CONCURRENCY: minimal
+    postBuildScripts:
+      - name: Strip macOS metadata
+        script: |
+          if [ -d "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME" ]; then
+            xattr -cr "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME" || true
+          fi

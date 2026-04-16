@@ -29,7 +29,8 @@ Rather than forcing the user to manually select text, copy it, translate it, and
 This makes translation a reversible local edit rather than a separate tool or context switch.
 
 The goal is to support bilingual writing, language learning, and multilingual drafting with minimal interruption.
-<img width="1536" height="1024" alt="a5151a4e-c91c-4dde-9089-f1fa39920189" src="https://github.com/user-attachments/assets/241accd9-2a5b-4707-9f55-18b92fd9c95c" />
+<img width="1536" height="1024" alt="a5151a4e-c91c-4dde-9089-f1fa39920189" src="https://github.com/user-attachments/assets/09e01b0a-884e-4b07-9ee8-bbd3e045956b" />
+
 
 ## Why Two Modes?
 

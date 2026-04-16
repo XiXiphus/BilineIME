@@ -1,117 +1,195 @@
 # BilineIME
-<img width="502" height="502" alt="147cfc80751997b17ff9a1fdab82ad20" src="https://github.com/user-attachments/assets/93da38f4-0a86-4ba3-8c33-29ad3645cc1b" />
 
-BilineIME is an experimental Chinese input method for macOS that explores bilingual writing directly inside the input workflow.
+<!-- markdownlint-disable MD033 -->
+<p align="center">
+  <img width="120" alt="BilineIME logo" src="https://github.com/user-attachments/assets/93da38f4-0a86-4ba3-8c33-29ad3645cc1b" />
+</p>
 
-The project has two long-term interaction ideas, but the first implementation will focus only on **Mode 1**.
+<p align="center">
+  <strong>A macOS input method for bilingual thinking.</strong>
+</p>
 
-## Current Focus — Mode 1
+<p align="center">
+  Type Chinese. Glance at English. Stay in flow.
+</p>
 
-Mode 1 keeps Chinese composition as the primary input flow while showing a lightweight translation preview for the currently selected candidate:
+<p align="center">
+  🧪 Experimental · 🍎 macOS · ⌨️ Input Method Kit · 📝 MIT
+</p>
+<!-- markdownlint-enable MD033 -->
+
+---
+
+## ✨ What Is This?
+
+BilineIME is an experimental Chinese input method for macOS that explores bilingual writing **inside** the input workflow.
+
+The core idea is simple:
+
+- you type Chinese as usual
+- the input method shows you the current Chinese candidate
+- at the same time, it gives you a lightweight English preview
+
+No copy-paste.
+No app switching.
+No breaking your sentence halfway through just to check how it would sound in another language.
+
+## 🎯 Current Focus: Mode 1
+
+BilineIME has two long-term ideas, but the first implementation is focused on **Mode 1 only**.
+
+### Mode 1 = Translation Preview During Composition
 
 - first line: Chinese candidate text
 - second line: translated preview in a target language
 
-The goal is to help the user think bilingually without leaving the input method or interrupting normal Chinese typing.
+This is the version we are actively building.
 
+<!-- markdownlint-disable MD033 -->
 <p align="center">
   <img alt="BilineIME concept mockup" src="https://github.com/user-attachments/assets/241accd9-2a5b-4707-9f55-18b92fd9c95c" width="220" />
 </p>
+<!-- markdownlint-enable MD033 -->
 
-## Deferred Direction — Mode 2
+### Mode 2 = Reversible Translation Operator
 
-Mode 2 is still part of the product vision, but it is intentionally deferred until after Mode 1 works well.
+Mode 2 is still part of the product vision, but it is deliberately deferred.
 
-In that mode, typing `=` after a Chinese clause or sentence would translate the nearby text in place and allow reversible toggling between source and target. That interaction requires a different set of document-range and edit-session rules, so it is not part of the first implementation milestone.
+That mode would treat `=` as a local transform operator for nearby Chinese text, turning it into translated output and allowing toggling back and forth. It is interesting, but it belongs to a different interaction layer and adds a much heavier editing model.
 
-## Why Mode 1 First
+For now:
 
-- It validates the core idea of bilingual assistance inside the IME without taking on document rewrite semantics.
-- It stays inside the normal composition lifecycle of a macOS input method.
-- It lets the project test latency, candidate UI, and translation usefulness before designing reversible editing.
-- It creates a clean foundation for later deciding whether Mode 2 belongs inside the same IME or in a separate extension layer.
+- ✅ Mode 1 is in scope
+- ⏸️ Mode 2 is parked for later
 
-## Why Two Modes?
+## 🔥 Why This Exists
 
-These two modes serve different writing needs:
+Most translation workflows are awkward during writing:
 
-- **Mode 1** is preview-oriented: it helps the user think bilingually while still committing Chinese text.
-- **Mode 2** is transform-oriented: it lets the user quickly turn a Chinese draft into target-language text and revert back for further editing when needed.
+1. type something
+2. copy it
+3. leave the editor
+4. translate it
+5. come back
+6. try not to lose the sentence in your head
 
-Together, they frame BilineIME not only as an input method, but as an experimental bilingual writing interface.
+BilineIME is trying to collapse that loop into a single place: the input method itself.
 
-## Current Scope
+This project is for:
+
+- bilingual drafting
+- language learning
+- quick expression checking
+- writing without breaking cognitive flow
+
+## 🧭 Why Mode 1 First
+
+Mode 1 is the right first move because it:
+
+- validates the bilingual-writing idea without rewriting committed text
+- stays inside the normal macOS IME composition lifecycle
+- lets the project test latency, UI usefulness, and interaction quality early
+- creates a clean foundation before tackling the much harder Mode 2 editing semantics
+
+## ✅ v1 Scope
 
 - macOS only
 - Chinese input first
-- translation preview for the currently selected candidate
-- translation must never block input
+- preview translation for the currently selected candidate
+- translation must never block typing
 - debounce, caching, and stale-result suppression
 - target language setting
-- architecture prepared for Mode 2, but Mode 2 is not part of v1
+- architecture ready for future expansion, but still centered on Mode 1
 
-## Non-Goals For v1
+## 🚫 v1 Non-Goals
 
 - sentence-level reversible translation
-- `=` transform operator
+- the `=` transform operator
 - `Backspace`-driven reversion logic
 - bilingual commit mode
-- a custom candidate window before the stock IME candidate flow is validated
-- locking the project to a single translation provider
+- a custom candidate window before the stock IME path is validated
+- locking the project to one translation provider forever
 
-## Architecture
+## 🏗️ Current Repo State
 
-The implementation blueprint lives in `docs/architecture.md`.
+This repo already contains a real demo foundation:
 
-That document records:
+- a Swift Package for core composition, preview coordination, and fixture-backed demo logic
+- an InputMethodKit shell app for macOS
+- Xcode project generation via `project.yml`
+- scripts for local install and internal package generation
+- architecture, standards, and ADR docs to keep the repo from turning into a mess
 
-- the v1 product boundary
-- macOS InputMethodKit constraints
-- candidate UI and translation preview options
-- Chinese composition engine options
-- the recommended delivery path for a first working prototype
+The source of truth for the app project is:
 
-## Open-Source Attribution
+- `project.yml`
 
-This project may learn from earlier input methods, sample projects, and language-engine work, but it will reference them explicitly and conservatively.
+Generated artifacts such as:
 
-Rules for this repository:
+- `BilineIME.xcodeproj`
+- generated support plists
+
+are intentionally ignored and should be regenerated locally, not committed.
+
+## 🛠️ Development
+
+```bash
+make bootstrap
+make project
+make test
+make build-ime
+make install-ime
+make package-internal
+make verify
+```
+
+What they do:
+
+- `make bootstrap` installs developer tooling
+- `make project` regenerates the Xcode project
+- `make test` runs Swift Package tests
+- `make build-ime` builds the input method app
+- `make install-ime` installs it into `/Library/Input Methods`
+- `make package-internal` builds an unsigned internal `.pkg`
+- `make verify` runs tests plus a full Xcode build
+
+## 🧠 Architecture
+
+The implementation blueprint lives in:
+
+- `docs/architecture.md`
+
+The engineering rules live in:
+
+- `AGENTS.md`
+- `docs/standards/engineering.md`
+- `docs/standards/acceptance.md`
+- `docs/adr/`
+
+The high-level architecture direction is:
+
+- keep InputMethodKit glue thin
+- keep composition and preview logic in testable Swift Package modules
+- start with a thin local engine
+- keep a clean path toward a future `librime` adapter
+- use stock `IMKCandidates` + annotation before building custom candidate UI
+
+## 🤝 Open-Source Policy
+
+This project can learn from earlier work, but it does not hand-wave attribution.
+
+Rules:
 
 - every upstream project we study or integrate must be recorded in `THIRD_PARTY_NOTICES.md`
-- every bundled dependency or adapted code path must carry its original project name, URL, and license
-- reference-only projects and code-reuse candidates must be distinguished clearly
-- GPL-licensed projects may be studied as references, but their code will not be copied into this MIT-licensed repository unless the licensing decision changes explicitly
+- every adapted dependency or code path must keep its source and license visible
+- reference-only and reusable sources must be distinguished clearly
+- GPL projects may be studied, but their code will not be copied into this MIT repository unless the license strategy changes explicitly
 
-At the moment this repository contains no vendored third-party code yet; the notices file exists to keep that boundary explicit from the start.
+If you care about open-source hygiene, this repo does too.
 
-## Status
+## 🗺️ Roadmap
 
-Early-stage research prototype.
-
-The repository now contains:
-
-- a Swift Package with core composition, preview coordination, and fixture-backed demo modules
-- an Xcode project workflow driven by `project.yml`
-- developer scripts for local install and internal package generation
-- a minimal InputMethodKit shell for the Mode 1 demo path
-
-The canonical project definition is `project.yml`.
-
-Generated artifacts such as `BilineIME.xcodeproj` and generated support plists are intentionally ignored and should be regenerated locally instead of committed.
-
-## Development
-
-- `make bootstrap` installs developer tools used by this repo
-- `make project` regenerates `BilineIME.xcodeproj`
-- `make test` runs package tests
-- `make build-ime` builds the input method app
-- `make install-ime` installs the app into `/Library/Input Methods`
-- `make package-internal` builds an unsigned internal `.pkg` for trusted testers
-- `make verify` runs package tests and a full Xcode build
-
-# Roadmap
-
-## Phase 0 — Shell
+### Phase 0 — Shell
 
 - [ ] Create a minimal macOS InputMethodKit project
 - [ ] Register and enable the input method
@@ -119,7 +197,7 @@ Generated artifacts such as `BilineIME.xcodeproj` and generated support plists a
 - [ ] Show marked text and commit selected text
 - [ ] Prove the stock candidate UI loop works end to end
 
-## Phase 1 — Mode 1 Vertical Slice
+### Phase 1 — Mode 1 Vertical Slice
 
 - [ ] Produce simple Chinese candidates from a small local engine or mock engine
 - [ ] Display the current candidate with the system candidate UI
@@ -128,7 +206,7 @@ Generated artifacts such as `BilineIME.xcodeproj` and generated support plists a
 - [ ] Ignore stale translation results when selection changes
 - [ ] Add target-language configuration
 
-## Phase 2 — Mode 1 Hardening
+### Phase 2 — Mode 1 Hardening
 
 - [ ] Replace the mock engine with a real Chinese composition backend
 - [ ] Add debounce and memory cache for previews
@@ -136,9 +214,17 @@ Generated artifacts such as `BilineIME.xcodeproj` and generated support plists a
 - [ ] Test cross-app compatibility on common macOS editors
 - [ ] Evaluate whether the stock annotation UI is good enough or a custom bilingual panel is needed
 
-## Later Exploration
+### Later
 
 - [ ] Revisit Mode 2 as a separate architecture track
 - [ ] Add bilingual commit mode
 - [ ] Add custom glossary and user phrases
 - [ ] Improve cross-app compatibility and settings UX
+
+## 🚧 Status
+
+Early-stage research prototype.
+
+Still rough.
+Already real.
+Not pretending to be finished.

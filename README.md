@@ -15,7 +15,7 @@ Mode 1 keeps Chinese composition as the primary input flow while showing a light
 The goal is to help the user think bilingually without leaving the input method or interrupting normal Chinese typing.
 
 <p align="center">
-  <img alt="BilineIME concept mockup" src="https://github.com/user-attachments/assets/241accd9-2a5b-4707-9f55-18b92fd9c95c" width="420" />
+  <img alt="BilineIME concept mockup" src="https://github.com/user-attachments/assets/241accd9-2a5b-4707-9f55-18b92fd9c95c" width="220" />
 </p>
 
 ## Deferred Direction — Mode 2

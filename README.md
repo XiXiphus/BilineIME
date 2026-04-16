@@ -1,4 +1,5 @@
 # BilineIME
+<img width="502" height="502" alt="147cfc80751997b17ff9a1fdab82ad20" src="https://github.com/user-attachments/assets/93da38f4-0a86-4ba3-8c33-29ad3645cc1b" />
 
 BilineIME is an experimental Chinese input method for macOS that explores bilingual writing directly inside the input workflow.
 

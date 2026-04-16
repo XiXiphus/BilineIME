@@ -2,35 +2,31 @@
 
 BilineIME is an experimental Chinese input method for macOS that explores bilingual writing directly inside the input workflow.
 
-Instead of treating input methods as pure text entry tools, BilineIME explores two complementary interaction models:
+The project has two long-term interaction ideas, but the first implementation will focus only on **Mode 1**.
 
-## Mode 1 — Translation Preview During Composition
+## Current Focus — Mode 1
+
+Mode 1 keeps Chinese composition as the primary input flow while showing a lightweight translation preview for the currently selected candidate:
 
 - first line: Chinese candidate text
 - second line: translated preview in a target language
 
-This mode keeps the Chinese input flow intact while surfacing a lightweight translation preview for the currently selected candidate.
+The goal is to help the user think bilingually without leaving the input method or interrupting normal Chinese typing.
 
-## Mode 2 — Reversible Sentence-Level Translation
+<img width="1536" height="1024" alt="BilineIME concept mockup" src="https://github.com/user-attachments/assets/241accd9-2a5b-4707-9f55-18b92fd9c95c" />
 
-BilineIME also explores a second interaction model designed for bilingual drafting and fast rewriting.
+## Deferred Direction — Mode 2
 
-In this mode, the user can type `=` at the end of a Chinese clause or sentence to trigger translation for the text immediately before the caret.
+Mode 2 is still part of the product vision, but it is intentionally deferred until after Mode 1 works well.
 
-Rather than forcing the user to manually select text, copy it, translate it, and switch back, BilineIME treats `=` as a transform operator:
+In that mode, typing `=` after a Chinese clause or sentence would translate the nearby text in place and allow reversible toggling between source and target. That interaction requires a different set of document-range and edit-session rules, so it is not part of the first implementation milestone.
 
-- type Chinese normally
-- press `=` to translate the nearest Chinese clause before the caret
-- replace the Chinese text with the translated result
-- press `Backspace` to revert the translated block back to the original Chinese
-- press `=` again to toggle between source and target
-- type `==` to insert a literal `=`
+## Why Mode 1 First
 
-This makes translation a reversible local edit rather than a separate tool or context switch.
-
-The goal is to support bilingual writing, language learning, and multilingual drafting with minimal interruption.
-<img width="1536" height="1024" alt="a5151a4e-c91c-4dde-9089-f1fa39920189" src="https://github.com/user-attachments/assets/09e01b0a-884e-4b07-9ee8-bbd3e045956b" />
-
+- It validates the core idea of bilingual assistance inside the IME without taking on document rewrite semantics.
+- It stays inside the normal composition lifecycle of a macOS input method.
+- It lets the project test latency, candidate UI, and translation usefulness before designing reversible editing.
+- It creates a clean foundation for later deciding whether Mode 2 belongs inside the same IME or in a separate extension layer.
 
 ## Why Two Modes?
 
@@ -41,57 +37,88 @@ These two modes serve different writing needs:
 
 Together, they frame BilineIME not only as an input method, but as an experimental bilingual writing interface.
 
+<img width="1536" height="1024" alt="BilineIME modes concept" src="https://github.com/user-attachments/assets/09e01b0a-884e-4b07-9ee8-bbd3e045956b" />
+
 ## Current Scope
+
 - macOS only
 - Chinese input first
 - translation preview for the currently selected candidate
-- reversible translation triggered by `=`
-- focus on interaction quality, latency, and usability
+- translation must never block input
+- debounce, caching, and stale-result suppression
+- target language setting
+- architecture prepared for Mode 2, but Mode 2 is not part of v1
 
-## Interaction Notes
+## Non-Goals For v1
 
-### Translation Preview Mode
-- Chinese composition remains the primary input flow
-- translation is shown as a live preview for the currently selected candidate
-- translation should never block input
+- sentence-level reversible translation
+- `=` transform operator
+- `Backspace`-driven reversion logic
+- bilingual commit mode
+- a custom candidate window before the stock IME candidate flow is validated
+- locking the project to a single translation provider
 
-### Reversible Translation Mode
-- `=` triggers translation for the nearest Chinese clause before the caret
-- the translated text replaces the original Chinese text
-- `Backspace` at the end of the translated block reverts it to the original Chinese
-- pressing `=` again toggles between source and target
-- `==` inserts a literal `=`
-- the reversible session is dropped if the user moves too far away or edits the surrounding text substantially
+## Architecture
+
+The implementation blueprint lives in `docs/architecture.md`.
+
+That document records:
+
+- the v1 product boundary
+- macOS InputMethodKit constraints
+- candidate UI and translation preview options
+- Chinese composition engine options
+- the recommended delivery path for a first working prototype
+
+## Open-Source Attribution
+
+This project may learn from earlier input methods, sample projects, and language-engine work, but it will reference them explicitly and conservatively.
+
+Rules for this repository:
+
+- every upstream project we study or integrate must be recorded in `THIRD_PARTY_NOTICES.md`
+- every bundled dependency or adapted code path must carry its original project name, URL, and license
+- reference-only projects and code-reuse candidates must be distinguished clearly
+- GPL-licensed projects may be studied as references, but their code will not be copied into this MIT-licensed repository unless the licensing decision changes explicitly
+
+At the moment this repository contains no vendored third-party code yet; the notices file exists to keep that boundary explicit from the start.
 
 ## Status
+
 Early-stage research prototype.
+
+There is currently no implementation in this repository yet; the immediate goal is to turn the product idea into a concrete build plan for Mode 1.
 
 # Roadmap
 
-## Phase 1
-- [ ] Set up a minimal macOS IME project
+## Phase 0 — Shell
+
+- [ ] Create a minimal macOS InputMethodKit project
 - [ ] Register and enable the input method
 - [ ] Handle basic key events
-- [ ] Display simple Chinese candidates
-- [ ] Commit selected Chinese text
+- [ ] Show marked text and commit selected text
+- [ ] Prove the stock candidate UI loop works end to end
 
-## Phase 2
-- [ ] Add translation preview for current candidate
-- [ ] Add debounce and caching
-- [ ] Add target language settings
-- [ ] Ensure translation never blocks input
+## Phase 1 — Mode 1 Vertical Slice
 
-## Phase 3
-- [ ] Explore two-line candidate UI
-- [ ] Prototype reversible translation triggered by `=`
-- [ ] Detect the nearest clause before the caret
-- [ ] Replace Chinese text with translated output
-- [ ] Add revert behavior with `Backspace`
-- [ ] Add toggle behavior with repeated `=`
+- [ ] Produce simple Chinese candidates from a small local engine or mock engine
+- [ ] Display the current candidate with the system candidate UI
+- [ ] Trigger translation preview for the selected candidate
+- [ ] Keep translation requests fully asynchronous
+- [ ] Ignore stale translation results when selection changes
+- [ ] Add target-language configuration
 
-## Phase 4
+## Phase 2 — Mode 1 Hardening
+
+- [ ] Replace the mock engine with a real Chinese composition backend
+- [ ] Add debounce and memory cache for previews
+- [ ] Improve failure handling and fallback behavior
+- [ ] Test cross-app compatibility on common macOS editors
+- [ ] Evaluate whether the stock annotation UI is good enough or a custom bilingual panel is needed
+
+## Later Exploration
+
+- [ ] Revisit Mode 2 as a separate architecture track
 - [ ] Add bilingual commit mode
 - [ ] Add custom glossary and user phrases
-- [ ] Improve cross-app compatibility
-- [ ] Refine invalidation rules for reversible translation sessions
-- [ ] Evaluate whether preview mode and reversible mode should coexist or be user-switchable
+- [ ] Improve cross-app compatibility and settings UX

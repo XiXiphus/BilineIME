@@ -1,0 +1,483 @@
+# BilineIME Architecture Blueprint
+
+## Purpose
+
+This document turns the current product idea into a concrete implementation plan.
+
+It intentionally treats **Mode 1** as the only first-phase target:
+
+- Chinese composition remains the primary workflow
+- the currently selected Chinese candidate gets a translation preview
+- translation never blocks typing
+
+Mode 2 remains a later extension and is documented here only as a deferred architecture concern.
+
+## Product Boundary For v1
+
+### In Scope
+
+- a macOS input method built on InputMethodKit
+- Chinese composition with marked text and candidate selection
+- preview translation for the currently selected candidate
+- asynchronous translation requests
+- caching and stale-result suppression
+- a settings surface for target language and preview behavior
+
+### Out Of Scope
+
+- reversible sentence-level translation triggered by `=`
+- tracking committed document ranges after composition ends
+- backspace-driven restoration of earlier source text
+- rich bilingual commit formats
+- shipping a production-grade Chinese IME on day one
+
+## Facts That Shape The Design
+
+The following are platform facts, not project guesses:
+
+1. Apple's `InputMethodKit` provides the core macOS IME integration points through `IMKServer`, `IMKInputController`, and `IMKCandidates`.
+2. `IMKServer` creates an `IMKInputController` for each input session, so composition state is naturally session-scoped.
+3. `IMKCandidates` is optional, but when used it notifies the input controller through `candidateSelectionChanged:` and `candidateSelected:`.
+4. Apple QA1644 shows that the stock `IMKCandidates` flow can display per-candidate annotation strings as `NSAttributedString`.
+5. The client side of composition is still based on marked-text semantics through `NSTextInputClient`, where marked text and committed text are separate states.
+
+These facts lead to three immediate design conclusions:
+
+- Mode 1 should stay inside the normal composition lifecycle rather than edit already committed document text.
+- The first prototype should use the stock IME candidate path before attempting a custom bilingual candidate window.
+- Session-local composition state and app-wide shared services should be separated from the start.
+
+## Decision Summary
+
+| Area | Decision For First Blueprint | Why |
+| --- | --- | --- |
+| IME host | Native macOS `InputMethodKit` app in Swift/AppKit | This is the canonical integration path on macOS. |
+| Candidate UI | System `IMKCandidates` plus annotation preview first | Fastest way to validate the interaction with real IME behavior. |
+| Chinese engine | Use a pluggable engine interface; start with a simple local engine or mock, but leave a clean path to a mature backend | The interaction can be validated before solving full Chinese IME quality. |
+| Durable engine target | Prefer a mature adapter such as `librime` if the goal becomes daily-usable Chinese input | Avoids rebuilding a full Chinese IME from scratch. |
+| Translation provider | Protocol-based async provider with cache and cancellation | Keeps preview logic independent from vendor or transport. |
+| Process model | Single process first; XPC helper only if later required by sandboxing, distribution, or stability concerns | Avoid early complexity. |
+
+## Attribution And License Policy
+
+This project is MIT-licensed, so upstream reuse must be intentional and documented.
+
+The project will use four different labels for external work:
+
+| Label | Meaning | Required action |
+| --- | --- | --- |
+| Documentation reference | Apple docs, Q&A pages, API references | Cite in docs when they shape behavior or architecture. |
+| Architecture reference | Another project's high-level structure or delivery approach informed a design choice | Record in `THIRD_PARTY_NOTICES.md` as reference-only. |
+| Code adaptation candidate | Small snippets, bootstrap patterns, or implementation ideas may be adapted | Record source, license, and touched files before landing code. |
+| Bundled dependency | Upstream library or engine shipped with or linked into BilineIME | Preserve original license/notice files and document scope of use. |
+
+Practical rules:
+
+- never copy code from a project unless its license is compatible with BilineIME's MIT license or the repository license is deliberately changed
+- keep GPL projects as reference-only unless the licensing strategy is revisited explicitly
+- when adapting code from a permissive project, keep the source project and license visible in both `THIRD_PARTY_NOTICES.md` and the relevant implementation area
+- if a future commit vendors a third-party component, that commit must update notices in the same change
+
+Current implications for the projects already referenced in this blueprint:
+
+- `librime` is BSD-3-Clause and is a viable future dependency candidate
+- Squirrel is GPL-3.0 and should be treated as an architecture reference, not a copy source, under the current MIT license
+- `libpinyin` is GPL-3.0 and should also stay reference-only unless licensing changes
+- `IMKitSample_2021` and `pinyinIME` are permissively licensed references and may be adapted only with explicit attribution
+
+## Option Analysis
+
+### 1. How To Build The Chinese Composition Engine
+
+#### Option A: Build A Minimal Engine From Scratch
+
+Pros:
+
+- smallest conceptual surface
+- full control over composition and ranking behavior
+- easiest way to get a shell prototype running
+
+Cons:
+
+- Chinese IME quality becomes the main project instead of bilingual preview
+- candidate quality, segmentation, learning, and dictionaries become a large parallel effort
+- likely needs replacement before the project is usable beyond demos
+
+Use when:
+
+- the immediate goal is only to validate the IME event loop and preview interaction
+
+#### Option B: Integrate `librime`
+
+Pros:
+
+- mature open-source input method core
+- explicit support for Chinese input method scenarios
+- existing macOS frontend precedent through Squirrel
+- BSD-3-Clause core is friendlier than GPL-based alternatives for downstream flexibility
+
+Cons:
+
+- heavier dependency and build setup
+- its schema/configuration model is more complex than a tiny prototype needs
+- adaptation work is still non-trivial
+
+Use when:
+
+- the project wants a realistic path from prototype to a usable Chinese IME
+
+#### Option C: Use A Smaller Sidecar Engine Such As `pinyinIME`
+
+Pros:
+
+- small and easy to understand
+- explicit support for HTTP-sidecar integration with native IME frontends
+- useful for rapid experimentation
+
+Cons:
+
+- adds Python/runtime and local HTTP process complexity
+- weaker long-term macOS-native story than a direct native engine
+- becomes another moving part before the product interaction is proven
+
+Use when:
+
+- the project values iteration speed over native purity for early experiments
+
+#### Recommendation
+
+Use a **two-step path**:
+
+1. Build the IME shell against a very small local engine or mock engine.
+2. Keep the engine behind a protocol so the project can later swap in `librime` without rewriting UI, session, or preview logic.
+
+This keeps the first milestone small while preserving a serious long-term path.
+
+### 2. How To Show The Translation Preview
+
+#### Option A: Use `IMKCandidates` And Candidate Annotation
+
+Pros:
+
+- aligns with the stock IME composition loop
+- low implementation risk
+- selected-candidate updates already map well to translation preview updates
+- enough to validate whether previewing the selected candidate is helpful
+
+Cons:
+
+- may not look exactly like a custom two-line bilingual list
+- annotation layout and polish are constrained by system UI
+
+#### Option B: Build A Custom Candidate Panel Immediately
+
+Pros:
+
+- exact control over two-line layout, typography, hierarchy, and motion
+- easier to represent candidate plus translation as a single designed unit
+
+Cons:
+
+- significantly higher UI and positioning complexity
+- more chances of app-specific compatibility problems
+- risks spending effort on presentation before proving the interaction
+
+#### Recommendation
+
+Start with **Option A**.
+
+If the stock annotation path proves too visually weak or too detached from the selected row, then move to a custom bilingual panel in a later phase. The first blueprint should not assume that custom UI is mandatory.
+
+### 3. How To Execute Translation Requests
+
+#### Option A: In-Process Provider
+
+Pros:
+
+- simpler architecture
+- easiest path for a prototype
+- lower integration overhead
+
+Cons:
+
+- network errors or slow provider code live in the IME process
+- may need refactoring if sandboxing or distribution constraints appear later
+
+#### Option B: XPC Helper
+
+Pros:
+
+- isolates network and model execution work
+- cleaner process boundaries
+- better long-term stability if translation becomes complex
+
+Cons:
+
+- more moving parts
+- more packaging and debugging overhead
+- too much complexity for the first vertical slice
+
+#### Recommendation
+
+Start with **Option A**, but keep translation behind a protocol and coordinator boundary so an XPC helper can be added later without rewriting the input controller.
+
+## Recommended Architecture
+
+## High-Level Structure
+
+```text
+InputMethod App Bundle
+  AppDelegate / Bootstrap
+  SessionController (IMKInputController)
+  CandidateUIAdapter (IMKCandidates + annotation)
+  Menu / Preferences bridge
+
+Core Domain
+  CompositionSession
+  CandidateEngine protocol
+  PreviewCoordinator
+  TranslationProvider protocol
+  TranslationCache
+  SettingsStore
+
+Future Optional Layer
+  TranslationHelperXPC
+  CustomBilingualPanel
+  Real engine adapter (for example librime)
+```
+
+### Responsibilities
+
+#### `SessionController`
+
+- owns one active composition session per IME session
+- receives key events and composition callbacks
+- updates marked text and candidate UI
+- commits the selected candidate
+- forwards selection changes to the preview coordinator
+
+#### `CompositionSession`
+
+- stores raw input buffer
+- stores current candidate list and selected index
+- knows whether marked text is active
+- exposes state transitions for typing, paging, selection, commit, and cancel
+
+This should be a plain Swift domain object, not a UI object.
+
+#### `CandidateEngine`
+
+- turns the raw phonetic input into Chinese candidates
+- can be backed by a mock implementation first
+- later can be backed by a mature engine adapter
+
+Important rule:
+
+The session controller should not know whether candidates came from a mock engine, a native engine, or a sidecar service.
+
+#### `PreviewCoordinator`
+
+- listens to candidate selection changes
+- computes preview request keys
+- debounces rapid selection movement
+- checks cache first
+- launches async translation tasks
+- drops late results if the session token or selection token has changed
+
+#### `TranslationProvider`
+
+- translates a Chinese candidate string into the target language
+- reports success, timeout, or failure
+- does not know about IME state or candidate UI
+
+#### `TranslationCache`
+
+- keyed by source text + target language + provider identifier
+- memory cache first
+- optional disk cache later if repeated phrases matter enough
+
+## Runtime Flow
+
+### Normal Composition
+
+1. The user types phonetic input.
+2. `SessionController` forwards input to `CompositionSession`.
+3. `CompositionSession` asks the active `CandidateEngine` for candidates.
+4. `SessionController` updates marked text and refreshes `IMKCandidates`.
+5. The selected candidate becomes the preview source.
+6. `PreviewCoordinator` checks cache and schedules an async translation if needed.
+7. When translation returns, the preview is shown as the annotation for the currently selected candidate.
+8. If the user changes selection before the translation returns, the old result is ignored.
+
+### Commit
+
+1. The user confirms a candidate.
+2. The Chinese candidate is committed to the client document.
+3. Marked text is cleared.
+4. Candidate UI and preview UI are dismissed.
+5. The preview session state is reset.
+
+### Failure Cases
+
+- If translation is slow, keep Chinese input responsive and show no preview yet.
+- If translation fails, keep composition intact and optionally show a lightweight failure state or nothing at all.
+- If the cache has a stale-but-valid preview, it may be shown immediately while a refresh happens in the background, but only if that does not cause UI flicker.
+
+## State Model
+
+The first implementation should use explicit state instead of ad hoc booleans.
+
+### Composition State
+
+Suggested fields:
+
+- `rawInput`
+- `markedText`
+- `candidates`
+- `selectedIndex`
+- `pageIndex`
+- `isComposing`
+
+### Preview State
+
+Suggested states:
+
+- `idle`
+- `loading(requestKey, token)`
+- `ready(requestKey, previewText)`
+- `failed(requestKey)`
+
+### Stale Result Rule
+
+Every async translation request must carry:
+
+- session identifier
+- selection version
+- request key
+
+A result may update UI only if all three still match current state.
+
+This rule is critical. Without it, fast candidate navigation will show the wrong translation under the wrong candidate.
+
+## Delivery Plan
+
+### Milestone 1: IME Shell
+
+- create the InputMethodKit bundle
+- register the input source
+- show marked text
+- show candidates from a tiny local engine or fixed candidate source
+- commit selected Chinese text
+
+Success condition:
+
+The input method works like a real IME even without translation.
+
+### Milestone 2: Mode 1 Vertical Slice
+
+- add `PreviewCoordinator`
+- add async `TranslationProvider`
+- show selected-candidate preview through annotation
+- ignore stale results
+- add target language setting
+
+Success condition:
+
+Typing and candidate navigation stay responsive while the selected candidate gains a preview translation.
+
+### Milestone 3: Hardening
+
+- add cache and debounce
+- improve failure handling
+- add test coverage for state transitions
+- run cross-app manual verification
+- decide whether stock annotation UI is sufficient
+
+Success condition:
+
+The feature feels stable enough to evaluate as a real writing aid, not just a demo.
+
+### Milestone 4: Real Engine Upgrade
+
+- replace the toy engine with a real backend
+- keep the rest of the stack unchanged except for the engine adapter
+
+Success condition:
+
+Chinese input quality improves without architectural rewrites to the preview stack.
+
+## Testing Strategy
+
+### Unit Tests
+
+- composition state transitions
+- candidate selection and pagination
+- stale-result suppression
+- cache hits and misses
+- preview state transitions for success, timeout, and failure
+
+### Manual Smoke Matrix
+
+At minimum test:
+
+- TextEdit
+- Notes
+- Safari search fields
+- Xcode or VS Code
+- one terminal app
+
+The goal is to catch marked-text and candidate-window behavior differences across client apps early.
+
+## Why Mode 2 Is Deferred
+
+Mode 2 looks related on the surface, but architecturally it is different.
+
+Mode 1 lives inside composition.
+Mode 2 edits already-formed document text near the caret.
+
+That means Mode 2 needs additional machinery:
+
+- clause detection before the caret
+- reversible mapping between source text and translated text
+- rules for invalidating a reversible edit session
+- backspace and repeated-operator semantics
+- potentially more surrounding-text awareness than the composition-only path needs
+
+If Mode 2 is mixed into the first milestone, the project will blur two separate systems:
+
+- an IME composition preview system
+- a local document transformation system
+
+The correct blueprint is to finish Mode 1 first, then decide whether Mode 2 belongs:
+
+- inside the same IME session model
+- inside a helper/editor integration layer
+- or in a separate tool entirely
+
+## Open Questions
+
+These are intentionally left open until implementation begins:
+
+- Should the first real engine target simplified Chinese only, or simplified and traditional from the start?
+- Is the selected-candidate preview enough, or does the user really need a visually integrated two-line candidate row?
+- Which translation backend should be used first: mock glossary, local model, or remote API?
+- What latency threshold still feels acceptable for preview usefulness?
+- Does the first settings surface live inside the IME menu only, or should it have a separate preferences window?
+
+## References
+
+Primary platform references:
+
+- Apple InputMethodKit overview: <https://developer.apple.com/documentation/inputmethodkit>
+- Apple `IMKInputController`: <https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller>
+- Apple `IMKCandidates`: <https://developer.apple.com/documentation/inputmethodkit/imkcandidates>
+- Apple `NSTextInputClient`: <https://developer.apple.com/documentation/appkit/nstextinputclient>
+- Apple QA1644 on candidate annotations: <https://developer.apple.com/library/archive/qa/qa1644/_index.html>
+
+Project and ecosystem references used for option analysis:
+
+- `librime`: <https://github.com/rime/librime>
+- Squirrel (Rime frontend for macOS): <https://github.com/rime/squirrel>
+- `libpinyin`: <https://github.com/libpinyin/libpinyin>
+- `pinyinIME`: <https://pypi.org/project/pinyinIME/>
+- IMKit sample project: <https://github.com/ensan-hcl/macOS_IMKitSample_2021>

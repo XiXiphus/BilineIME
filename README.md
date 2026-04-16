@@ -37,8 +37,6 @@ These two modes serve different writing needs:
 
 Together, they frame BilineIME not only as an input method, but as an experimental bilingual writing interface.
 
-<img width="1536" height="1024" alt="BilineIME modes concept" src="https://github.com/user-attachments/assets/09e01b0a-884e-4b07-9ee8-bbd3e045956b" />
-
 ## Current Scope
 
 - macOS only

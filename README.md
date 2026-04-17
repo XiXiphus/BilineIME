@@ -47,8 +47,9 @@ This is the version we are actively building.
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img alt="BilineIME concept mockup" src="https://github.com/user-attachments/assets/241accd9-2a5b-4707-9f55-18b92fd9c95c" width="220" />
+<img width="500" height="100" alt="image" src="https://github.com/user-attachments/assets/c82b595c-3b4f-496d-85dc-4e5043728cd1" />
 </p>
+<p align="center">
 <!-- markdownlint-enable MD033 -->
 
 ### Mode 2 = Reversible Translation Operator

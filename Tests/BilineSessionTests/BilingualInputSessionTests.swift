@@ -31,6 +31,18 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.selectedFlatIndex, 1)
     }
 
+    func testCompactPresentationDoesNotPadCandidatesToFiveColumns() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "ni")
+
+        XCTAssertEqual(session.snapshot.presentationMode, .compact)
+        XCTAssertEqual(session.snapshot.items.count, 3)
+        XCTAssertEqual(session.snapshot.visibleRowCount, 1)
+        XCTAssertEqual(session.snapshot.items(inRow: 0).map(\.candidate.surface), ["你", "呢", "妮"])
+        XCTAssertNil(session.snapshot.item(row: 0, column: 3))
+    }
+
     func testExpandedNavigationMovesByRowsAndColumns() {
         let session = DemoFixtures.makeBilingualSession(
             compactColumnCount: 2,
@@ -66,6 +78,20 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.selectedColumn, 1)
         XCTAssertEqual(session.snapshot.selectedFlatIndex, 1)
         XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "时")
+    }
+
+    func testExpandedPresentationShowsSecondRowWhenPageHasMoreThanFiveCandidates() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        XCTAssertEqual(session.snapshot.items.count, 10)
+        XCTAssertEqual(session.snapshot.visibleRowCount, 1)
+
+        session.togglePresentationMode()
+
+        XCTAssertEqual(session.snapshot.presentationMode, .expanded)
+        XCTAssertEqual(session.snapshot.visibleRowCount, 2)
+        XCTAssertEqual(session.snapshot.items(inRow: 1).map(\.candidate.surface), ["识", "诗", "十", "史", "食"])
     }
 
     func testEnglishCommitUsesReadyPreviewText() async {

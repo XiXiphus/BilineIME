@@ -7,7 +7,7 @@ This document turns the current product idea into a concrete implementation plan
 It intentionally treats **Mode 1** as the only first-phase target:
 
 - Chinese composition remains the primary workflow
-- candidates are rendered as a bilingual matrix: compact `2x5`, expanded `5x5`
+- candidates are rendered as a bilingual matrix: compact mode shows up to `2x5`, expanded mode shows up to `5x5`
 - `Shift` toggles the active commit layer between Chinese and English
 - `+` expands or collapses the current candidate page
 - translation never blocks typing
@@ -403,7 +403,7 @@ The input method works like a real IME even without translation.
 - add `PreviewCoordinator`
 - add async `TranslationProvider`
 - show a custom bilingual candidate panel for the visible page
-- support compact `2x5` and expanded `5x5` presentation for the same page
+- support compact and expanded presentation for the same page, with at most `5` columns and at most `5` rows per page
 - support `Shift`-based layer switching, `+` expansion, and active-layer commit
 - ignore stale results
 - add target language setting

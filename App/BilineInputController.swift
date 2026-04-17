@@ -5,15 +5,28 @@ import BilinePreview
 import BilineSession
 import Cocoa
 @preconcurrency import InputMethodKit
+import OSLog
 
 @objc(BilineInputController)
 final class BilineInputController: IMKInputController {
+    private struct RoutedKeySignature: Equatable {
+        let keyCode: UInt16
+        let text: String
+        let modifiersRawValue: Int
+        let timestamp: TimeInterval
+    }
+
     private let inputSession: BilingualInputSession
     private let candidatePanel = BilineCandidatePanelController()
     private let textInputBridge = BilineTextInputBridge()
     private let eventRouter = InputControllerEventRouter()
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
+        category: "input-controller"
+    )
 
     private weak var activeClient: AnyObject?
+    private var lastHandledKeySignature: RoutedKeySignature?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let settingsStore = DefaultSettingsStore()
@@ -44,6 +57,48 @@ final class BilineInputController: IMKInputController {
         Bundle.main.object(forInfoDictionaryKey: "ComponentInputModeDict") as? [AnyHashable: Any]
     }
 
+    override func inputText(
+        _ string: String!,
+        key keyCode: Int,
+        modifiers flags: Int,
+        client sender: Any!
+    ) -> Bool {
+        guard let client = sender as? IMKTextInput else {
+            return false
+        }
+
+        let text = string ?? ""
+        let modifiers = modifierFlags(fromRawValue: flags)
+        let signature = RoutedKeySignature(
+            keyCode: UInt16(truncatingIfNeeded: keyCode),
+            text: text,
+            modifiersRawValue: modifiers.rawValue,
+            timestamp: ProcessInfo.processInfo.systemUptime
+        )
+
+        if shouldSuppressDuplicate(signature) {
+            return true
+        }
+
+        let handled = routeAndApply(
+            event: InputControllerEvent(
+                type: .keyDown,
+                keyCode: UInt16(truncatingIfNeeded: keyCode),
+                characters: text,
+                charactersIgnoringModifiers: text,
+                modifierFlags: modifiers
+            ),
+            client: client,
+            loggingSource: "inputText"
+        )
+
+        if handled {
+            rememberHandled(signature)
+        }
+
+        return handled
+    }
+
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         guard let event, let client = sender as? IMKTextInput else {
             return false
@@ -55,7 +110,19 @@ final class BilineInputController: IMKInputController {
             activeClient = clientObject
         }
 
-        let action = eventRouter.route(
+        if event.type == .keyDown {
+            let signature = RoutedKeySignature(
+                keyCode: event.keyCode,
+                text: event.characters ?? event.charactersIgnoringModifiers ?? "",
+                modifiersRawValue: modifierFlags(from: event).rawValue,
+                timestamp: ProcessInfo.processInfo.systemUptime
+            )
+            if shouldSuppressDuplicate(signature) {
+                return true
+            }
+        }
+
+        return routeAndApply(
             event: InputControllerEvent(
                 type: event.type == .flagsChanged ? .flagsChanged : .keyDown,
                 keyCode: event.keyCode,
@@ -63,45 +130,9 @@ final class BilineInputController: IMKInputController {
                 charactersIgnoringModifiers: event.charactersIgnoringModifiers,
                 modifierFlags: modifierFlags(from: event)
             ),
-            state: InputControllerState(
-                isComposing: inputSession.snapshot.isComposing,
-                canDeleteBackward: inputSession.canDeleteBackward,
-                hasCandidates: inputSession.hasCandidates,
-                compactColumnCount: inputSession.snapshot.compactColumnCount
-            )
+            client: client,
+            loggingSource: "handle"
         )
-
-        switch action {
-        case .passThrough:
-            return false
-        case .consume:
-            return true
-        case .append(let text):
-            inputSession.append(text: text)
-        case .deleteBackward:
-            inputSession.deleteBackward()
-        case .commit:
-            return commitSelection(using: client)
-        case .cancel:
-            inputSession.cancel()
-            textInputBridge.clearAnchorCache()
-        case .moveColumn(let direction):
-            inputSession.moveColumn(direction)
-        case .moveRow(let direction):
-            inputSession.moveRow(direction)
-        case .turnPage(let direction):
-            inputSession.turnPage(direction)
-        case .toggleLayer:
-            inputSession.toggleActiveLayer()
-        case .togglePresentation:
-            inputSession.togglePresentationMode()
-        case .selectColumn(let columnIndex):
-            inputSession.selectColumn(at: columnIndex)
-            return commitSelection(using: client)
-        }
-
-        render(client: client)
-        return true
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -112,6 +143,7 @@ final class BilineInputController: IMKInputController {
         textInputBridge.clearAnchorCache()
         candidatePanel.hide()
         eventRouter.reset()
+        lastHandledKeySignature = nil
         activeClient = nil
         super.deactivateServer(sender)
     }
@@ -159,5 +191,91 @@ final class BilineInputController: IMKInputController {
             flags.insert(.command)
         }
         return flags
+    }
+
+    private func modifierFlags(fromRawValue rawValue: Int) -> InputModifierFlags {
+        let cocoaFlags = NSEvent.ModifierFlags(rawValue: UInt(rawValue))
+        var flags: InputModifierFlags = []
+        if cocoaFlags.contains(.shift) {
+            flags.insert(.shift)
+        }
+        if cocoaFlags.contains(.command) {
+            flags.insert(.command)
+        }
+        return flags
+    }
+
+    private func routeAndApply(
+        event: InputControllerEvent,
+        client: IMKTextInput,
+        loggingSource: StaticString
+    ) -> Bool {
+        let action = eventRouter.route(
+            event: event,
+            state: InputControllerState(
+                isComposing: inputSession.snapshot.isComposing,
+                canDeleteBackward: inputSession.canDeleteBackward,
+                hasCandidates: inputSession.hasCandidates,
+                compactColumnCount: inputSession.snapshot.compactColumnCount,
+                isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded
+            )
+        )
+
+        #if DEBUG
+            if inputSession.snapshot.isComposing, action == .passThrough {
+                logger.info(
+                    "[\(loggingSource, privacy: .public)] unhandled composing event type=\(String(describing: event.type), privacy: .public) keyCode=\(event.keyCode) chars=\(event.characters ?? "", privacy: .public) charsIgnoring=\(event.charactersIgnoringModifiers ?? "", privacy: .public) modifiers=\(event.modifierFlags.rawValue)"
+                )
+            }
+        #endif
+
+        switch action {
+        case .passThrough:
+            return false
+        case .consume:
+            return true
+        case .append(let text):
+            inputSession.append(text: text)
+        case .deleteBackward:
+            inputSession.deleteBackward()
+        case .commit:
+            return commitSelection(using: client)
+        case .cancel:
+            inputSession.cancel()
+            textInputBridge.clearAnchorCache()
+        case .moveColumn(let direction):
+            inputSession.moveColumn(direction)
+        case .moveRow(let direction):
+            inputSession.moveRow(direction)
+        case .turnPage(let direction):
+            inputSession.turnPage(direction)
+        case .toggleLayer:
+            inputSession.toggleActiveLayer()
+        case .togglePresentation:
+            inputSession.togglePresentationMode()
+        case .selectColumn(let columnIndex):
+            inputSession.selectColumn(at: columnIndex)
+            return commitSelection(using: client)
+        }
+
+        render(client: client)
+        return true
+    }
+
+    private func shouldSuppressDuplicate(_ signature: RoutedKeySignature) -> Bool {
+        guard let previous = lastHandledKeySignature else {
+            return false
+        }
+
+        let isFresh = signature.timestamp - previous.timestamp < 0.05
+        let matches = signature.keyCode == previous.keyCode
+            && signature.text == previous.text
+            && signature.modifiersRawValue == previous.modifiersRawValue
+        lastHandledKeySignature = nil
+        return isFresh && matches
+    }
+
+    private func rememberHandled(_ signature: RoutedKeySignature) {
+        lastHandledKeySignature = signature
     }
 }

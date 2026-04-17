@@ -14,7 +14,8 @@
 
 ## App shell
 
-- The custom candidate panel renders a compact `2x5` matrix and an expanded `5x5` candidate grid for the current page.
+- The custom candidate panel renders up to `5` columns per row and up to `5` rows per page for the current candidate page.
+- Compact mode shows only the first visible row; expanded mode shows all real rows on the current page, without padding empty cells or rows.
 - Each candidate cell keeps Chinese on the top line and English on the bottom line, with strict left alignment inside the same column.
 - The custom candidate panel anchors to the host-provided line-height rectangle.
 - When the host does not provide a fresh valid caret rect, the candidate panel may reuse the current session's last valid rect, but never falls back to mouse position.

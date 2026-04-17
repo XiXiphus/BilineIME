@@ -99,11 +99,11 @@ private final class BilineCandidatePanelView: NSView {
 
         let widths = columnWidths()
         let rowCount = max(1, snapshot.visibleRowCount)
+        let widestRowWidth = (0..<rowCount)
+            .map { row in totalWidth(forRow: row, columnWidths: widths) }
+            .max() ?? 0
         let width = contentInsets.left
-            + rowInsets.left
-            + widths.reduce(0, +)
-            + CGFloat(max(0, widths.count - 1)) * columnSpacing
-            + rowInsets.right
+            + widestRowWidth
             + contentInsets.right
         let height = contentInsets.top
             + CGFloat(rowCount) * groupHeight
@@ -138,11 +138,14 @@ private final class BilineCandidatePanelView: NSView {
     }
 
     private func columnWidths() -> [CGFloat] {
-        guard snapshot.compactColumnCount > 0 else { return [] }
+        let maxVisibleColumns = (0..<snapshot.visibleRowCount)
+            .map { snapshot.items(inRow: $0).count }
+            .max() ?? 0
+        guard maxVisibleColumns > 0 else { return [] }
 
-        var widths = Array(repeating: CGFloat.zero, count: snapshot.compactColumnCount)
+        var widths = Array(repeating: CGFloat.zero, count: maxVisibleColumns)
 
-        for column in 0..<snapshot.compactColumnCount {
+        for column in 0..<maxVisibleColumns {
             for row in 0..<snapshot.visibleRowCount {
                 guard let item = snapshot.item(row: row, column: column) else { continue }
                 let chineseWidth = candidateLine(column: column, item: item, active: false).size().width
@@ -163,10 +166,7 @@ private final class BilineCandidatePanelView: NSView {
 
     private func drawCandidateGroup(row: Int, columnWidths: [CGFloat]) {
         let originY = contentInsets.top + CGFloat(row) * (groupHeight + groupSpacing)
-        let totalWidth = rowInsets.left
-            + columnWidths.reduce(0, +)
-            + CGFloat(max(0, columnWidths.count - 1)) * columnSpacing
-            + rowInsets.right
+        let totalWidth = totalWidth(forRow: row, columnWidths: columnWidths)
         let chineseRowRect = NSRect(
             x: contentInsets.left,
             y: originY,
@@ -184,7 +184,8 @@ private final class BilineCandidatePanelView: NSView {
         drawRowContainer(in: englishRowRect)
 
         var originX = chineseRowRect.minX + rowInsets.left
-        for column in 0..<snapshot.compactColumnCount {
+        let rowColumnCount = snapshot.items(inRow: row).count
+        for column in 0..<rowColumnCount {
             let width = columnWidths[column]
             let segmentRect = NSRect(x: originX, y: 0, width: width, height: 0)
 
@@ -227,6 +228,19 @@ private final class BilineCandidatePanelView: NSView {
 
             originX += width + columnSpacing
         }
+    }
+
+    private func totalWidth(forRow row: Int, columnWidths: [CGFloat]) -> CGFloat {
+        let rowColumnCount = snapshot.items(inRow: row).count
+        guard rowColumnCount > 0 else {
+            return rowInsets.left + rowInsets.right
+        }
+
+        let rowWidths = columnWidths.prefix(rowColumnCount)
+        return rowInsets.left
+            + rowWidths.reduce(0, +)
+            + CGFloat(max(0, rowColumnCount - 1)) * columnSpacing
+            + rowInsets.right
     }
 
     private func drawRowContainer(in rect: NSRect) {

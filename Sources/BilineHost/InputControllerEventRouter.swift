@@ -44,17 +44,20 @@ public struct InputControllerState: Sendable, Equatable {
     public let canDeleteBackward: Bool
     public let hasCandidates: Bool
     public let compactColumnCount: Int
+    public let isExpandedPresentation: Bool
 
     public init(
         isComposing: Bool,
         canDeleteBackward: Bool,
         hasCandidates: Bool,
-        compactColumnCount: Int
+        compactColumnCount: Int,
+        isExpandedPresentation: Bool = false
     ) {
         self.isComposing = isComposing
         self.canDeleteBackward = canDeleteBackward
         self.hasCandidates = hasCandidates
         self.compactColumnCount = max(1, compactColumnCount)
+        self.isExpandedPresentation = isExpandedPresentation
     }
 }
 
@@ -74,6 +77,23 @@ public enum InputControllerAction: Sendable, Equatable {
 }
 
 public final class InputControllerEventRouter: @unchecked Sendable {
+    private enum KeyBinding {
+        static let returnKey: UInt16 = 36
+        static let space: UInt16 = 49
+        static let deleteBackward: UInt16 = 51
+        static let escape: UInt16 = 53
+        static let leftArrow: UInt16 = 123
+        static let rightArrow: UInt16 = 124
+        static let downArrow: UInt16 = 125
+        static let upArrow: UInt16 = 126
+        static let pageUp: UInt16 = 116
+        static let pageDown: UInt16 = 121
+        static let equal: UInt16 = 24
+        static let keypadPlus: UInt16 = 69
+        static let leftShift: UInt16 = 56
+        static let rightShift: UInt16 = 60
+    }
+
     private var isShiftPressed = false
     private var shiftUsedAsModifier = false
 
@@ -108,23 +128,29 @@ public final class InputControllerEventRouter: @unchecked Sendable {
         }
 
         switch event.keyCode {
-        case 36, 49:
+        case KeyBinding.returnKey, KeyBinding.space:
             return state.isComposing ? .commit : .passThrough
-        case 51:
+        case KeyBinding.deleteBackward:
             return state.isComposing && state.canDeleteBackward ? .deleteBackward : .passThrough
-        case 53:
+        case KeyBinding.escape:
             return state.isComposing ? .cancel : .passThrough
-        case 123:
+        case KeyBinding.leftArrow:
             return state.isComposing ? .moveColumn(.previous) : .passThrough
-        case 124:
+        case KeyBinding.rightArrow:
             return state.isComposing ? .moveColumn(.next) : .passThrough
-        case 126:
-            return state.isComposing ? .moveRow(.previous) : .passThrough
-        case 125:
-            return state.isComposing ? .moveRow(.next) : .passThrough
-        case 116:
+        case KeyBinding.upArrow:
+            guard state.isComposing, state.isExpandedPresentation else {
+                return .passThrough
+            }
+            return .moveRow(.previous)
+        case KeyBinding.downArrow:
+            guard state.isComposing, state.isExpandedPresentation else {
+                return .passThrough
+            }
+            return .moveRow(.next)
+        case KeyBinding.pageUp:
             return state.isComposing ? .turnPage(.previous) : .passThrough
-        case 121:
+        case KeyBinding.pageDown:
             return state.isComposing ? .turnPage(.next) : .passThrough
         default:
             break
@@ -149,7 +175,7 @@ public final class InputControllerEventRouter: @unchecked Sendable {
         event: InputControllerEvent,
         state: InputControllerState
     ) -> InputControllerAction {
-        guard event.keyCode == 56 || event.keyCode == 60 else {
+        guard event.keyCode == KeyBinding.leftShift || event.keyCode == KeyBinding.rightShift else {
             return .passThrough
         }
 
@@ -193,10 +219,18 @@ public final class InputControllerEventRouter: @unchecked Sendable {
     }
 
     private func isExpansionToggle(_ event: InputControllerEvent) -> Bool {
-        if event.keyCode == 69 {
+        if event.keyCode == KeyBinding.keypadPlus {
             return true
         }
 
-        return event.characters == "+"
+        if event.keyCode == KeyBinding.equal {
+            let reportedCharacters = [event.characters, event.charactersIgnoringModifiers]
+                .compactMap { $0 }
+            if reportedCharacters.contains("+") || reportedCharacters.contains("=") {
+                return true
+            }
+        }
+
+        return event.characters == "+" || event.charactersIgnoringModifiers == "+"
     }
 }

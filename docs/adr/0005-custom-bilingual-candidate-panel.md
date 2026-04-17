@@ -10,8 +10,8 @@ Mode 1 uses a custom AppKit candidate panel instead of stock `IMKCandidates` ann
 
 The panel renders a bilingual matrix:
 
-- compact mode: `2x5`
-- expanded mode: `5x5`
+- compact mode: up to `2x5`
+- expanded mode: up to `5x5`
 - each candidate cell keeps Chinese on the upper line and English on the lower line
 
 `Shift` toggles the active layer for the selected cell, `+` expands or collapses the current page, and confirming a candidate commits the current layer only.
@@ -23,6 +23,7 @@ This interaction is now part of the product definition rather than a future poli
 The stock candidate path can show a selected candidate plus annotation, but it does not naturally support:
 
 - a compact bilingual matrix plus an expanded matrix for the same page
+- a maximum page size of `25` without forcing empty cells or rows when fewer candidates are available
 - persistent active-layer highlighting
 - English-layer selection and commit behavior
 

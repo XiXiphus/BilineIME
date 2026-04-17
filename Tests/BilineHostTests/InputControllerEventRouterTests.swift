@@ -74,6 +74,58 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
+    func testCompactModePassesThroughUpDownWhileComposing() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            isExpandedPresentation: false
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 126),
+                state: state
+            ),
+            .passThrough
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 125),
+                state: state
+            ),
+            .passThrough
+        )
+    }
+
+    func testExpandedModeUsesUpDownForRowNavigation() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            isExpandedPresentation: true
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 126),
+                state: state
+            ),
+            .moveRow(.previous)
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 125),
+                state: state
+            ),
+            .moveRow(.next)
+        )
+    }
+
     func testShiftTapTogglesLayerDuringComposition() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
@@ -104,6 +156,99 @@ final class InputControllerEventRouterTests: XCTestCase {
                 state: state
             ),
             .toggleLayer
+        )
+    }
+
+    func testShiftEqualTogglesPresentationDuringComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 24,
+                    characters: "+",
+                    charactersIgnoringModifiers: "=",
+                    modifierFlags: [.shift]
+                ),
+                state: state
+            ),
+            .togglePresentation
+        )
+    }
+
+    func testKeypadPlusTogglesPresentationDuringComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 69,
+                    characters: "+",
+                    charactersIgnoringModifiers: "+"
+                ),
+                state: state
+            ),
+            .togglePresentation
+        )
+    }
+
+    func testEqualPhysicalKeyTogglesPresentationWithoutShiftFlagWhenComposing() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 24,
+                    characters: "=",
+                    charactersIgnoringModifiers: "="
+                ),
+                state: state
+            ),
+            .togglePresentation
+        )
+    }
+
+    func testEqualPhysicalKeyStillPassesThroughWhenNotComposing() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 24,
+                    characters: "=",
+                    charactersIgnoringModifiers: "="
+                ),
+                state: state
+            ),
+            .passThrough
         )
     }
 

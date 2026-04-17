@@ -20,6 +20,7 @@ An entry here does **not** mean the code is bundled in BilineIME.
 | `libpinyin` | <https://github.com/libpinyin/libpinyin> | GPL-3.0 | Alternative Chinese engine reference during option analysis | Reference only; do not copy code into this MIT repository under current licensing |
 | `IMKitSample_2021` | <https://github.com/ensan-hcl/macOS_IMKitSample_2021> | MIT | Bootstrap and packaging reference for a minimal InputMethodKit project | Adaptation candidate with explicit attribution if code is reused |
 | `pinyinIME` | <https://pypi.org/project/pinyinIME/> | MIT | Small-engine and sidecar-architecture reference for prototype options | Adaptation candidate with explicit attribution if code is reused |
+| Heroicons | <https://github.com/tailwindlabs/heroicons> | MIT | Source of the current `menu_icon.pdf` and `AppIcon.icns` input-method icon assets | Bundled asset adaptation for menu/input-source and app icon |
 | `XcodeGen` | <https://github.com/yonaskolb/XcodeGen> | MIT | Development tooling used to generate the Xcode project from `project.yml` | Tooling dependency only; not bundled in app output |
 | `swift-format` | <https://github.com/swiftlang/swift-format> | Apache-2.0 | Development tooling used for source formatting conventions | Tooling dependency only; not bundled in app output |
 

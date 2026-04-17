@@ -14,10 +14,16 @@
 
 ## App shell
 
-- The custom candidate panel renders the current page as vertically stacked Chinese and English rows.
-- `Shift` toggles the active layer without changing the selected candidate index.
+- The custom candidate panel renders a compact `2x5` matrix and an expanded `5x5` candidate grid for the current page.
+- Each candidate cell keeps Chinese on the top line and English on the bottom line, with strict left alignment inside the same column.
+- The custom candidate panel anchors to the host-provided line-height rectangle.
+- When the host does not provide a fresh valid caret rect, the candidate panel may reuse the current session's last valid rect, but never falls back to mouse position.
+- `Shift` toggles the active layer without changing the selected row or column.
+- `+` toggles between compact and expanded presentation.
 - Committing a candidate inserts the active layer text and clears composition.
 - English preview state never changes Chinese candidate order or paging.
+- `Backspace`, arrows, paging keys, and digits pass through to the host when Biline is not composing.
+- While Biline is composing, `Backspace` deletes raw input until empty; once empty, the next `Backspace` returns to the host.
 
 ## Delivery
 

@@ -7,6 +7,11 @@ public enum ActiveLayer: String, Sendable, Equatable, Codable {
     case english
 }
 
+public enum CandidatePresentationMode: String, Sendable, Equatable, Codable {
+    case compact
+    case expanded
+}
+
 public enum BilingualPreviewState: Sendable, Equatable {
     case unavailable
     case loading
@@ -43,26 +48,38 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
     public let rawInput: String
     public let markedText: String
     public let items: [BilingualCandidateItem]
-    public let selectedIndex: Int
     public let pageIndex: Int
     public let activeLayer: ActiveLayer
+    public let presentationMode: CandidatePresentationMode
+    public let selectedRow: Int
+    public let selectedColumn: Int
+    public let compactColumnCount: Int
+    public let expandedRowCount: Int
     public let isComposing: Bool
 
     public init(
         rawInput: String,
         markedText: String,
         items: [BilingualCandidateItem],
-        selectedIndex: Int,
         pageIndex: Int,
         activeLayer: ActiveLayer,
+        presentationMode: CandidatePresentationMode,
+        selectedRow: Int,
+        selectedColumn: Int,
+        compactColumnCount: Int,
+        expandedRowCount: Int,
         isComposing: Bool
     ) {
         self.rawInput = rawInput
         self.markedText = markedText
         self.items = items
-        self.selectedIndex = selectedIndex
         self.pageIndex = pageIndex
         self.activeLayer = activeLayer
+        self.presentationMode = presentationMode
+        self.selectedRow = selectedRow
+        self.selectedColumn = selectedColumn
+        self.compactColumnCount = max(1, compactColumnCount)
+        self.expandedRowCount = max(1, expandedRowCount)
         self.isComposing = isComposing
     }
 
@@ -70,17 +87,56 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         rawInput: "",
         markedText: "",
         items: [],
-        selectedIndex: 0,
         pageIndex: 0,
         activeLayer: .chinese,
+        presentationMode: .compact,
+        selectedRow: 0,
+        selectedColumn: 0,
+        compactColumnCount: 5,
+        expandedRowCount: 5,
         isComposing: false
     )
+
+    public var selectedFlatIndex: Int {
+        selectedRow * compactColumnCount + selectedColumn
+    }
+
+    public var totalRowCount: Int {
+        guard !items.isEmpty else { return 0 }
+        return ((items.count - 1) / compactColumnCount) + 1
+    }
+
+    public var visibleRowCount: Int {
+        switch presentationMode {
+        case .compact:
+            return min(totalRowCount, 1)
+        case .expanded:
+            return min(totalRowCount, expandedRowCount)
+        }
+    }
+
+    public func item(row: Int, column: Int) -> BilingualCandidateItem? {
+        guard row >= 0, column >= 0 else { return nil }
+        let index = row * compactColumnCount + column
+        guard index < items.count else { return nil }
+        return items[index]
+    }
+
+    public func items(inRow row: Int) -> [BilingualCandidateItem] {
+        guard row >= 0 else { return [] }
+        let startIndex = row * compactColumnCount
+        guard startIndex < items.count else { return [] }
+        let endIndex = min(startIndex + compactColumnCount, items.count)
+        return Array(items[startIndex..<endIndex])
+    }
 }
 
 public final class BilingualInputSession: @unchecked Sendable {
     public var onSnapshotUpdate: ((BilingualCompositionSnapshot) -> Void)?
 
     public private(set) var snapshot: BilingualCompositionSnapshot = .idle
+    public var canDeleteBackward: Bool { !rawInput.isEmpty }
+    public var hasCandidates: Bool { !engineSnapshot.candidates.isEmpty }
 
     private let settingsStore: any SettingsStore
     private let previewCoordinator: PreviewCoordinator
@@ -89,6 +145,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     private var engineSnapshot: CompositionSnapshot = .idle
     private var rawInput = ""
     private var activeLayer: ActiveLayer = .chinese
+    private var presentationMode: CandidatePresentationMode = .compact
     private var previewStates: [String: BilingualPreviewState] = [:]
     private var previewTasks: [String: Task<Void, Never>] = [:]
     private let sessionID = UUID()
@@ -121,8 +178,33 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func moveSelection(_ direction: SelectionDirection) {
+        moveColumn(direction)
+    }
+
+    public func moveColumn(_ direction: SelectionDirection) {
         guard engineSnapshot.isComposing else { return }
-        updateEngineSnapshot(engineSession.moveSelection(direction))
+
+        let delta = direction == .next ? 1 : -1
+        let targetColumn = currentSelectedColumn + delta
+        selectCandidate(row: currentSelectedRow, column: targetColumn, clampColumn: false)
+    }
+
+    public func moveRow(_ direction: SelectionDirection) {
+        guard engineSnapshot.isComposing else { return }
+        guard presentationMode == .expanded else {
+            publishSnapshot()
+            return
+        }
+
+        let delta = direction == .next ? 1 : -1
+        let targetRow = currentSelectedRow + delta
+        guard targetRow >= 0, targetRow < currentRowCount else {
+            publishSnapshot()
+            return
+        }
+
+        let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
+        selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
     }
 
     public func turnPage(_ direction: PageDirection) {
@@ -132,18 +214,27 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     public func selectCandidate(at localIndex: Int) {
         guard localIndex >= 0, localIndex < engineSnapshot.candidates.count else { return }
+        moveEngineSelection(to: localIndex)
+    }
 
-        let delta = localIndex - engineSnapshot.selectedIndex
-        guard delta != 0 else {
+    public func selectColumn(at columnIndex: Int) {
+        guard engineSnapshot.isComposing else { return }
+        selectCandidate(row: currentSelectedRowForSelection, column: columnIndex, clampColumn: false)
+    }
+
+    public func togglePresentationMode() {
+        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
+
+        switch presentationMode {
+        case .compact:
+            presentationMode = .expanded
             publishSnapshot()
-            return
+        case .expanded:
+            presentationMode = .compact
+            let firstRowCount = max(1, candidateCount(inRow: 0))
+            let targetColumn = min(currentSelectedColumn, firstRowCount - 1)
+            selectCandidate(row: 0, column: targetColumn, clampColumn: true)
         }
-
-        let direction: SelectionDirection = delta > 0 ? .next : .previous
-        for _ in 0..<abs(delta) {
-            engineSnapshot = engineSession.moveSelection(direction)
-        }
-        updateEngineSnapshot(engineSnapshot)
     }
 
     public func toggleActiveLayer() {
@@ -173,6 +264,7 @@ public final class BilingualInputSession: @unchecked Sendable {
         rawInput = ""
         engineSnapshot = commitResult.snapshot
         activeLayer = .chinese
+        presentationMode = .compact
         clearPreviews()
         publishSnapshot()
         return committedText.isEmpty ? nil : committedText
@@ -182,15 +274,44 @@ public final class BilingualInputSession: @unchecked Sendable {
         rawInput = ""
         engineSnapshot = engineSession.reset()
         activeLayer = .chinese
+        presentationMode = .compact
         clearPreviews()
         publishSnapshot()
     }
 
+    private var compactColumnCount: Int {
+        max(1, settingsStore.compactColumnCount)
+    }
+
+    private var expandedRowCount: Int {
+        max(1, settingsStore.expandedRowCount)
+    }
+
+    private var currentSelectedFlatIndex: Int {
+        engineSnapshot.selectedIndex
+    }
+
+    private var currentSelectedRow: Int {
+        currentSelectedFlatIndex / compactColumnCount
+    }
+
+    private var currentSelectedColumn: Int {
+        currentSelectedFlatIndex % compactColumnCount
+    }
+
+    private var currentSelectedRowForSelection: Int {
+        presentationMode == .expanded ? currentSelectedRow : 0
+    }
+
+    private var currentRowCount: Int {
+        rowCount(for: engineSnapshot.candidates)
+    }
+
     private var currentItem: BilingualCandidateItem? {
-        guard engineSnapshot.selectedIndex >= 0, engineSnapshot.selectedIndex < snapshot.items.count else {
+        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < snapshot.items.count else {
             return nil
         }
-        return snapshot.items[engineSnapshot.selectedIndex]
+        return snapshot.items[currentSelectedFlatIndex]
     }
 
     private func updateEngineSnapshot(_ newSnapshot: CompositionSnapshot) {
@@ -199,6 +320,7 @@ public final class BilingualInputSession: @unchecked Sendable {
 
         if !engineSnapshot.isComposing {
             activeLayer = .chinese
+            presentationMode = .compact
         }
 
         let currentCandidateIDs = visibleCandidateIDs(for: engineSnapshot)
@@ -210,6 +332,47 @@ public final class BilingualInputSession: @unchecked Sendable {
         } else {
             publishSnapshot()
         }
+    }
+
+    private func moveEngineSelection(to localIndex: Int) {
+        let delta = localIndex - engineSnapshot.selectedIndex
+        guard delta != 0 else {
+            publishSnapshot()
+            return
+        }
+
+        let direction: SelectionDirection = delta > 0 ? .next : .previous
+        for _ in 0..<abs(delta) {
+            engineSnapshot = engineSession.moveSelection(direction)
+        }
+        updateEngineSnapshot(engineSnapshot)
+    }
+
+    private func selectCandidate(row: Int, column: Int, clampColumn: Bool) {
+        guard row >= 0, column >= 0 else {
+            publishSnapshot()
+            return
+        }
+
+        let count = candidateCount(inRow: row)
+        guard count > 0 else {
+            publishSnapshot()
+            return
+        }
+
+        guard clampColumn || column < count else {
+            publishSnapshot()
+            return
+        }
+
+        let targetColumn = clampColumn ? min(column, count - 1) : column
+        let targetIndex = row * compactColumnCount + targetColumn
+        guard targetIndex < engineSnapshot.candidates.count else {
+            publishSnapshot()
+            return
+        }
+
+        moveEngineSelection(to: targetIndex)
     }
 
     private func reconcilePreviews(
@@ -317,10 +480,10 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private var currentSelectedCandidateID: String? {
-        guard engineSnapshot.selectedIndex >= 0, engineSnapshot.selectedIndex < engineSnapshot.candidates.count else {
+        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < engineSnapshot.candidates.count else {
             return nil
         }
-        return engineSnapshot.candidates[engineSnapshot.selectedIndex].id
+        return engineSnapshot.candidates[currentSelectedFlatIndex].id
     }
 
     private func makeSnapshot() -> BilingualCompositionSnapshot {
@@ -340,19 +503,23 @@ public final class BilingualInputSession: @unchecked Sendable {
             rawInput: engineSnapshot.rawInput,
             markedText: markedText,
             items: items,
-            selectedIndex: engineSnapshot.selectedIndex,
             pageIndex: engineSnapshot.pageIndex,
             activeLayer: activeLayer,
+            presentationMode: presentationMode,
+            selectedRow: currentSelectedRowForSelection,
+            selectedColumn: currentSelectedColumn,
+            compactColumnCount: compactColumnCount,
+            expandedRowCount: expandedRowCount,
             isComposing: engineSnapshot.isComposing
         )
     }
 
     private func makeMarkedText(items: [BilingualCandidateItem]) -> String {
-        guard engineSnapshot.selectedIndex >= 0, engineSnapshot.selectedIndex < items.count else {
+        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < items.count else {
             return engineSnapshot.markedText
         }
 
-        let selectedItem = items[engineSnapshot.selectedIndex]
+        let selectedItem = items[currentSelectedFlatIndex]
         if activeLayer == .english, let englishText = selectedItem.englishText {
             return englishText
         }
@@ -382,6 +549,18 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     private func fallbackPreviewState() -> BilingualPreviewState {
         settingsStore.previewEnabled ? .loading : .unavailable
+    }
+
+    private func rowCount(for candidates: [Candidate]) -> Int {
+        guard !candidates.isEmpty else { return 0 }
+        return ((candidates.count - 1) / compactColumnCount) + 1
+    }
+
+    private func candidateCount(inRow row: Int) -> Int {
+        guard row >= 0 else { return 0 }
+        let startIndex = row * compactColumnCount
+        guard startIndex < engineSnapshot.candidates.count else { return 0 }
+        return min(compactColumnCount, engineSnapshot.candidates.count - startIndex)
     }
 
     private func normalize(_ string: String) -> String {

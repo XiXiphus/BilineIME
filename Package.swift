@@ -8,6 +8,7 @@ let package = Package(
     ],
     products: [
         .library(name: "BilineCore", targets: ["BilineCore"]),
+        .library(name: "BilineHost", targets: ["BilineHost"]),
         .library(name: "BilinePreview", targets: ["BilinePreview"]),
         .library(name: "BilineSession", targets: ["BilineSession"]),
         .library(name: "BilineMocks", targets: ["BilineMocks"]),
@@ -16,6 +17,10 @@ let package = Package(
     targets: [
         .target(
             name: "BilineCore"
+        ),
+        .target(
+            name: "BilineHost",
+            dependencies: ["BilineCore"]
         ),
         .target(
             name: "BilinePreview",
@@ -39,6 +44,10 @@ let package = Package(
         .testTarget(
             name: "BilineCoreTests",
             dependencies: ["BilineCore", "BilineMocks", "BilineTestSupport"]
+        ),
+        .testTarget(
+            name: "BilineHostTests",
+            dependencies: ["BilineHost"]
         ),
         .testTarget(
             name: "BilinePreviewTests",

@@ -8,7 +8,7 @@ final class BilineCandidatePanelController {
     init() {
         self.contentView = BilineCandidatePanelView(frame: .zero)
         self.panel = CandidatePanelWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 200),
+            contentRect: NSRect(x: 0, y: 0, width: 420, height: 140),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: true
@@ -17,14 +17,17 @@ final class BilineCandidatePanelController {
         panel.isOpaque = false
         panel.hasShadow = true
         panel.backgroundColor = .clear
-        panel.level = .statusBar
         panel.collectionBehavior = [.transient, .ignoresCycle]
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = true
         panel.contentView = contentView
     }
 
-    func render(snapshot: BilingualCompositionSnapshot, anchorRect: NSRect?) {
+    func render(
+        snapshot: BilingualCompositionSnapshot,
+        anchorRect: NSRect,
+        windowLevel: NSWindow.Level
+    ) {
         guard snapshot.isComposing, !snapshot.items.isEmpty else {
             hide()
             return
@@ -33,6 +36,7 @@ final class BilineCandidatePanelController {
         contentView.snapshot = snapshot
         let panelSize = contentView.preferredSize
         let panelFrame = positionedFrame(size: panelSize, anchorRect: anchorRect)
+        panel.level = windowLevel
         panel.setFrame(panelFrame, display: true)
         panel.orderFrontRegardless()
     }
@@ -41,21 +45,17 @@ final class BilineCandidatePanelController {
         panel.orderOut(nil)
     }
 
-    private func positionedFrame(size: NSSize, anchorRect: NSRect?) -> NSRect {
-        let spacing: CGFloat = 8
-        let fallbackOrigin = NSPoint(x: NSEvent.mouseLocation.x + 12, y: NSEvent.mouseLocation.y - size.height - 12)
-        var origin = fallbackOrigin
+    private func positionedFrame(size: NSSize, anchorRect: NSRect) -> NSRect {
+        let spacing: CGFloat = 4
+        var origin = NSPoint(x: anchorRect.minX, y: anchorRect.minY - size.height - spacing)
 
-        if let anchorRect, !anchorRect.isEmpty {
-            origin = NSPoint(x: anchorRect.minX, y: anchorRect.minY - size.height - spacing)
-            if let screen = NSScreen.screens.first(where: { $0.frame.intersects(anchorRect) }) {
-                let visibleFrame = screen.visibleFrame.insetBy(dx: 8, dy: 8)
-                if origin.y < visibleFrame.minY {
-                    origin.y = min(anchorRect.maxY + spacing, visibleFrame.maxY - size.height)
-                }
-                origin.x = min(max(origin.x, visibleFrame.minX), visibleFrame.maxX - size.width)
-                origin.y = min(max(origin.y, visibleFrame.minY), visibleFrame.maxY - size.height)
+        if let screen = NSScreen.screens.first(where: { $0.frame.intersects(anchorRect) }) {
+            let visibleFrame = screen.visibleFrame.insetBy(dx: 8, dy: 8)
+            if origin.y < visibleFrame.minY {
+                origin.y = min(anchorRect.maxY + spacing, visibleFrame.maxY - size.height)
             }
+            origin.x = min(max(origin.x, visibleFrame.minX), visibleFrame.maxX - size.width)
+            origin.y = min(max(origin.y, visibleFrame.minY), visibleFrame.maxY - size.height)
         }
 
         return NSRect(origin: origin, size: size)
@@ -77,184 +77,231 @@ private final class BilineCandidatePanelView: NSView {
 
     override var isFlipped: Bool { true }
 
-    private let contentInsets = NSEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
-    private let rowSpacing: CGFloat = 10
-    private let indexColumnWidth: CGFloat = 24
-    private let textGap: CGFloat = 10
-    private let lineSpacing: CGFloat = 4
-    private let lineInsets = NSEdgeInsets(top: 5, left: 8, bottom: 5, right: 8)
+    private let contentInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
+    private let groupSpacing: CGFloat = 10
+    private let languageRowSpacing: CGFloat = 6
+    private let columnSpacing: CGFloat = 6
+    private let rowInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
+    private let segmentPadding = NSEdgeInsets(top: 5, left: 6, bottom: 5, right: 6)
+    private let minimumColumnWidth: CGFloat = 28
+    private let segmentBreathingRoom: CGFloat = 2
     private let chineseFont = NSFont.systemFont(ofSize: 16, weight: .semibold)
     private let englishFont = NSFont.systemFont(ofSize: 13, weight: .regular)
-    private let indexFont = NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium)
-
-    var preferredSize: NSSize {
-        guard !snapshot.items.isEmpty else {
-            return NSSize(width: 320, height: 0)
-        }
-
-        let maxLineWidth = snapshot.items.enumerated().reduce(CGFloat(240)) { partialResult, pair in
-            let itemWidth = max(
-                candidateLine(for: pair.offset, item: pair.element).size().width,
-                englishLine(for: pair.element).size().width
-            )
-            return max(partialResult, itemWidth)
-        }
-
-        let rowHeight = rowHeight
-        let height = contentInsets.top
-            + CGFloat(snapshot.items.count) * rowHeight
-            + CGFloat(max(0, snapshot.items.count - 1)) * rowSpacing
-            + contentInsets.bottom
-        let width = contentInsets.left
-            + indexColumnWidth
-            + textGap
-            + maxLineWidth
-            + contentInsets.right
-        return NSSize(width: ceil(width), height: ceil(height))
-    }
 
     override var intrinsicContentSize: NSSize {
         preferredSize
     }
 
+    var preferredSize: NSSize {
+        guard !snapshot.items.isEmpty else {
+            return NSSize(width: 360, height: 0)
+        }
+
+        let widths = columnWidths()
+        let rowCount = max(1, snapshot.visibleRowCount)
+        let width = contentInsets.left
+            + rowInsets.left
+            + widths.reduce(0, +)
+            + CGFloat(max(0, widths.count - 1)) * columnSpacing
+            + rowInsets.right
+            + contentInsets.right
+        let height = contentInsets.top
+            + CGFloat(rowCount) * groupHeight
+            + CGFloat(max(0, rowCount - 1)) * groupSpacing
+            + contentInsets.bottom
+
+        return NSSize(width: ceil(width), height: ceil(height))
+    }
+
     override func draw(_ dirtyRect: NSRect) {
         guard !snapshot.items.isEmpty else { return }
 
-        let boundsPath = NSBezierPath(
-            roundedRect: bounds,
-            xRadius: 14,
-            yRadius: 14
-        )
-        NSColor.windowBackgroundColor.withAlphaComponent(0.96).setFill()
-        boundsPath.fill()
-        NSColor.separatorColor.withAlphaComponent(0.5).setStroke()
-        boundsPath.lineWidth = 1
-        boundsPath.stroke()
+        let widths = columnWidths()
+        let rowCount = snapshot.visibleRowCount
+        guard rowCount > 0 else { return }
 
-        for (index, item) in snapshot.items.enumerated() {
-            drawRow(for: index, item: item)
+        for row in 0..<rowCount {
+            drawCandidateGroup(row: row, columnWidths: widths)
         }
     }
 
-    private var rowHeight: CGFloat {
-        chineseFont.ascender - chineseFont.descender
-            + englishFont.ascender - englishFont.descender
-            + lineInsets.top + lineInsets.bottom
-            + lineSpacing
-            + 10
+    private var chineseRowHeight: CGFloat {
+        ceil(chineseFont.ascender - chineseFont.descender) + rowInsets.top + rowInsets.bottom
     }
 
-    private func drawRow(for index: Int, item: BilingualCandidateItem) {
-        let originY = contentInsets.top + CGFloat(index) * (rowHeight + rowSpacing)
-        let rowRect = NSRect(
+    private var englishRowHeight: CGFloat {
+        ceil(englishFont.ascender - englishFont.descender) + rowInsets.top + rowInsets.bottom
+    }
+
+    private var groupHeight: CGFloat {
+        chineseRowHeight + languageRowSpacing + englishRowHeight
+    }
+
+    private func columnWidths() -> [CGFloat] {
+        guard snapshot.compactColumnCount > 0 else { return [] }
+
+        var widths = Array(repeating: CGFloat.zero, count: snapshot.compactColumnCount)
+
+        for column in 0..<snapshot.compactColumnCount {
+            for row in 0..<snapshot.visibleRowCount {
+                guard let item = snapshot.item(row: row, column: column) else { continue }
+                let chineseWidth = candidateLine(column: column, item: item, active: false).size().width
+                let englishWidth = englishLine(column: column, item: item, active: false).size().width
+                let contentWidth = ceil(max(chineseWidth, englishWidth))
+                let fittedWidth = contentWidth
+                    + segmentPadding.left
+                    + segmentPadding.right
+                    + segmentBreathingRoom
+                widths[column] = max(widths[column], fittedWidth)
+            }
+
+            widths[column] = max(widths[column], minimumColumnWidth)
+        }
+
+        return widths
+    }
+
+    private func drawCandidateGroup(row: Int, columnWidths: [CGFloat]) {
+        let originY = contentInsets.top + CGFloat(row) * (groupHeight + groupSpacing)
+        let totalWidth = rowInsets.left
+            + columnWidths.reduce(0, +)
+            + CGFloat(max(0, columnWidths.count - 1)) * columnSpacing
+            + rowInsets.right
+        let chineseRowRect = NSRect(
             x: contentInsets.left,
             y: originY,
-            width: bounds.width - contentInsets.left - contentInsets.right,
-            height: rowHeight
+            width: totalWidth,
+            height: chineseRowHeight
+        )
+        let englishRowRect = NSRect(
+            x: contentInsets.left,
+            y: chineseRowRect.maxY + languageRowSpacing,
+            width: totalWidth,
+            height: englishRowHeight
         )
 
-        let isSelected = index == snapshot.selectedIndex
-        let isEnglishActive = isSelected && snapshot.activeLayer == .english
-        let isChineseActive = isSelected && snapshot.activeLayer == .chinese
+        drawRowContainer(in: chineseRowRect)
+        drawRowContainer(in: englishRowRect)
 
-        if isSelected {
-            let rowBackground = NSBezierPath(roundedRect: rowRect, xRadius: 10, yRadius: 10)
-            NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
-            rowBackground.fill()
-            NSColor.controlAccentColor.withAlphaComponent(0.25).setStroke()
-            rowBackground.lineWidth = 1
-            rowBackground.stroke()
+        var originX = chineseRowRect.minX + rowInsets.left
+        for column in 0..<snapshot.compactColumnCount {
+            let width = columnWidths[column]
+            let segmentRect = NSRect(x: originX, y: 0, width: width, height: 0)
+
+            if let item = snapshot.item(row: row, column: column) {
+                let isSelected = row == snapshot.selectedRow && column == snapshot.selectedColumn
+                let isChineseActive = isSelected && snapshot.activeLayer == .chinese
+                let isEnglishActive = isSelected && snapshot.activeLayer == .english
+
+                let chineseSegmentRect = NSRect(
+                    x: segmentRect.minX,
+                    y: chineseRowRect.minY + rowInsets.top / 2,
+                    width: segmentRect.width,
+                    height: chineseRowRect.height - rowInsets.top
+                )
+                let englishSegmentRect = NSRect(
+                    x: segmentRect.minX,
+                    y: englishRowRect.minY + rowInsets.top / 2,
+                    width: segmentRect.width,
+                    height: englishRowRect.height - rowInsets.top
+                )
+
+                drawSelectionPill(
+                    in: chineseSegmentRect,
+                    selected: isSelected,
+                    active: isChineseActive
+                )
+                drawSelectionPill(
+                    in: englishSegmentRect,
+                    selected: isSelected,
+                    active: isEnglishActive
+                )
+
+                candidateLine(column: column, item: item, active: isChineseActive).draw(
+                    in: inset(rect: chineseSegmentRect, insets: segmentPadding)
+                )
+                englishLine(column: column, item: item, active: isEnglishActive).draw(
+                    in: inset(rect: englishSegmentRect, insets: segmentPadding)
+                )
+            }
+
+            originX += width + columnSpacing
         }
-
-        let indexRect = NSRect(
-            x: rowRect.minX,
-            y: rowRect.midY - 8,
-            width: indexColumnWidth,
-            height: 16
-        )
-        let indexString = NSAttributedString(
-            string: indexLabel(for: index),
-            attributes: [
-                .font: indexFont,
-                .foregroundColor: NSColor.secondaryLabelColor,
-            ]
-        )
-        indexString.draw(in: indexRect)
-
-        let textRect = NSRect(
-            x: rowRect.minX + indexColumnWidth + textGap,
-            y: rowRect.minY,
-            width: rowRect.width - indexColumnWidth - textGap,
-            height: rowRect.height
-        )
-        let chineseRect = NSRect(
-            x: textRect.minX,
-            y: textRect.minY,
-            width: textRect.width,
-            height: (rowRect.height - lineSpacing) / 2
-        )
-        let englishRect = NSRect(
-            x: textRect.minX,
-            y: chineseRect.maxY + lineSpacing,
-            width: textRect.width,
-            height: rowRect.height - chineseRect.height - lineSpacing
-        )
-
-        if isChineseActive {
-            drawActiveLineBackground(in: chineseRect, alpha: 0.9)
-        }
-        if isEnglishActive {
-            drawActiveLineBackground(in: englishRect, alpha: 0.78)
-        }
-
-        candidateLine(for: index, item: item).draw(
-            in: inset(rect: chineseRect, insets: lineInsets)
-        )
-        englishLine(for: item, active: isEnglishActive).draw(
-            in: inset(rect: englishRect, insets: lineInsets)
-        )
     }
 
-    private func candidateLine(for index: Int, item: BilingualCandidateItem) -> NSAttributedString {
-        let text = "\(item.candidate.surface)"
-        let isActive = index == snapshot.selectedIndex && snapshot.activeLayer == .chinese
-        return NSAttributedString(
-            string: text,
+    private func drawRowContainer(in rect: NSRect) {
+        let path = NSBezierPath(roundedRect: rect, xRadius: 14, yRadius: 14)
+        NSColor.windowBackgroundColor.withAlphaComponent(0.97).setFill()
+        path.fill()
+        NSColor.separatorColor.withAlphaComponent(0.55).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+    }
+
+    private func drawSelectionPill(in rect: NSRect, selected: Bool, active: Bool) {
+        guard selected else { return }
+
+        let pillRect = NSRect(
+            x: rect.minX + 2,
+            y: rect.minY + 2,
+            width: rect.width - 4,
+            height: rect.height - 4
+        )
+        let path = NSBezierPath(roundedRect: pillRect, xRadius: 12, yRadius: 12)
+        let fillColor: NSColor
+        let strokeColor: NSColor
+
+        if active {
+            fillColor = NSColor.controlAccentColor.withAlphaComponent(0.92)
+            strokeColor = NSColor.controlAccentColor.withAlphaComponent(0.98)
+        } else {
+            fillColor = NSColor.controlAccentColor.withAlphaComponent(0.10)
+            strokeColor = NSColor.controlAccentColor.withAlphaComponent(0.24)
+        }
+
+        fillColor.setFill()
+        path.fill()
+        strokeColor.setStroke()
+        path.lineWidth = 1
+        path.stroke()
+    }
+
+    private func candidateLine(
+        column: Int,
+        item: BilingualCandidateItem,
+        active: Bool
+    ) -> NSAttributedString {
+        NSAttributedString(
+            string: "\(column + 1) \(item.candidate.surface)",
             attributes: [
                 .font: chineseFont,
-                .foregroundColor: isActive ? NSColor.white : NSColor.labelColor,
+                .foregroundColor: active ? NSColor.white : NSColor.labelColor,
             ]
         )
     }
 
-    private func englishLine(for item: BilingualCandidateItem, active: Bool = false) -> NSAttributedString {
+    private func englishLine(
+        column: Int,
+        item: BilingualCandidateItem,
+        active: Bool
+    ) -> NSAttributedString {
         let color: NSColor
         switch item.previewState {
         case .ready:
             color = active ? .white : .secondaryLabelColor
         case .loading:
-            color = active ? NSColor.white.withAlphaComponent(0.9) : .tertiaryLabelColor
+            color = active ? NSColor.white.withAlphaComponent(0.92) : .tertiaryLabelColor
         case .failed, .unavailable:
             color = active ? NSColor.white.withAlphaComponent(0.85) : .quaternaryLabelColor
         }
 
         return NSAttributedString(
-            string: englishPlaceholder(for: item.previewState),
+            string: "\(column + 1) \(englishPlaceholder(for: item.previewState))",
             attributes: [
                 .font: englishFont,
                 .foregroundColor: color,
             ]
         )
-    }
-
-    private func drawActiveLineBackground(in rect: NSRect, alpha: CGFloat) {
-        let path = NSBezierPath(
-            roundedRect: inset(rect: rect, insets: NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)),
-            xRadius: 8,
-            yRadius: 8
-        )
-        NSColor.controlAccentColor.withAlphaComponent(alpha).setFill()
-        path.fill()
     }
 
     private func englishPlaceholder(for state: BilingualPreviewState) -> String {
@@ -268,13 +315,6 @@ private final class BilineCandidatePanelView: NSView {
         case .unavailable:
             return "Preview unavailable"
         }
-    }
-
-    private func indexLabel(for index: Int) -> String {
-        guard index < 9 else {
-            return "•"
-        }
-        return "\(index + 1)"
     }
 
     private func inset(rect: NSRect, insets: NSEdgeInsets) -> NSRect {

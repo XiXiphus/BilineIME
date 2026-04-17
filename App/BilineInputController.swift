@@ -1,22 +1,19 @@
 import BilineCore
+import BilineHost
 import BilineMocks
 import BilinePreview
 import BilineSession
 import Cocoa
 @preconcurrency import InputMethodKit
-import OSLog
 
 @objc(BilineInputController)
 final class BilineInputController: IMKInputController {
-    private let logger = Logger(
-        subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
-        category: "input-controller"
-    )
     private let inputSession: BilingualInputSession
     private let candidatePanel = BilineCandidatePanelController()
+    private let textInputBridge = BilineTextInputBridge()
+    private let eventRouter = InputControllerEventRouter()
 
     private weak var activeClient: AnyObject?
-    private var isShiftPressed = false
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let settingsStore = DefaultSettingsStore()
@@ -52,69 +49,70 @@ final class BilineInputController: IMKInputController {
             return false
         }
 
-        activeClient = client as AnyObject
-
-        if event.type == .flagsChanged {
-            return handleFlagsChanged(event, client: client)
+        let clientObject = client as AnyObject
+        if activeClient !== clientObject {
+            textInputBridge.clearAnchorCache()
+            activeClient = clientObject
         }
 
-        if event.modifierFlags.contains(.command) {
+        let action = eventRouter.route(
+            event: InputControllerEvent(
+                type: event.type == .flagsChanged ? .flagsChanged : .keyDown,
+                keyCode: event.keyCode,
+                characters: event.characters,
+                charactersIgnoringModifiers: event.charactersIgnoringModifiers,
+                modifierFlags: modifierFlags(from: event)
+            ),
+            state: InputControllerState(
+                isComposing: inputSession.snapshot.isComposing,
+                canDeleteBackward: inputSession.canDeleteBackward,
+                hasCandidates: inputSession.hasCandidates,
+                compactColumnCount: inputSession.snapshot.compactColumnCount
+            )
+        )
+
+        switch action {
+        case .passThrough:
             return false
-        }
-
-        switch event.keyCode {
-        case 36, 49:
-            return commitSelection(using: client)
-        case 51:
+        case .consume:
+            return true
+        case .append(let text):
+            inputSession.append(text: text)
+        case .deleteBackward:
             inputSession.deleteBackward()
-            render(client: client)
-            return true
-        case 53:
+        case .commit:
+            return commitSelection(using: client)
+        case .cancel:
             inputSession.cancel()
-            render(client: client)
-            return true
-        case 123, 126:
-            inputSession.moveSelection(.previous)
-            render(client: client)
-            return true
-        case 124, 125:
-            inputSession.moveSelection(.next)
-            render(client: client)
-            return true
-        case 116:
-            inputSession.turnPage(.previous)
-            render(client: client)
-            return true
-        case 121:
-            inputSession.turnPage(.next)
-            render(client: client)
-            return true
-        default:
-            break
-        }
-
-        if let digitIndex = candidateIndex(from: event), !inputSession.snapshot.items.isEmpty {
-            inputSession.selectCandidate(at: digitIndex)
+            textInputBridge.clearAnchorCache()
+        case .moveColumn(let direction):
+            inputSession.moveColumn(direction)
+        case .moveRow(let direction):
+            inputSession.moveRow(direction)
+        case .turnPage(let direction):
+            inputSession.turnPage(direction)
+        case .toggleLayer:
+            inputSession.toggleActiveLayer()
+        case .togglePresentation:
+            inputSession.togglePresentationMode()
+        case .selectColumn(let columnIndex):
+            inputSession.selectColumn(at: columnIndex)
             return commitSelection(using: client)
         }
 
-        guard let characters = event.charactersIgnoringModifiers, !characters.isEmpty else {
-            return false
-        }
-
-        let normalized = characters.filter { $0.isLetter || $0 == "'" }
-        guard !normalized.isEmpty else {
-            return false
-        }
-
-        inputSession.append(text: normalized)
         render(client: client)
         return true
     }
 
     override func deactivateServer(_ sender: Any!) {
+        if let client = activeClient as? IMKTextInput {
+            textInputBridge.clearComposition(in: client)
+        }
+        inputSession.cancel()
+        textInputBridge.clearAnchorCache()
         candidatePanel.hide()
-        isShiftPressed = false
+        eventRouter.reset()
+        activeClient = nil
         super.deactivateServer(sender)
     }
 
@@ -123,6 +121,7 @@ final class BilineInputController: IMKInputController {
             _ = commitSelection(using: client)
         } else {
             inputSession.cancel()
+            textInputBridge.clearAnchorCache()
             candidatePanel.hide()
         }
     }
@@ -133,10 +132,8 @@ final class BilineInputController: IMKInputController {
             return inputSession.snapshot.isComposing
         }
 
-        client.insertText(
-            committedText,
-            replacementRange: NSRange(location: NSNotFound, length: NSNotFound)
-        )
+        textInputBridge.insertCommittedText(committedText, into: client)
+        textInputBridge.clearAnchorCache()
         render(client: client)
         return true
     }
@@ -146,79 +143,21 @@ final class BilineInputController: IMKInputController {
         snapshot: BilingualCompositionSnapshot? = nil
     ) {
         let snapshot = snapshot ?? inputSession.snapshot
-
-        if snapshot.isComposing {
-            client.setMarkedText(
-                snapshot.markedText,
-                selectionRange: NSRange(location: snapshot.markedText.count, length: 0),
-                replacementRange: NSRange(location: NSNotFound, length: NSNotFound)
-            )
-        } else {
-            client.setMarkedText(
-                "",
-                selectionRange: NSRange(location: 0, length: 0),
-                replacementRange: NSRange(location: NSNotFound, length: NSNotFound)
-            )
-        }
-
-        if snapshot.items.isEmpty {
-            candidatePanel.hide()
-            return
-        }
-
-        candidatePanel.render(snapshot: snapshot, anchorRect: candidateAnchorRect(for: client))
-    }
-
-    private func handleFlagsChanged(_ event: NSEvent, client: IMKTextInput) -> Bool {
-        guard event.keyCode == 56 || event.keyCode == 60 else {
-            return false
-        }
-
-        guard inputSession.snapshot.isComposing else {
-            isShiftPressed = event.modifierFlags.contains(.shift)
-            return false
-        }
-
-        let isShiftDown = event.modifierFlags.contains(.shift)
-        defer { isShiftPressed = isShiftDown }
-
-        guard isShiftDown, !isShiftPressed else {
-            return true
-        }
-
-        inputSession.toggleActiveLayer()
-        render(client: client)
-        return true
-    }
-
-    private func candidateAnchorRect(for client: IMKTextInput) -> NSRect? {
-        guard let textClient = client as? NSTextInputClient else {
-            return nil
-        }
-
-        var actualRange = NSRange(location: NSNotFound, length: 0)
-        let selectedRange = textClient.selectedRange()
-        let rect = textClient.firstRect(
-            forCharacterRange: selectedRange,
-            actualRange: &actualRange
+        textInputBridge.render(
+            snapshot: snapshot,
+            client: client,
+            candidatePanel: candidatePanel
         )
-        return rect.isEmpty ? nil : rect
     }
 
-    private func candidateIndex(from event: NSEvent) -> Int? {
-        guard let characters = event.charactersIgnoringModifiers, characters.count == 1 else {
-            return nil
+    private func modifierFlags(from event: NSEvent) -> InputModifierFlags {
+        var flags: InputModifierFlags = []
+        if event.modifierFlags.contains(.shift) {
+            flags.insert(.shift)
         }
-
-        guard let scalar = characters.unicodeScalars.first,
-            CharacterSet.decimalDigits.contains(scalar),
-            let value = Int(String(characters)),
-            value >= 1
-        else {
-            return nil
+        if event.modifierFlags.contains(.command) {
+            flags.insert(.command)
         }
-
-        let localIndex = value - 1
-        return localIndex < inputSession.snapshot.items.count ? localIndex : nil
+        return flags
     }
 }

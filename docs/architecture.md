@@ -7,8 +7,9 @@ This document turns the current product idea into a concrete implementation plan
 It intentionally treats **Mode 1** as the only first-phase target:
 
 - Chinese composition remains the primary workflow
-- each visible candidate is rendered as a Chinese row plus an English row
+- candidates are rendered as a bilingual matrix: compact `2x5`, expanded `5x5`
 - `Shift` toggles the active commit layer between Chinese and English
+- `+` expands or collapses the current candidate page
 - translation never blocks typing
 
 Mode 2 remains a later extension and is documented here only as a deferred architecture concern.
@@ -48,6 +49,13 @@ These facts lead to three immediate design conclusions:
 - Mode 1 should stay inside the normal composition lifecycle rather than edit already committed document text.
 - Mode 1 should own its bilingual candidate presentation explicitly rather than approximate it through annotation.
 - Session-local composition state and app-wide shared services should be separated from the start.
+
+One additional implementation rule now follows from the same platform boundary:
+
+- host-event routing, marked-text synchronization, and anchor resolution should live in a thin IMK bridge layer rather than leak into the composition session model
+- custom candidate anchoring should prefer the client-provided line-height rectangle rather than document-range rect lookup
+- if the host cannot provide a fresh valid caret rect, the custom panel may reuse the last valid rect from the current IME session, but must never fall back to mouse position
+- editing keys outside composition should pass through to the host application unchanged
 
 ## Decision Summary
 
@@ -348,7 +356,9 @@ Suggested fields:
 - `rawInput`
 - `markedText`
 - `items`
-- `selectedIndex`
+- `presentationMode`
+- `selectedRow`
+- `selectedColumn`
 - `pageIndex`
 - `activeLayer`
 - `isComposing`
@@ -388,18 +398,19 @@ Success condition:
 
 The input method works like a real IME even without translation.
 
-### Milestone 2: Mode 1 Vertical Slice
+### Milestone 2: Mode 1 Matrix Slice
 
 - add `PreviewCoordinator`
 - add async `TranslationProvider`
 - show a custom bilingual candidate panel for the visible page
-- support `Shift`-based layer switching and active-layer commit
+- support compact `2x5` and expanded `5x5` presentation for the same page
+- support `Shift`-based layer switching, `+` expansion, and active-layer commit
 - ignore stale results
 - add target language setting
 
 Success condition:
 
-Typing and candidate navigation stay responsive while visible candidates gain English preview rows.
+Typing and candidate navigation stay responsive while the visible page renders as a bilingual matrix with English preview rows.
 
 ### Milestone 3: Hardening
 

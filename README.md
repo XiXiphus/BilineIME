@@ -119,7 +119,7 @@ This repo already contains a real demo foundation:
 - a Swift Package for core composition, preview coordination, and fixture-backed demo logic
 - an InputMethodKit shell app for macOS
 - Xcode project generation via `project.yml`
-- scripts for local install and internal package generation
+- scripts for developer install, diagnostics, and release package generation
 - architecture, standards, and ADR docs to keep the repo from turning into a mess
 
 The source of truth for the app project is:
@@ -140,8 +140,13 @@ make bootstrap
 make project
 make test
 make build-ime
+make build-ime-release
 make install-ime
-make package-internal
+make uninstall-ime
+make reset-ime
+make repair-ime
+make package-release
+make diagnose-ime
 make verify
 ```
 
@@ -150,10 +155,50 @@ What they do:
 - `make bootstrap` installs developer tooling
 - `make project` regenerates the Xcode project
 - `make test` runs Swift Package tests
-- `make build-ime` builds the input method app
-- `make install-ime` installs it into `/Library/Input Methods`
-- `make package-internal` builds an unsigned internal `.pkg`
-- `make verify` runs tests plus a full Xcode build
+- `make build-ime` builds the developer input method target
+- `make build-ime-release` builds the release input method target in a temporary derived-data directory and unregisters it afterwards
+- `make install-ime` installs the developer build into `~/Library/Input Methods`
+- `make uninstall-ime` removes the developer bundle and unregisters the local dev lane
+- `make reset-ime` runs the safe uninstall flow first, then reinstalls the dev lane
+- `make repair-ime` runs the staged local repair flow for ghost Biline sources and broken Keyboard settings state
+- `make package-release` builds the release installer package
+- `make diagnose-ime` prints bundle, TIS, HIToolbox, Launch Services, and recent IMK logs
+- `make verify` runs tests plus both IME build variants
+
+Build products are generated under `~/Library/Caches/BilineIME/DerivedData` instead of the repo tree. This avoids Finder/file-provider metadata inside the workspace from breaking app signing.
+
+### Input Method Registration Notes
+
+- The dev lane installs to `~/Library/Input Methods` so it does not collide with the release lane in `HIToolbox`, `TIS`, or Launch Services.
+- `make build-ime` and `make install-ime` now try to detect a local Xcode development team from `com.apple.dt.Xcode.plist`. Override that auto-detection with `BILINE_DEV_TEAM_ID=<TEAM_ID>` if needed.
+- `make install-ime` now stops at a conservative install boundary:
+  - build the dev bundle
+  - replace `~/Library/Input Methods/BilineIMEDev.app`
+  - refresh Launch Services and `TextInputMenuAgent`
+  - leave source enabling and selection to macOS UI
+- `make install-ime` no longer treats `TISSelectInputSource == 0` as part of install success. Re-select `BilineIME Dev` manually in Keyboard settings or from the input menu.
+- `make uninstall-ime` no longer doubles as a system-cache repair tool. Use `make repair-ime` when Keyboard settings shows blank Biline rows, stale raw ids, or crashes.
+- The release lane installs to `/Library/Input Methods` and should be distributed via the installer package, not by manually copying a debug build into the system directory.
+- Installing into an Input Methods directory is necessary, but it is not sufficient. The bundle must also expose keyboard input modes through both `ComponentInputModeDict` and `InputMethodServerModeDictionary`, and `IMKInputController.modes(_:)` must return that dictionary.
+- `tsVisibleInputModeOrderedArrayKey` must reference the keys inside `tsInputModeListKey`, not the `TISInputSourceID` values.
+- The keyboard menu can only select the child input mode, not the root input-method source. Give the child mode a localized display name in `InfoPlist.strings`, or macOS may surface the non-selectable parent row and leave it grey.
+- Biline now ships explicit input-method and mode icon metadata so the system picker is less likely to fall back to a raw id or blank row.
+- If Keyboard settings shows blank Biline rows, run `make diagnose-ime`.
+  - `STALE_BUNDLE_NODE=1` means Launch Services still tracks a missing Biline bundle.
+  - `BLANK_TIS_NAME=1` means `TIS` still has a Biline source whose localized name is empty.
+- If the input-source picker shows a raw `io.github...` Biline row, that is usually stale Biline state. Run `make repair-ime`.
+- `make repair-ime` is staged:
+  - level 1: uninstall Biline dev/release, unregister Biline bundles, prune Biline from `HIToolbox`, restart text-input agents
+  - level 2: clear `IntlDataCache` and require a reboot
+  - level 3: delete the Launch Services database and require a reboot
+- `make repair-ime` defaults to level 2. Run `make repair-ime REPAIR_LEVEL=3` only as a last resort.
+- First install, bundle-id changes, mode-list changes, and display-name/icon changes should be treated as metadata changes. For those cases, log out and log back in before adding the input source in Keyboard > Input Sources.
+- Code-only updates usually do not require a full relogin. Reinstall the bundle, then re-select the input source in the system UI if needed.
+- Do not `open` the input method app as part of installation. The expected launch path is: add/select the input source, then let macOS and `imklaunchagent` start the process.
+- If the input method appears grey or disappears from the menu, run `make diagnose-ime` before blaming the install path.
+- If Launch Services still reports a Biline bundle whose path no longer exists, the explicit last-resort recovery is:
+  - `sudo /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -delete`
+  - reboot
 
 ## 🧠 Architecture
 

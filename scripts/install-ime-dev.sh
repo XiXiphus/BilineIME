@@ -2,30 +2,49 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PROJECT_NAME="BilineIME"
-SCHEME="BilineIME"
-CONFIGURATION="${CONFIGURATION:-Debug}"
-DERIVED_DATA="$ROOT_DIR/build/DerivedData"
-APP_PATH="$DERIVED_DATA/Build/Products/$CONFIGURATION/$PROJECT_NAME.app"
-INSTALL_PATH="/Library/Input Methods/$PROJECT_NAME.app"
+source "$ROOT_DIR/scripts/ime-paths.sh"
 
 cd "$ROOT_DIR"
 
-xcodegen generate --quiet
-xcodebuild \
-  -project "$PROJECT_NAME.xcodeproj" \
-  -scheme "$SCHEME" \
-  -configuration "$CONFIGURATION" \
-  -derivedDataPath "$DERIVED_DATA" \
-  build
+./scripts/build-ime-dev.sh
 
-if [[ ! -d "$APP_PATH" ]]; then
-  echo "Built app not found at $APP_PATH" >&2
+if [[ ! -d "$DEV_BUILD_APP_PATH" ]]; then
+  echo "Built app not found at $DEV_BUILD_APP_PATH" >&2
   exit 1
 fi
 
-sudo mkdir -p "/Library/Input Methods"
-sudo rm -rf "$INSTALL_PATH"
-sudo ditto "$APP_PATH" "$INSTALL_PATH"
+QUIET=1 ./scripts/uninstall-ime.sh
 
-echo "Installed $PROJECT_NAME to $INSTALL_PATH"
+mkdir -p "$DEV_INSTALL_ROOT"
+rm -rf "$DEV_INSTALL_PATH"
+ditto "$DEV_BUILD_APP_PATH" "$DEV_INSTALL_PATH"
+xattr -cr "$DEV_INSTALL_PATH"
+
+for path in "${STALE_DEV_PATHS[@]}"; do
+  "$LSREGISTER" -u "$path" >/dev/null 2>&1 || true
+done
+"$LSREGISTER" -f -R -trusted "$DEV_INSTALL_PATH" >/dev/null 2>&1 || true
+"$LSREGISTER" -gc >/dev/null 2>&1 || true
+
+pkill -x "$DEV_EXECUTABLE" >/dev/null 2>&1 || true
+killall TextInputMenuAgent >/dev/null 2>&1 || true
+sleep 1
+
+ATTEMPTS=0
+until ./scripts/select-input-source.sh exists "$DEV_SOURCE_ID" >/dev/null 2>&1; do
+  ATTEMPTS=$((ATTEMPTS + 1))
+  if [[ $ATTEMPTS -ge 15 ]]; then
+    echo "Timed out waiting for $DEV_SOURCE_ID to appear in TIS." >&2
+    exit 1
+  fi
+  sleep 1
+done
+
+cat <<EOF
+Installed BilineIME Dev to $DEV_INSTALL_PATH
+
+Next steps:
+- Open Keyboard > Input Sources and add or re-select BilineIME Dev manually.
+- Treat first install and metadata changes as logout/login cases.
+- If the input-source picker shows blank Biline rows or Keyboard settings still crashes, run make repair-ime before reinstalling again.
+EOF

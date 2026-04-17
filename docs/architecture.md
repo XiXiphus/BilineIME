@@ -60,6 +60,29 @@ These facts lead to three immediate design conclusions:
 | Translation provider | Protocol-based async provider with cache and cancellation | Keeps preview logic independent from vendor or transport. |
 | Process model | Single process first; XPC helper only if later required by sandboxing, distribution, or stability concerns | Avoid early complexity. |
 
+## Installation Model
+
+The repository treats developer installation and release installation as two different system states:
+
+- `BilineIME Dev` is the developer-only input method installed into `~/Library/Input Methods`
+- `BilineIME` is the release-facing input method installed into `/Library/Input Methods`
+
+This split keeps debug iteration from colliding with release-facing `TIS`, `HIToolbox`, and Launch Services state.
+
+The repository also treats **repair** as a separate concern from **install**:
+
+- install scripts should only build, copy, and register Biline bundles
+- repair scripts may prune Biline state from `HIToolbox`, clear text-input caches, or reset Launch Services as a last resort
+- install is conservative by default; it does not promise automatic source selection
+
+The expected launch model is also explicit:
+
+- installation copies the bundle into an Input Methods directory
+- the user enables or selects the input source in Keyboard settings or the menu bar
+- macOS and `imklaunchagent` launch the process when the input source is activated
+
+The project does not treat `open /path/to/InputMethod.app` as a normal installation step.
+
 ## Attribution And License Policy
 
 This project is MIT-licensed, so upstream reuse must be intentional and documented.

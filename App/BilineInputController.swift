@@ -9,7 +9,7 @@ import OSLog
 @objc(BilineInputController)
 final class BilineInputController: IMKInputController {
     private let logger = Logger(
-        subsystem: "io.github.xixiphus.inputmethod.BilineIME",
+        subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
         category: "input-controller"
     )
     private let inputSession: BilingualInputSession
@@ -41,6 +41,10 @@ final class BilineInputController: IMKInputController {
 
     override func recognizedEvents(_ sender: Any!) -> Int {
         Int(NSEvent.EventTypeMask.keyDown.rawValue | NSEvent.EventTypeMask.flagsChanged.rawValue)
+    }
+
+    override func modes(_ sender: Any!) -> [AnyHashable: Any]! {
+        Bundle.main.object(forInfoDictionaryKey: "ComponentInputModeDict") as? [AnyHashable: Any]
     }
 
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {

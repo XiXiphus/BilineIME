@@ -4,15 +4,22 @@ import Foundation
 struct DefaultSettingsStore: SettingsStore {
     let targetLanguage: TargetLanguage
     let previewEnabled: Bool
-    let pageSize: Int
+    let compactColumnCount: Int
+    let expandedRowCount: Int
+
+    var pageSize: Int {
+        compactColumnCount * expandedRowCount
+    }
 
     init(
         targetLanguage: TargetLanguage = .english,
         previewEnabled: Bool = true,
-        pageSize: Int = 5
+        compactColumnCount: Int = 5,
+        expandedRowCount: Int = 5
     ) {
         self.targetLanguage = targetLanguage
         self.previewEnabled = previewEnabled
-        self.pageSize = pageSize
+        self.compactColumnCount = max(1, compactColumnCount)
+        self.expandedRowCount = max(1, expandedRowCount)
     }
 }

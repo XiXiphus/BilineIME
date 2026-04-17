@@ -12,14 +12,13 @@ settings:
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 0.1.0
     CODE_SIGN_STYLE: Automatic
-    PRODUCT_NAME: BilineIME
 
 packages:
   BilineModules:
     path: .
 
-targets:
-  BilineIME:
+targetTemplates:
+  InputMethodBase:
     type: application
     platform: macOS
     deploymentTarget: "14.0"
@@ -38,11 +37,19 @@ targets:
     info:
       path: App/Support/Info.plist
       properties:
-        NSPrincipalClass: "$(PRODUCT_MODULE_NAME).BilineManualApplication"
-        LSBackgroundOnly: true
+        CFBundleDisplayName: "$(INPUT_METHOD_DISPLAY_NAME)"
+        CFBundleName: "$(INPUT_METHOD_DISPLAY_NAME)"
         InputMethodConnectionName: "$(PRODUCT_BUNDLE_IDENTIFIER)_Connection"
         InputMethodServerControllerClass: "$(PRODUCT_MODULE_NAME).BilineInputController"
+        InputMethodServerDelegateClass: "$(PRODUCT_MODULE_NAME).BilineInputController"
+        LSHasLocalizedDisplayName: true
+        LSUIElement: true
+        NSPrincipalClass: "$(PRODUCT_MODULE_NAME).BilineManualApplication"
+        TICapsLockLanguageSwitchCapable: true
+        TISIntendedLanguage: zh-Hans
+        tsInputMethodIconFileKey: menu_icon.pdf
         tsInputMethodCharacterRepertoireKey:
+          - Hans
           - Latn
     entitlements:
       path: App/Support/BilineIME.entitlements
@@ -51,7 +58,6 @@ targets:
         com.apple.security.temporary-exception.mach-register.global-name: "$(PRODUCT_BUNDLE_IDENTIFIER)_Connection"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.xixiphus.inputmethod.BilineIME
         SWIFT_STRICT_CONCURRENCY: minimal
     postBuildScripts:
       - name: Strip macOS metadata
@@ -59,3 +65,64 @@ targets:
           if [ -d "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME" ]; then
             xattr -cr "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME" || true
           fi
+
+targets:
+  BilineIMEDev:
+    templates:
+      - InputMethodBase
+    sources:
+      - path: Resources/Dev
+        buildPhase: resources
+    info:
+      path: App/Support/Info.plist
+      properties:
+        ComponentInputModeDict: &devInputModeDict
+          TISUnifiedUIForInputMethodEnabling: true
+          tsInputModeListKey:
+            io.github.xixiphus.inputmethod.BilineIME.dev.pinyin:
+              TISInputSourceID: io.github.xixiphus.inputmethod.BilineIME.dev.pinyin
+              TISIntendedLanguage: zh-Hans
+              tsInputModeDefaultStateKey: true
+              tsInputModeIsVisibleKey: true
+              tsInputModeMenuIconFileKey: menu_icon.pdf
+              tsInputModePaletteIconFileKey: menu_icon.pdf
+              tsInputModePrimaryInScriptKey: true
+              tsInputModeScriptKey: smSimpChinese
+          tsVisibleInputModeOrderedArrayKey:
+            - io.github.xixiphus.inputmethod.BilineIME.dev.pinyin
+        InputMethodServerModeDictionary: *devInputModeDict
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.xixiphus.inputmethod.BilineIME.dev
+        PRODUCT_NAME: BilineIMEDev
+        INPUT_METHOD_DISPLAY_NAME: BilineIME Dev
+
+  BilineIME:
+    templates:
+      - InputMethodBase
+    sources:
+      - path: Resources/Release
+        buildPhase: resources
+    info:
+      path: App/Support/Info.plist
+      properties:
+        ComponentInputModeDict: &releaseInputModeDict
+          TISUnifiedUIForInputMethodEnabling: true
+          tsInputModeListKey:
+            io.github.xixiphus.inputmethod.BilineIME.pinyin:
+              TISInputSourceID: io.github.xixiphus.inputmethod.BilineIME.pinyin
+              TISIntendedLanguage: zh-Hans
+              tsInputModeDefaultStateKey: true
+              tsInputModeIsVisibleKey: true
+              tsInputModeMenuIconFileKey: menu_icon.pdf
+              tsInputModePaletteIconFileKey: menu_icon.pdf
+              tsInputModePrimaryInScriptKey: true
+              tsInputModeScriptKey: smSimpChinese
+          tsVisibleInputModeOrderedArrayKey:
+            - io.github.xixiphus.inputmethod.BilineIME.pinyin
+        InputMethodServerModeDictionary: *releaseInputModeDict
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.xixiphus.inputmethod.BilineIME
+        PRODUCT_NAME: BilineIME
+        INPUT_METHOD_DISPLAY_NAME: BilineIME

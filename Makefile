@@ -1,9 +1,10 @@
 PROJECT_NAME := BilineIME
-SCHEME := BilineIME
-DERIVED_DATA := build/DerivedData
+DEV_SCHEME := BilineIMEDev
+RELEASE_SCHEME := BilineIME
+DERIVED_DATA := $(HOME)/Library/Caches/BilineIME/DerivedData
 CONFIGURATION ?= Debug
 
-.PHONY: bootstrap project test build-ime install-ime package-internal format verify
+.PHONY: bootstrap project test build-ime build-ime-release install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime format verify
 
 bootstrap:
 	brew install xcodegen swift-format
@@ -15,15 +16,33 @@ test:
 	swift test
 
 build-ime: project
-	xcodebuild -project $(PROJECT_NAME).xcodeproj -scheme $(SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) build
+	./scripts/build-ime-dev.sh
+
+build-ime-release: project
+	./scripts/build-ime-release.sh
 
 install-ime:
 	./scripts/install-ime-dev.sh
 
-package-internal:
-	./scripts/build-internal-pkg.sh
+uninstall-ime:
+	./scripts/uninstall-ime.sh
+
+reset-ime:
+	./scripts/uninstall-ime.sh
+	./scripts/install-ime-dev.sh
+
+repair-ime:
+	./scripts/repair-ime.sh $(REPAIR_LEVEL)
+
+package-release:
+	./scripts/build-release-pkg.sh
+
+package-internal: package-release
+
+diagnose-ime:
+	./scripts/diagnose-ime.sh
 
 format:
 	swift-format format -i $$(find App Sources Tests -name '*.swift' -print)
 
-verify: test build-ime
+verify: test build-ime build-ime-release

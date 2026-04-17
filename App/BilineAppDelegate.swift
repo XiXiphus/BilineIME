@@ -5,7 +5,9 @@ import OSLog
 @main
 final class BilineAppDelegate: NSObject, NSApplicationDelegate {
     private let logger = Logger(
-        subsystem: "io.github.xixiphus.inputmethod.BilineIME", category: "app")
+        subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
+        category: "app"
+    )
     private(set) var server = IMKServer()
 
     func applicationDidFinishLaunching(_ notification: Notification) {

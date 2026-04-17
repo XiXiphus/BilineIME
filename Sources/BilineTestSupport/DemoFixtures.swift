@@ -14,13 +14,18 @@ public enum DemoFixtures {
     }
 
     public static func makeBilingualSession(
-        pageSize: Int = 5,
+        compactColumnCount: Int = 5,
+        expandedRowCount: Int = 5,
         delay: Duration = .zero,
         failures: Set<String> = [],
         previewEnabled: Bool = true
     ) -> BilingualInputSession {
         BilingualInputSession(
-            settingsStore: DemoSettingsStore(previewEnabled: previewEnabled, pageSize: pageSize),
+            settingsStore: DemoSettingsStore(
+                previewEnabled: previewEnabled,
+                compactColumnCount: compactColumnCount,
+                expandedRowCount: expandedRowCount
+            ),
             engineFactory: makeEngineFactory(),
             previewCoordinator: makeCoordinator(delay: delay, failures: failures)
         )
@@ -48,5 +53,10 @@ public enum DemoFixtures {
 private struct DemoSettingsStore: SettingsStore {
     let targetLanguage: TargetLanguage = .english
     let previewEnabled: Bool
-    let pageSize: Int
+    let compactColumnCount: Int
+    let expandedRowCount: Int
+
+    var pageSize: Int {
+        compactColumnCount * expandedRowCount
+    }
 }

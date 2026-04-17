@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+
+INSTALL_PATH="/Library/Input Methods/BilineIME.app"
+LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister"
+
+if [[ -d "$INSTALL_PATH" ]]; then
+  xattr -cr "$INSTALL_PATH" || true
+  "$LSREGISTER" -f -R -trusted "$INSTALL_PATH" || true
+fi
+
+pkill -x "BilineIME" || true
+killall TextInputMenuAgent || true
+
+cat <<'EOF'
+BilineIME was installed to /Library/Input Methods/BilineIME.app
+
+If this is the first install, or if input-source metadata changed, log out and log back in
+before adding BilineIME in Keyboard > Input Sources.
+EOF
+
+exit 0

@@ -13,6 +13,8 @@ public protocol TranslationProvider: Sendable {
 public protocol SettingsStore: Sendable {
     var targetLanguage: TargetLanguage { get }
     var previewEnabled: Bool { get }
+    var compactColumnCount: Int { get }
+    var expandedRowCount: Int { get }
     var pageSize: Int { get }
 }
 

@@ -2,12 +2,12 @@
 
 ## Status
 
-Accepted
+Superseded by ADR 0006
 
 ## Decision
 
-The first deliverable supports local developer installation and unsigned internal `.pkg` generation for trusted testers. Public notarized distribution is deferred.
+The first deliverable supported local developer installation and unsigned internal `.pkg` generation for trusted testers. That decision has now been replaced by a split dev/release installation model.
 
 ## Rationale
 
-This is the smallest packaging path that still allows real-user feedback without blocking on Apple distribution setup.
+This was the smallest packaging path that still allowed real-user feedback without blocking on Apple distribution setup, but it mixed debug installs and release-like installs too aggressively for stable TIS registration.

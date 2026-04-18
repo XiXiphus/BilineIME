@@ -32,6 +32,13 @@
 - New core behavior needs unit tests in `Tests/`.
 - Prefer fixture-driven tests over brittle stringly ad hoc setup.
 - Treat stale-result handling as required behavior, not best effort.
+- For any IME-facing behavior change, do not stop at tests and build:
+  - run focused tests
+  - `make build-ime`
+  - `make install-ime`
+  - real-host smoke test in `TextEdit`
+- For Computer Use-based smoke tests, use `press_key`, not `type_text`, because literal text injection may bypass IME composition.
+- When validating candidate UI, do not trust a single app-local screenshot. The candidate panel may appear on another display, so check all active displays before concluding the UI is missing or misplaced.
 
 ## Dependency policy
 

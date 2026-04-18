@@ -8,9 +8,12 @@ It intentionally treats **Mode 1** as the only first-phase target:
 
 - Chinese composition remains the primary workflow
 - candidates are rendered as a bilingual matrix for the current page, with compact mode showing the first row and expanded mode showing all real visible rows up to `5x5`, with Chinese rows grouped above English rows
-- `Shift` toggles the active commit layer between Chinese and English
-- `=` / `]` expand from compact mode and jump to the next candidate row; `-` / `[` move to the previous candidate row and collapse back to the compact first item when already on the first row
-- `+` is treated as an ordinary non-candidate key and has no special candidate-window behavior
+- `Shift+Tab` switches the active commit layer for the current highlighted candidate cell between Chinese and English without changing the selected candidate
+- once switched, the active layer persists across further typing and candidate browsing until commit, cancel, or session end
+- `=` / `]` expand from compact mode and jump to the next candidate row while candidate browsing is active; in raw-buffer-only composition they are preserved as literal input
+- `-` / `[` move to the previous candidate row and collapse back to the compact first item when already on the first row; before any successful expansion they may push composition into a raw-buffer-only literal state
+- `+` is treated as an ordinary input character with no IME-specific behavior
+- punctuation is handled by a fixed Chinese-mode punctuation policy, so raw preedit display and committed punctuation render as Chinese/full-width forms without pushing symbol-specific rules into the key router
 - translation never blocks typing
 
 Mode 2 remains a later extension and is documented here only as a deferred architecture concern.
@@ -273,7 +276,7 @@ Future Optional Layer
 - owns one active composition session per IME session
 - receives key events and composition callbacks
 - updates marked text and candidate UI
-- toggles the active layer on `Shift`
+- updates the active layer when the user presses `Shift+Tab`
 - commits the selected candidate in the current layer
 - forwards visible-page changes to the preview coordinator
 
@@ -405,7 +408,7 @@ The input method works like a real IME even without translation.
 - add async `TranslationProvider`
 - show a custom bilingual candidate panel for the visible page
 - support a whole-page bilingual matrix, with at most `5` columns and at most `5` rows per page
-- support `Shift`-based layer switching, `=`/`]` next-row browsing, `-`/`[` previous-row browsing, and active-layer commit
+- support `Shift+Tab` layer switching on the current highlighted candidate cell, candidate-aware `=`/`]` and `-`/`[` row browsing, raw-buffer-only literal input preservation, a fixed Chinese punctuation policy for raw preedit and committed punctuation, and active-layer commit
 - ignore stale results
 - add target language setting
 

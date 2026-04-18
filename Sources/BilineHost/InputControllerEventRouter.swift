@@ -39,36 +39,49 @@ public struct InputControllerEvent: Sendable, Equatable {
     }
 }
 
+public enum InputCompositionMode: Sendable, Equatable {
+    case candidateCompact
+    case candidateExpanded
+    case rawBufferOnly
+}
+
 public struct InputControllerState: Sendable, Equatable {
+    public let compositionMode: InputCompositionMode
     public let isComposing: Bool
     public let canDeleteBackward: Bool
     public let hasCandidates: Bool
     public let compactColumnCount: Int
     public let selectedRow: Int
     public let isExpandedPresentation: Bool
+    public let hasEverExpandedInCurrentComposition: Bool
 
     public init(
+        compositionMode: InputCompositionMode = .candidateCompact,
         isComposing: Bool,
         canDeleteBackward: Bool,
         hasCandidates: Bool,
         compactColumnCount: Int,
         selectedRow: Int = 0,
-        isExpandedPresentation: Bool = false
+        isExpandedPresentation: Bool = false,
+        hasEverExpandedInCurrentComposition: Bool = false
     ) {
+        self.compositionMode = compositionMode
         self.isComposing = isComposing
         self.canDeleteBackward = canDeleteBackward
         self.hasCandidates = hasCandidates
         self.compactColumnCount = max(1, compactColumnCount)
         self.selectedRow = max(0, selectedRow)
         self.isExpandedPresentation = isExpandedPresentation
+        self.hasEverExpandedInCurrentComposition = hasEverExpandedInCurrentComposition
     }
 }
 
 public enum InputControllerAction: Sendable, Equatable {
     case passThrough
-    case consume
     case append(String)
+    case appendLiteral(String)
     case commitChineseAndInsert(String)
+    case toggleLayer
     case deleteBackward
     case commit
     case cancel
@@ -78,12 +91,12 @@ public enum InputControllerAction: Sendable, Equatable {
     case expandAndAdvanceRow
     case collapseToCompactAndSelectFirst
     case turnPage(PageDirection)
-    case toggleLayer
     case selectColumn(Int)
 }
 
 public final class InputControllerEventRouter: @unchecked Sendable {
     private enum KeyBinding {
+        static let tab: UInt16 = 48
         static let returnKey: UInt16 = 36
         static let space: UInt16 = 49
         static let deleteBackward: UInt16 = 51
@@ -98,44 +111,36 @@ public final class InputControllerEventRouter: @unchecked Sendable {
         static let minus: UInt16 = 27
         static let leftBracket: UInt16 = 33
         static let rightBracket: UInt16 = 30
-        static let leftShift: UInt16 = 56
-        static let rightShift: UInt16 = 60
     }
-
-    private var isShiftPressed = false
-    private var shiftUsedAsModifier = false
 
     public init() {}
 
-    public func reset() {
-        isShiftPressed = false
-        shiftUsedAsModifier = false
-    }
+    public func reset() {}
 
     public func route(
         event: InputControllerEvent,
         state: InputControllerState
     ) -> InputControllerAction {
         if event.type == .flagsChanged {
-            return routeFlagsChanged(event: event, state: state)
-        }
-
-        if event.modifierFlags.contains(.command) {
-            if isShiftPressed {
-                shiftUsedAsModifier = true
-            }
             return .passThrough
         }
 
-        if isShiftPressed {
-            shiftUsedAsModifier = true
+        if event.modifierFlags.contains(.command) {
+            return .passThrough
         }
 
         if let rowAction = rowBrowseAction(for: event, state: state) {
             return rowAction
         }
 
+        if let literalAction = literalAppendAction(for: event, state: state) {
+            return literalAction
+        }
+
         switch event.keyCode {
+        case KeyBinding.tab:
+            return state.isComposing && state.hasCandidates && event.modifierFlags.contains(.shift)
+                ? .toggleLayer : .passThrough
         case KeyBinding.returnKey, KeyBinding.space:
             return state.isComposing ? .commit : .passThrough
         case KeyBinding.deleteBackward:
@@ -150,14 +155,26 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             guard state.isComposing, state.hasCandidates else {
                 return .passThrough
             }
-            return state.isExpandedPresentation && state.selectedRow == 0
-                ? .collapseToCompactAndSelectFirst
-                : .browsePreviousRow
+            switch state.compositionMode {
+            case .candidateExpanded:
+                return state.selectedRow == 0 ? .collapseToCompactAndSelectFirst : .browsePreviousRow
+            case .candidateCompact:
+                return .browsePreviousRow
+            case .rawBufferOnly:
+                return .passThrough
+            }
         case KeyBinding.downArrow:
             guard state.isComposing, state.hasCandidates else {
                 return .passThrough
             }
-            return state.isExpandedPresentation ? .browseNextRow : .expandAndAdvanceRow
+            switch state.compositionMode {
+            case .candidateExpanded:
+                return .browseNextRow
+            case .candidateCompact:
+                return .expandAndAdvanceRow
+            case .rawBufferOnly:
+                return .passThrough
+            }
         case KeyBinding.pageUp:
             return state.isComposing ? .turnPage(.previous) : .passThrough
         case KeyBinding.pageDown:
@@ -173,7 +190,7 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             return .selectColumn(digitIndex)
         }
 
-        if state.isComposing, let punctuation = punctuationCommitText(from: event) {
+        if state.isComposing, let punctuation = terminatingPunctuationCommitText(from: event) {
             return .commitChineseAndInsert(punctuation)
         }
 
@@ -183,33 +200,6 @@ public final class InputControllerEventRouter: @unchecked Sendable {
 
         let normalized = characters.filter { $0.isLetter || $0 == "'" }
         return normalized.isEmpty ? .passThrough : .append(normalized)
-    }
-
-    private func routeFlagsChanged(
-        event: InputControllerEvent,
-        state: InputControllerState
-    ) -> InputControllerAction {
-        guard event.keyCode == KeyBinding.leftShift || event.keyCode == KeyBinding.rightShift else {
-            return .passThrough
-        }
-
-        let isShiftDown = event.modifierFlags.contains(.shift)
-        guard state.isComposing else {
-            isShiftPressed = isShiftDown
-            shiftUsedAsModifier = false
-            return .passThrough
-        }
-
-        if isShiftDown {
-            isShiftPressed = true
-            shiftUsedAsModifier = false
-            return .consume
-        }
-
-        let shouldToggleLayer = isShiftPressed && !shiftUsedAsModifier
-        isShiftPressed = false
-        shiftUsedAsModifier = false
-        return shouldToggleLayer ? .toggleLayer : .consume
     }
 
     private func candidateColumnIndex(
@@ -232,24 +222,12 @@ public final class InputControllerEventRouter: @unchecked Sendable {
         return index < columnCount ? index : nil
     }
 
-    private func punctuationCommitText(from event: InputControllerEvent) -> String? {
+    private func terminatingPunctuationCommitText(from event: InputControllerEvent) -> String? {
         let candidates = [event.characters, event.charactersIgnoringModifiers].compactMap { $0 }
+        let terminatingPunctuation: Set<String> = [",", ".", "!", "?", ";", ":"]
 
         for candidate in candidates where candidate.count == 1 {
-            guard let scalar = candidate.unicodeScalars.first, scalar.isASCII else {
-                continue
-            }
-
-            let value = scalar.value
-            let isASCIIPunctuation =
-                (33...47).contains(value)
-                || (58...64).contains(value)
-                || (91...96).contains(value)
-                || (123...126).contains(value)
-            let excluded = value == 39 || value == 43 || value == 45 || value == 61
-                || value == 91 || value == 93
-
-            if isASCIIPunctuation && !excluded {
+            if terminatingPunctuation.contains(candidate) {
                 return candidate
             }
         }
@@ -271,54 +249,113 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             return .passThrough
         }
 
-        guard state.hasCandidates else {
+        switch state.compositionMode {
+        case .candidateCompact:
+            if matchedNextRow {
+                return .expandAndAdvanceRow
+            }
+            return state.hasEverExpandedInCurrentComposition
+                ? .collapseToCompactAndSelectFirst
+                : .appendLiteral(previousRowLiteral(for: event))
+        case .candidateExpanded:
+            if matchedNextRow {
+                return .browseNextRow
+            }
+            return state.selectedRow == 0 ? .collapseToCompactAndSelectFirst : .browsePreviousRow
+        case .rawBufferOnly:
+            return .appendLiteral(
+                matchedNextRow ? nextRowLiteral(for: event) : previousRowLiteral(for: event)
+            )
+        }
+    }
+
+    private func literalAppendAction(
+        for event: InputControllerEvent,
+        state: InputControllerState
+    ) -> InputControllerAction? {
+        guard state.isComposing else {
             return nil
         }
 
-        if matchedNextRow {
-            return state.isExpandedPresentation ? .browseNextRow : .expandAndAdvanceRow
+        if let literal = genericLiteralPunctuation(for: event) {
+            return .appendLiteral(literal)
         }
 
-        return state.isExpandedPresentation && state.selectedRow == 0
-            ? .collapseToCompactAndSelectFirst
-            : .browsePreviousRow
+        return nil
+    }
+
+    private func genericLiteralPunctuation(for event: InputControllerEvent) -> String? {
+        guard let character = actualCharacter(for: event), character.count == 1 else {
+            return nil
+        }
+
+        guard let scalar = character.unicodeScalars.first, scalar.isASCII else {
+            return nil
+        }
+
+        let value = scalar.value
+        let isASCIIPunctuation =
+            (33...47).contains(value)
+            || (58...64).contains(value)
+            || (91...96).contains(value)
+            || (123...126).contains(value)
+        guard isASCIIPunctuation else {
+            return nil
+        }
+
+        let excludedLiterals: Set<String> = ["'", "-", "=", "[", "]", ",", ".", "!", "?", ";", ":"]
+        return excludedLiterals.contains(character) ? nil : character
     }
 
     private func isNextRowKey(_ event: InputControllerEvent) -> Bool {
-        if event.keyCode == KeyBinding.equal {
-            let reportedCharacters = [event.characters, event.charactersIgnoringModifiers]
-                .compactMap { $0 }
-            if reportedCharacters.contains("=") {
-                return true
-            }
+        let character = actualCharacter(for: event)
+        if event.keyCode == KeyBinding.equal, character == "=" {
+            return true
         }
 
-        if event.keyCode == KeyBinding.rightBracket {
-            return event.characters == "]" || event.charactersIgnoringModifiers == "]"
+        if event.keyCode == KeyBinding.rightBracket, character == "]" {
+            return true
         }
 
-        return event.characters == "=" || event.charactersIgnoringModifiers == "="
-            || event.characters == "]" || event.charactersIgnoringModifiers == "]"
+        return character == "=" || character == "]"
     }
 
     private func isPreviousRowKey(_ event: InputControllerEvent) -> Bool {
-        if event.keyCode == KeyBinding.minus {
-            let reportedCharacters = [event.characters, event.charactersIgnoringModifiers]
-                .compactMap { $0 }
-            if reportedCharacters.contains("-") {
-                return true
-            }
+        let character = actualCharacter(for: event)
+        if event.keyCode == KeyBinding.minus, character == "-" {
+            return true
         }
 
-        if event.keyCode == KeyBinding.leftBracket {
-            let reportedCharacters = [event.characters, event.charactersIgnoringModifiers]
-                .compactMap { $0 }
-            if reportedCharacters.contains("[") {
-                return true
-            }
+        if event.keyCode == KeyBinding.leftBracket, character == "[" {
+            return true
         }
 
-        return event.characters == "-" || event.charactersIgnoringModifiers == "-"
-            || event.characters == "[" || event.charactersIgnoringModifiers == "["
+        return character == "-" || character == "["
+    }
+
+    private func nextRowLiteral(for event: InputControllerEvent) -> String {
+        if actualCharacter(for: event) == "]" {
+            return "]"
+        }
+        return "="
+    }
+
+    private func previousRowLiteral(for event: InputControllerEvent) -> String {
+        if actualCharacter(for: event) == "[" {
+            return "["
+        }
+        return "-"
+    }
+
+    private func actualCharacter(for event: InputControllerEvent) -> String? {
+        if let characters = event.characters, !characters.isEmpty {
+            return characters
+        }
+        if let charactersIgnoringModifiers = event.charactersIgnoringModifiers,
+            !charactersIgnoringModifiers.isEmpty
+        {
+            return charactersIgnoringModifiers
+        }
+        return nil
     }
 }

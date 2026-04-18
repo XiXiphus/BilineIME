@@ -3,7 +3,22 @@ import BilineTestSupport
 import XCTest
 
 final class BilingualInputSessionTests: XCTestCase {
-    func testShiftToggleChangesLayerWithoutChangingCell() {
+    func testSetActiveLayerChangesLayerWithoutChangingCell() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "nihao")
+        let before = session.snapshot
+
+        session.setActiveLayer(.english)
+        let after = session.snapshot
+
+        XCTAssertEqual(before.selectedRow, after.selectedRow)
+        XCTAssertEqual(before.selectedColumn, after.selectedColumn)
+        XCTAssertEqual(before.selectedFlatIndex, after.selectedFlatIndex)
+        XCTAssertEqual(after.activeLayer, .english)
+    }
+
+    func testToggleActiveLayerChangesLayerWithoutChangingCell() {
         let session = DemoFixtures.makeBilingualSession()
 
         session.append(text: "nihao")
@@ -22,13 +37,46 @@ final class BilingualInputSessionTests: XCTestCase {
         let session = DemoFixtures.makeBilingualSession()
 
         session.append(text: "shi")
-        session.toggleActiveLayer()
+        session.setActiveLayer(.english)
         session.moveColumn(.next)
 
         XCTAssertEqual(session.snapshot.activeLayer, .english)
         XCTAssertEqual(session.snapshot.selectedRow, 0)
         XCTAssertEqual(session.snapshot.selectedColumn, 1)
         XCTAssertEqual(session.snapshot.selectedFlatIndex, 1)
+    }
+
+    func testAppendingInputKeepsEnglishLayerActive() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.setActiveLayer(.english)
+        session.append(text: "a")
+
+        XCTAssertEqual(session.snapshot.rawInput, "shia")
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
+    }
+
+    func testToggleActiveLayerPersistsAcrossTypingAndBrowsing() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.toggleActiveLayer()
+        session.append(text: "a")
+        session.browseNextRow()
+
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
+    }
+
+    func testBrowsingRowsKeepsEnglishLayerActive() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.setActiveLayer(.english)
+        session.expandAndAdvanceRow()
+
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
     }
 
     func testCompactPresentationDoesNotPadCandidatesToFiveColumns() {
@@ -128,11 +176,15 @@ final class BilingualInputSessionTests: XCTestCase {
         session.append(text: "shi")
         XCTAssertEqual(session.snapshot.items.count, 10)
         XCTAssertEqual(session.snapshot.presentationMode, .compact)
+        XCTAssertEqual(session.compositionMode, .candidateCompact)
+        XCTAssertFalse(session.hasEverExpandedInCurrentComposition)
         XCTAssertEqual(session.snapshot.visibleRowCount, 1)
 
         session.expandAndAdvanceRow()
 
         XCTAssertEqual(session.snapshot.presentationMode, .expanded)
+        XCTAssertEqual(session.compositionMode, .candidateExpanded)
+        XCTAssertTrue(session.hasEverExpandedInCurrentComposition)
         XCTAssertEqual(session.snapshot.selectedRow, 1)
         XCTAssertEqual(session.snapshot.items(inRow: 1).map(\.candidate.surface), ["识", "诗", "十", "史", "食"])
     }
@@ -162,10 +214,62 @@ final class BilingualInputSessionTests: XCTestCase {
         session.appendLiteral(text: "-")
 
         XCTAssertTrue(session.snapshot.isComposing)
+        XCTAssertEqual(session.compositionMode, .rawBufferOnly)
         XCTAssertEqual(session.snapshot.rawInput, "shi-")
-        XCTAssertEqual(session.snapshot.markedText, "shi-")
+        XCTAssertEqual(session.snapshot.displayRawInput, "shi－")
+        XCTAssertEqual(session.snapshot.markedText, "shi－")
         XCTAssertTrue(session.snapshot.items.isEmpty)
         XCTAssertEqual(session.snapshot.presentationMode, .compact)
+    }
+
+    func testExpandHistoryPreventsHyphenFromReenteringRawBufferOnly() {
+        let session = DemoFixtures.makeBilingualSession(
+            compactColumnCount: 2,
+            expandedRowCount: 2
+        )
+
+        session.append(text: "shi")
+        session.expandAndAdvanceRow()
+        session.collapseToCompactAndSelectFirst()
+
+        XCTAssertTrue(session.hasEverExpandedInCurrentComposition)
+        XCTAssertEqual(session.compositionMode, .candidateCompact)
+
+        session.collapseToCompactAndSelectFirst()
+
+        XCTAssertEqual(session.compositionMode, .candidateCompact)
+        XCTAssertFalse(session.snapshot.items.isEmpty)
+        XCTAssertEqual(session.snapshot.rawInput, "shi")
+    }
+
+    func testRawBufferOnlyCanAccumulateMinusEqualAndPlus() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "ni")
+        session.appendLiteral(text: "-")
+        session.appendLiteral(text: "-")
+        session.appendLiteral(text: "=")
+        session.appendLiteral(text: "=")
+        session.appendLiteral(text: "+")
+
+        XCTAssertEqual(session.compositionMode, .rawBufferOnly)
+        XCTAssertEqual(session.snapshot.rawInput, "ni--==+")
+        XCTAssertEqual(session.snapshot.displayRawInput, "ni－－＝＝＋")
+        XCTAssertTrue(session.snapshot.items.isEmpty)
+    }
+
+    func testRawBufferOnlyDisplayUsesChinesePunctuationPolicy() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "%")
+        session.appendLiteral(text: "_")
+        session.appendLiteral(text: "+")
+
+        XCTAssertEqual(session.compositionMode, .rawBufferOnly)
+        XCTAssertEqual(session.snapshot.rawInput, "shi%_+")
+        XCTAssertEqual(session.snapshot.displayRawInput, "shi％＿＋")
+        XCTAssertEqual(session.snapshot.markedText, "shi％＿＋")
     }
 
     func testDeletingLiteralBufferRestoresCandidateComposition() {
@@ -188,8 +292,29 @@ final class BilingualInputSessionTests: XCTestCase {
         session.appendLiteral(text: "-")
         session.appendLiteral(text: "-")
 
-        XCTAssertEqual(session.commitSelection(), "shi--")
+        XCTAssertEqual(session.commitSelection(), "shi－－")
         XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testCommitSelectionTransformsRawBufferPunctuationForCommit() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "ni")
+        session.appendLiteral(text: "-")
+        session.appendLiteral(text: "=")
+        session.appendLiteral(text: "%")
+        session.appendLiteral(text: "+")
+
+        XCTAssertEqual(session.commitSelection(), "ni－＝％＋")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testRenderCommittedTextUsesChinesePunctuationPolicy() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        XCTAssertEqual(session.renderCommittedText(","), "，")
+        XCTAssertEqual(session.renderCommittedText("()"), "（）")
+        XCTAssertEqual(session.renderCommittedText("%+_"), "％＋＿")
     }
 
     func testVisiblePreviewUpdatesToReadyWithoutExtraNavigation() async {
@@ -230,7 +355,7 @@ final class BilingualInputSessionTests: XCTestCase {
         }
 
         session.append(text: "shi")
-        session.toggleActiveLayer()
+        session.setActiveLayer(.english)
 
         await fulfillment(of: [ready], timeout: 1.0)
 
@@ -257,7 +382,7 @@ final class BilingualInputSessionTests: XCTestCase {
         }
 
         session.append(text: "nihao")
-        session.toggleActiveLayer()
+        session.setActiveLayer(.english)
 
         await fulfillment(of: [ready], timeout: 1.0)
 
@@ -270,7 +395,7 @@ final class BilingualInputSessionTests: XCTestCase {
         let session = DemoFixtures.makeBilingualSession(delay: .milliseconds(60))
 
         session.append(text: "nihao")
-        session.toggleActiveLayer()
+        session.setActiveLayer(.english)
 
         XCTAssertNil(session.commitSelection())
         XCTAssertTrue(session.snapshot.isComposing)

@@ -15,7 +15,7 @@ That decision no longer matches the current product definition.
 Mode 1 now requires:
 
 - a two-line bilingual row for every visible candidate
-- `Shift`-based layer switching between Chinese and English
+- `Shift+Tab`-based layer switching between Chinese and English on the current highlighted candidate cell
 - committing either layer for the selected candidate
 
 Those interaction requirements exceed what stock annotation can express cleanly, so the annotation-first path is retained only as historical context.

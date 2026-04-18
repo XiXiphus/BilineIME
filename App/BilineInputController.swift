@@ -228,15 +228,27 @@ final class BilineInputController: IMKInputController {
         client: IMKTextInput,
         loggingSource: StaticString
     ) -> Bool {
+        let compositionMode: InputCompositionMode
+        switch inputSession.compositionMode {
+        case .candidateCompact:
+            compositionMode = .candidateCompact
+        case .candidateExpanded:
+            compositionMode = .candidateExpanded
+        case .rawBufferOnly:
+            compositionMode = .rawBufferOnly
+        }
+
         let action = eventRouter.route(
             event: event,
             state: InputControllerState(
+                compositionMode: compositionMode,
                 isComposing: inputSession.snapshot.isComposing,
                 canDeleteBackward: inputSession.canDeleteBackward,
                 hasCandidates: inputSession.hasCandidates,
                 compactColumnCount: inputSession.snapshot.compactColumnCount,
                 selectedRow: inputSession.snapshot.selectedRow,
-                isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded
+                isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded,
+                hasEverExpandedInCurrentComposition: inputSession.hasEverExpandedInCurrentComposition
             )
         )
 
@@ -251,16 +263,21 @@ final class BilineInputController: IMKInputController {
         switch action {
         case .passThrough:
             return false
-        case .consume:
-            return true
         case .append(let text):
             inputSession.append(text: text)
+        case .appendLiteral(let text):
+            inputSession.appendLiteral(text: text)
+        case .toggleLayer:
+            inputSession.toggleActiveLayer()
         case .commitChineseAndInsert(let text):
             let committedText = inputSession.commitChineseSelection()
             if let committedText, !committedText.isEmpty {
                 textInputBridge.insertCommittedText(committedText, into: client)
             }
-            textInputBridge.insertCommittedText(text, into: client)
+            textInputBridge.insertCommittedText(
+                inputSession.renderCommittedText(text),
+                into: client
+            )
             textInputBridge.clearAnchorCache()
             render(client: client)
             return true
@@ -283,8 +300,6 @@ final class BilineInputController: IMKInputController {
             inputSession.collapseToCompactAndSelectFirst()
         case .turnPage(let direction):
             inputSession.turnPage(direction)
-        case .toggleLayer:
-            inputSession.toggleActiveLayer()
         case .selectColumn(let columnIndex):
             inputSession.selectColumn(at: columnIndex)
             return commitSelection(using: client)

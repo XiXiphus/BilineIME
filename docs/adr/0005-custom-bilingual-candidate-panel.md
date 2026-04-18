@@ -13,7 +13,7 @@ The panel renders a bilingual matrix:
 - current page: up to `5x5`
 - all visible Chinese rows stay grouped in the upper block and all visible English rows stay grouped in the lower block
 
-`Shift` toggles the active layer for the selected cell, `=` / `]` expand from compact mode and jump to the next candidate row, `-` / `[` browse upward and collapse back to the compact first item when already on the first row, `+` has no candidate-window behavior, and confirming a candidate commits the current layer only.
+`Shift+Tab` switches the active layer for the current highlighted cell, `=` / `]` expand from compact mode and jump to the next candidate row when candidate browsing is active, `-` / `[` browse upward and collapse back to the compact first item when already on the first row, raw-buffer-only composition preserves the physical `=` / `-` / `[` / `]` input while rendering Chinese/full-width punctuation in the UI, and confirming a candidate commits the current layer only.
 
 ## Rationale
 

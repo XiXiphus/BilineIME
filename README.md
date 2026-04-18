@@ -201,6 +201,27 @@ Build products are generated under `~/Library/Caches/BilineIME/DerivedData` inst
   - `sudo /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -delete`
   - reboot
 
+### Post-install IME Smoke Test
+
+For IME-facing changes, build success is not enough. Run a real-host smoke test after `make install-ime`.
+
+Recommended baseline:
+
+1. Select the dev input source:
+   - `./scripts/select-input-source.sh select io.github.xixiphus.inputmethod.BilineIME.dev.pinyin`
+   - `./scripts/select-input-source.sh current`
+2. Open `TextEdit` and test real key presses there first.
+3. If you automate the test with Codex `Computer Use`, use `press_key`, not `type_text`.
+4. If the candidate panel seems missing, inspect all displays. The panel may render on another monitor even when the host app stays on the current one.
+
+Use a fixed regression set for punctuation and candidate behavior, for example:
+
+- `shi_`
+- `shi%`
+- `ni----====+`
+- `shi,`
+- `shi()`
+
 ## 🧠 Architecture
 
 The implementation blueprint lives in:

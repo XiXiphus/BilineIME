@@ -77,6 +77,7 @@ final class InputControllerEventRouterTests: XCTestCase {
     func testUpDownBrowseRowsWhileComposingWithCandidates() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
+            compositionMode: .candidateCompact,
             isComposing: true,
             canDeleteBackward: true,
             hasCandidates: true,
@@ -99,9 +100,10 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
-    func testShiftTapTogglesLayerDuringComposition() {
+    func testShiftPassesThroughDuringComposition() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
+            compositionMode: .candidateCompact,
             isComposing: true,
             canDeleteBackward: true,
             hasCandidates: true,
@@ -117,18 +119,54 @@ final class InputControllerEventRouterTests: XCTestCase {
                 ),
                 state: state
             ),
-            .consume
+            .passThrough
         )
+    }
+
+    func testShiftTabTogglesLayerDuringComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
         XCTAssertEqual(
             router.route(
                 event: InputControllerEvent(
-                    type: .flagsChanged,
-                    keyCode: 56,
-                    modifierFlags: []
+                    type: .keyDown,
+                    keyCode: 48,
+                    characters: "\t",
+                    charactersIgnoringModifiers: "\t",
+                    modifierFlags: [.shift]
                 ),
                 state: state
             ),
             .toggleLayer
+        )
+    }
+
+    func testTabPassesThroughDuringComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 48,
+                    characters: "\t",
+                    charactersIgnoringModifiers: "\t"
+                ),
+                state: state
+            ),
+            .passThrough
         )
     }
 
@@ -158,6 +196,7 @@ final class InputControllerEventRouterTests: XCTestCase {
     func testEqualPhysicalKeyBrowsesNextRowWhenExpanded() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
+            compositionMode: .candidateExpanded,
             isComposing: true,
             canDeleteBackward: true,
             hasCandidates: true,
@@ -239,6 +278,7 @@ final class InputControllerEventRouterTests: XCTestCase {
     func testHyphenMovesToPreviousRowWhileExpandedAndNotOnFirstRow() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
+            compositionMode: .candidateExpanded,
             isComposing: true,
             canDeleteBackward: true,
             hasCandidates: true,
@@ -264,6 +304,7 @@ final class InputControllerEventRouterTests: XCTestCase {
     func testHyphenCollapsesToCompactAndSelectsFirstWhenExpandedAtFirstRow() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
+            compositionMode: .candidateExpanded,
             isComposing: true,
             canDeleteBackward: true,
             hasCandidates: true,
@@ -283,6 +324,178 @@ final class InputControllerEventRouterTests: XCTestCase {
                 state: state
             ),
             .collapseToCompactAndSelectFirst
+        )
+    }
+
+    func testHyphenAppendsLiteralWhenCompactAndNeverExpanded() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            selectedRow: 0,
+            isExpandedPresentation: false,
+            hasEverExpandedInCurrentComposition: false
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 27,
+                    characters: "-",
+                    charactersIgnoringModifiers: "-"
+                ),
+                state: state
+            ),
+            .appendLiteral("-")
+        )
+    }
+
+    func testHyphenCollapsesToFirstWhenCompactAfterExpansionHistory() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            hasEverExpandedInCurrentComposition: true
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 27,
+                    characters: "-",
+                    charactersIgnoringModifiers: "-"
+                ),
+                state: state
+            ),
+            .collapseToCompactAndSelectFirst
+        )
+    }
+
+    func testRawBufferOnlyMinusAppendsLiteral() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .rawBufferOnly,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 27,
+                    characters: "-",
+                    charactersIgnoringModifiers: "-"
+                ),
+                state: state
+            ),
+            .appendLiteral("-")
+        )
+    }
+
+    func testRawBufferOnlyEqualAppendsLiteral() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .rawBufferOnly,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 24,
+                    characters: "=",
+                    charactersIgnoringModifiers: "="
+                ),
+                state: state
+            ),
+            .appendLiteral("=")
+        )
+    }
+
+    func testPlusAppendsLiteralDuringComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 24,
+                    characters: "+",
+                    charactersIgnoringModifiers: "="
+                ),
+                state: state
+            ),
+            .appendLiteral("+")
+        )
+    }
+
+    func testUnderscoreAppendsLiteralDuringComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 27,
+                    characters: "_",
+                    charactersIgnoringModifiers: "-"
+                ),
+                state: state
+            ),
+            .appendLiteral("_")
+        )
+    }
+
+    func testPercentAppendsLiteralDuringComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 23,
+                    characters: "%",
+                    charactersIgnoringModifiers: "5"
+                ),
+                state: state
+            ),
+            .appendLiteral("%")
         )
     }
 

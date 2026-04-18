@@ -402,6 +402,117 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.activeLayer, .english)
     }
 
+    func testPhraseCandidateRanksAheadOfShortPrefixCandidates() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "haopingguo")
+
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "好苹果")
+        XCTAssertTrue(session.snapshot.items.contains(where: { $0.candidate.surface == "好" }))
+        XCTAssertEqual(session.snapshot.markedText, "haopingguo")
+    }
+
+    func testEnglishPhraseCandidateCommitsFullTranslation() async {
+        let session = DemoFixtures.makeBilingualSession()
+        let ready = expectation(description: "english preview ready for 好苹果")
+        var didFulfill = false
+
+        session.onSnapshotUpdate = { snapshot in
+            guard !didFulfill else { return }
+            guard snapshot.activeLayer == .english,
+                snapshot.items.first?.candidate.surface == "好苹果",
+                snapshot.items.first?.englishText == "good apple"
+            else {
+                return
+            }
+            didFulfill = true
+            ready.fulfill()
+        }
+
+        session.append(text: "haopingguo")
+        session.setActiveLayer(.english)
+        await fulfillment(of: [ready], timeout: 1.0)
+
+        XCTAssertEqual(session.commitSelection(), "good apple")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testEnglishPrefixCandidatePartiallyCommitsAndKeepsTail() async {
+        let session = DemoFixtures.makeBilingualSession()
+        let ready = expectation(description: "english preview ready for 好")
+        var didFulfill = false
+
+        session.onSnapshotUpdate = { snapshot in
+            guard !didFulfill else { return }
+            guard snapshot.activeLayer == .english,
+                snapshot.items.count > 1,
+                snapshot.items[1].candidate.surface == "好",
+                snapshot.items[1].englishText == "good"
+            else {
+                return
+            }
+            didFulfill = true
+            ready.fulfill()
+        }
+
+        session.append(text: "haopingguo")
+        session.setActiveLayer(.english)
+        await fulfillment(of: [ready], timeout: 1.0)
+
+        session.moveColumn(.next)
+
+        XCTAssertEqual(session.commitSelection(), "good")
+        XCTAssertEqual(session.snapshot.rawInput, "pingguo")
+        XCTAssertEqual(session.snapshot.markedText, "pingguo")
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "苹果")
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
+    }
+
+    func testChinesePrefixCandidatePartiallyCommitsAndKeepsTail() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "haopingguo")
+        session.moveColumn(.next)
+
+        XCTAssertEqual(session.commitSelection(), "好")
+        XCTAssertEqual(session.snapshot.rawInput, "pingguo")
+        XCTAssertEqual(session.snapshot.markedText, "pingguo")
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "苹果")
+        XCTAssertEqual(session.snapshot.activeLayer, .chinese)
+    }
+
+    func testBackspaceAfterPartialCommitOnlyEditsTail() async {
+        let session = DemoFixtures.makeBilingualSession()
+        let ready = expectation(description: "english preview ready for 好")
+        var didFulfill = false
+
+        session.onSnapshotUpdate = { snapshot in
+            guard !didFulfill else { return }
+            guard snapshot.activeLayer == .english,
+                snapshot.items.count > 1,
+                snapshot.items[1].candidate.surface == "好",
+                snapshot.items[1].englishText == "good"
+            else {
+                return
+            }
+            didFulfill = true
+            ready.fulfill()
+        }
+
+        session.append(text: "haopingguo")
+        session.setActiveLayer(.english)
+        await fulfillment(of: [ready], timeout: 1.0)
+
+        session.moveColumn(.next)
+        XCTAssertEqual(session.commitSelection(), "good")
+
+        session.deleteBackward()
+
+        XCTAssertEqual(session.snapshot.rawInput, "pinggu")
+        XCTAssertEqual(session.snapshot.markedText, "pinggu")
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
+    }
+
     func testSwitchingPagesLoadsVisibleCandidatesWithoutCorruptingNewPage() async {
         let session = DemoFixtures.makeBilingualSession(
             compactColumnCount: 2,

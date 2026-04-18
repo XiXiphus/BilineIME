@@ -4,7 +4,7 @@ RELEASE_SCHEME := BilineIME
 DERIVED_DATA := $(HOME)/Library/Caches/BilineIME/DerivedData
 CONFIGURATION ?= Debug
 
-.PHONY: bootstrap project test build-ime build-ime-release install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime format verify
+.PHONY: bootstrap project test build-ime build-ime-release install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime smoke-ime verify-ime format verify
 
 bootstrap:
 	brew install xcodegen swift-format
@@ -41,6 +41,16 @@ package-internal: package-release
 
 diagnose-ime:
 	./scripts/diagnose-ime.sh
+
+smoke-ime:
+	./scripts/smoke-ime.sh prepare
+	./scripts/smoke-ime.sh run
+
+verify-ime:
+	swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests'
+	$(MAKE) build-ime
+	$(MAKE) install-ime
+	$(MAKE) smoke-ime
 
 format:
 	swift-format format -i $$(find App Sources Tests -name '*.swift' -print)

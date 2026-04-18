@@ -78,6 +78,7 @@ public struct InputControllerState: Sendable, Equatable {
 
 public enum InputControllerAction: Sendable, Equatable {
     case passThrough
+    case consume
     case append(String)
     case appendLiteral(String)
     case commitChineseAndInsert(String)
@@ -139,8 +140,10 @@ public final class InputControllerEventRouter: @unchecked Sendable {
 
         switch event.keyCode {
         case KeyBinding.tab:
-            return state.isComposing && state.hasCandidates && event.modifierFlags.contains(.shift)
-                ? .toggleLayer : .passThrough
+            if state.isComposing && event.modifierFlags.contains(.shift) {
+                return state.hasCandidates ? .toggleLayer : .consume
+            }
+            return .passThrough
         case KeyBinding.returnKey, KeyBinding.space:
             return state.isComposing ? .commit : .passThrough
         case KeyBinding.deleteBackward:

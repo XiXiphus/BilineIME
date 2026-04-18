@@ -38,7 +38,7 @@
 - `make build-ime-release` succeeds on a machine with Xcode installed.
 - `make install-ime` installs the dev input method into `~/Library/Input Methods` without requiring manual bundle copying.
 - `make install-ime` does not depend on automatic source activation to count as a successful install.
-- IME-facing behavior changes are verified in a real host after install, with `TextEdit` as the baseline smoke-test host.
-- Computer Use-based IME smoke tests use real key presses rather than literal text injection, and candidate-panel checks inspect all displays when necessary.
+- IME-facing behavior changes are verified in a real host after install, with `TextEdit` as the baseline smoke-test host and `make smoke-ime` as the default entry.
+- Interactive Codex follow-up checks use real key presses rather than literal text injection, and candidate-panel checks inspect all displays when necessary.
 - `make repair-ime` provides a staged recovery path for ghost Biline sources and broken Keyboard settings state.
 - `make package-release` produces an installer package that installs the release input method into `/Library/Input Methods`.

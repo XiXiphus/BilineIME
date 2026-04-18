@@ -44,7 +44,8 @@ private enum FixtureLoader {
                         id: "\(entry.reading)#\(index)#\(entry.surface)",
                         surface: entry.surface,
                         reading: entry.reading,
-                        score: entry.score
+                        score: entry.score,
+                        consumedTokenCount: entry.reading.split(separator: " ").count
                     )
                 }
         }
@@ -94,6 +95,9 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
     private var rawInput = ""
     private var allCandidates: [Candidate] = []
     private var selectedGlobalIndex = 0
+    private var activeRawInput = ""
+    private var remainingRawInput = ""
+    private var consumedTokenCount = 0
 
     fileprivate init(lexicon: FixtureLexicon, config: EngineConfig) {
         self.lexicon = lexicon
@@ -118,6 +122,7 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
             selectedGlobalIndex = max(selectedGlobalIndex - 1, 0)
         }
 
+        syncSelectionSpan()
         return makeSnapshot()
     }
 
@@ -138,6 +143,7 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
         }
 
         selectedGlobalIndex = min(targetPage * config.pageSize, allCandidates.count - 1)
+        syncSelectionSpan()
         return makeSnapshot()
     }
 
@@ -151,6 +157,9 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
         rawInput = ""
         allCandidates = []
         selectedGlobalIndex = 0
+        activeRawInput = ""
+        remainingRawInput = ""
+        consumedTokenCount = 0
         return .idle
     }
 
@@ -158,17 +167,51 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
         guard !rawInput.isEmpty else {
             allCandidates = []
             selectedGlobalIndex = 0
+            activeRawInput = ""
+            remainingRawInput = ""
+            consumedTokenCount = 0
             return
         }
 
         guard let tokens = tokenize(rawInput) else {
             allCandidates = []
             selectedGlobalIndex = 0
+            activeRawInput = ""
+            remainingRawInput = rawInput
+            consumedTokenCount = 0
             return
         }
 
-        allCandidates = lexicon.candidatesByReading[tokens.joined(separator: " ")] ?? []
+        var mergedCandidates: [Candidate] = []
+        for prefixCount in stride(from: tokens.count, through: 1, by: -1) {
+            let prefixTokens = Array(tokens.prefix(prefixCount))
+            let reading = prefixTokens.joined(separator: " ")
+            guard let candidates = lexicon.candidatesByReading[reading], !candidates.isEmpty else {
+                continue
+            }
+            mergedCandidates.append(contentsOf: candidates)
+        }
+
+        allCandidates = mergedCandidates
         selectedGlobalIndex = min(selectedGlobalIndex, max(allCandidates.count - 1, 0))
+
+        syncSelectionSpan()
+    }
+
+    private func syncSelectionSpan() {
+        guard let tokens = tokenize(rawInput),
+            let selectedCandidate = allCandidates[safe: selectedGlobalIndex]
+        else {
+            activeRawInput = ""
+            remainingRawInput = rawInput
+            consumedTokenCount = 0
+            return
+        }
+
+        let consumedCount = min(selectedCandidate.consumedTokenCount, tokens.count)
+        activeRawInput = Array(tokens.prefix(consumedCount)).joined()
+        remainingRawInput = Array(tokens.dropFirst(consumedCount)).joined()
+        consumedTokenCount = consumedCount
     }
 
     private func makeSnapshot() -> CompositionSnapshot {
@@ -183,7 +226,10 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
                 candidates: [],
                 selectedIndex: 0,
                 pageIndex: 0,
-                isComposing: true
+                isComposing: true,
+                activeRawInput: activeRawInput,
+                remainingRawInput: remainingRawInput,
+                consumedTokenCount: consumedTokenCount
             )
         }
 
@@ -199,7 +245,10 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
             candidates: pageCandidates,
             selectedIndex: selectedIndex,
             pageIndex: pageIndex,
-            isComposing: true
+            isComposing: true,
+            activeRawInput: activeRawInput,
+            remainingRawInput: remainingRawInput,
+            consumedTokenCount: consumedTokenCount
         )
     }
 

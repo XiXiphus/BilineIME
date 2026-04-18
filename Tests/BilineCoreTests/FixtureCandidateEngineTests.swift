@@ -57,4 +57,18 @@ final class FixtureCandidateEngineTests: XCTestCase {
         XCTAssertTrue(snapshot.candidates.isEmpty)
         XCTAssertTrue(snapshot.isComposing)
     }
+
+    func testLongestLeftPrefixProducesCandidatesAndRemainingTail() {
+        let session = DemoFixtures.makeSession(pageSize: 5)
+
+        let snapshot = session.updateInput("haopingguo")
+
+        XCTAssertEqual(snapshot.rawInput, "haopingguo")
+        XCTAssertEqual(snapshot.activeRawInput, "haopingguo")
+        XCTAssertEqual(snapshot.remainingRawInput, "")
+        XCTAssertEqual(snapshot.consumedTokenCount, 3)
+        XCTAssertEqual(snapshot.candidates.first?.surface, "好苹果")
+        XCTAssertTrue(snapshot.candidates.contains(where: { $0.surface == "好" && $0.consumedTokenCount == 1 }))
+        XCTAssertTrue(snapshot.isComposing)
+    }
 }

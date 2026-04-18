@@ -61,7 +61,7 @@ final class BilineTextInputBridge {
     ) {
         client.setMarkedText(
             snapshot.markedText,
-            selectionRange: NSRange(location: snapshot.markedText.count, length: 0),
+            selectionRange: snapshot.markedSelectionRange,
             replacementRange: NSRange(location: NSNotFound, length: NSNotFound)
         )
     }

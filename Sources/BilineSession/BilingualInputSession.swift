@@ -111,6 +111,10 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         selectedRow * compactColumnCount + selectedColumn
     }
 
+    public var markedSelectionRange: NSRange {
+        NSRange(location: markedText.count, length: 0)
+    }
+
     public var totalRowCount: Int {
         guard !items.isEmpty else { return 0 }
         return ((items.count - 1) / compactColumnCount) + 1
@@ -179,7 +183,9 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func append(text: String) {
-        rawInput.append(contentsOf: normalize(text))
+        let normalized = normalize(text)
+        guard !normalized.isEmpty else { return }
+        rawInput.append(contentsOf: normalized)
         refreshCompositionState()
     }
 
@@ -190,7 +196,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func deleteBackward() {
-        guard !rawInput.isEmpty else { return }
+        guard canDeleteBackward else { return }
         rawInput.removeLast()
         refreshCompositionState()
     }
@@ -200,7 +206,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func moveColumn(_ direction: SelectionDirection) {
-        guard engineSnapshot.isComposing else { return }
+        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
 
         let delta = direction == .next ? 1 : -1
         let targetColumn = currentSelectedColumn + delta
@@ -354,57 +360,51 @@ public final class BilingualInputSession: @unchecked Sendable {
         PunctuationPolicy.renderCommittedText(text)
     }
 
+    public func cancel() {
+        resetCompositionState()
+    }
+
     private func commitSelection(for layer: ActiveLayer) -> String? {
         guard engineSnapshot.isComposing else { return nil }
 
         if engineSnapshot.candidates.isEmpty {
             let committedText = renderedRawInput
-            rawInput = ""
-            engineSnapshot = engineSession.reset()
-            activeLayer = .chinese
-            compositionMode = .candidateCompact
-            hasEverExpandedInCurrentComposition = false
-            presentationMode = .compact
-            clearPreviews()
-            publishSnapshot()
+            resetCompositionState()
             return committedText.isEmpty ? nil : committedText
         }
 
-        let englishSelection = currentItem?.englishText
+        guard let item = currentItem else {
+            publishSnapshot()
+            return nil
+        }
+
+        let englishSelection = item.englishText
         if layer == .english, englishSelection == nil {
             publishSnapshot()
             return nil
         }
 
-        let commitResult = engineSession.commitSelected()
-        let committedText: String
-        switch layer {
-        case .chinese:
-            committedText = commitResult.committedText
-        case .english:
-            committedText = englishSelection ?? ""
+        let committedText = finalizedCurrentSelectionText(
+            for: layer,
+            englishSelection: englishSelection
+        )
+        guard !committedText.isEmpty else {
+            publishSnapshot()
+            return nil
         }
 
-        rawInput = ""
-        engineSnapshot = commitResult.snapshot
-        activeLayer = .chinese
-        compositionMode = .candidateCompact
-        hasEverExpandedInCurrentComposition = false
-        presentationMode = .compact
-        clearPreviews()
-        publishSnapshot()
-        return committedText.isEmpty ? nil : committedText
-    }
+        if !engineSnapshot.remainingRawInput.isEmpty {
+            rawInput = engineSnapshot.remainingRawInput
+            activeLayer = layer
+            hasEverExpandedInCurrentComposition = false
+            presentationMode = .compact
+            clearPreviews()
+            updateEngineSnapshot(engineSession.updateInput(rawInput))
+            return committedText
+        }
 
-    public func cancel() {
-        rawInput = ""
-        engineSnapshot = engineSession.reset()
-        activeLayer = .chinese
-        compositionMode = .candidateCompact
-        hasEverExpandedInCurrentComposition = false
-        presentationMode = .compact
-        clearPreviews()
-        publishSnapshot()
+        resetCompositionState()
+        return committedText
     }
 
     private var compactColumnCount: Int {
@@ -461,13 +461,7 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     private func refreshCompositionState() {
         guard !rawInput.isEmpty else {
-            engineSnapshot = engineSession.reset()
-            activeLayer = .chinese
-            compositionMode = .candidateCompact
-            hasEverExpandedInCurrentComposition = false
-            presentationMode = .compact
-            clearPreviews()
-            publishSnapshot()
+            resetCompositionState()
             return
         }
 
@@ -481,15 +475,41 @@ public final class BilingualInputSession: @unchecked Sendable {
                 candidates: [],
                 selectedIndex: 0,
                 pageIndex: 0,
-                isComposing: true
+                isComposing: true,
+                activeRawInput: "",
+                remainingRawInput: rawInput,
+                consumedTokenCount: 0
             )
             publishSnapshot()
             return
         }
 
-        compositionMode = .candidateCompact
         presentationMode = .compact
         updateEngineSnapshot(engineSession.updateInput(rawInput))
+    }
+
+    private func resetCompositionState() {
+        rawInput = ""
+        engineSnapshot = engineSession.reset()
+        activeLayer = .chinese
+        compositionMode = .candidateCompact
+        hasEverExpandedInCurrentComposition = false
+        presentationMode = .compact
+        clearPreviews()
+        publishSnapshot()
+    }
+
+    private func finalizedCurrentSelectionText(
+        for layer: ActiveLayer,
+        englishSelection: String?
+    ) -> String {
+        guard let item = currentItem else { return "" }
+        switch layer {
+        case .chinese:
+            return item.candidate.surface
+        case .english:
+            return englishSelection ?? ""
+        }
     }
 
     private func updateEngineSnapshot(_ newSnapshot: CompositionSnapshot) {
@@ -499,12 +519,7 @@ public final class BilingualInputSession: @unchecked Sendable {
             rawInput = engineSnapshot.rawInput
         }
 
-        if !engineSnapshot.isComposing {
-            activeLayer = .chinese
-            compositionMode = .candidateCompact
-            hasEverExpandedInCurrentComposition = false
-            presentationMode = .compact
-        } else if engineSnapshot.candidates.isEmpty {
+        if engineSnapshot.candidates.isEmpty {
             compositionMode = .rawBufferOnly
             presentationMode = .compact
         } else {
@@ -707,7 +722,7 @@ public final class BilingualInputSession: @unchecked Sendable {
             return .idle
         }
 
-        guard !engineSnapshot.candidates.isEmpty else {
+        if engineSnapshot.candidates.isEmpty {
             return BilingualCompositionSnapshot(
                 rawInput: rawInput,
                 displayRawInput: renderedRawInput,
@@ -731,11 +746,10 @@ public final class BilingualInputSession: @unchecked Sendable {
             )
         }
 
-        let markedText = makeMarkedText(items: items)
         return BilingualCompositionSnapshot(
             rawInput: engineSnapshot.rawInput,
             displayRawInput: renderedRawInput,
-            markedText: markedText,
+            markedText: renderedRawInput,
             items: items,
             pageIndex: engineSnapshot.pageIndex,
             activeLayer: activeLayer,
@@ -744,20 +758,8 @@ public final class BilingualInputSession: @unchecked Sendable {
             selectedColumn: currentSelectedColumn,
             compactColumnCount: compactColumnCount,
             expandedRowCount: expandedRowCount,
-            isComposing: engineSnapshot.isComposing
+            isComposing: true
         )
-    }
-
-    private func makeMarkedText(items: [BilingualCandidateItem]) -> String {
-        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < items.count else {
-            return engineSnapshot.markedText
-        }
-
-        let selectedItem = items[currentSelectedFlatIndex]
-        if activeLayer == .english, let englishText = selectedItem.englishText {
-            return englishText
-        }
-        return selectedItem.candidate.surface
     }
 
     private var renderedRawInput: String {

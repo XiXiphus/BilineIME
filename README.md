@@ -210,17 +210,16 @@ Recommended baseline:
 1. Select the dev input source:
    - `./scripts/select-input-source.sh select io.github.xixiphus.inputmethod.BilineIME.dev.pinyin`
    - `./scripts/select-input-source.sh current`
-2. Open `TextEdit` and test real key presses there first.
-3. If you automate the test with Codex `Computer Use`, use `press_key`, not `type_text`.
-4. If the candidate panel seems missing, inspect all displays. The panel may render on another monitor even when the host app stays on the current one.
-
-Use a fixed regression set for punctuation and candidate behavior, for example:
-
-- `shi_`
-- `shi%`
-- `ni----====+`
-- `shi,`
-- `shi()`
+2. Prefer the staged flow:
+   - `./scripts/smoke-ime.sh prepare`
+   - `./scripts/smoke-ime.sh run`
+3. `prepare` does only non-intrusive checks. It confirms the current input source before any scripted key injection starts.
+4. `make smoke-ime` runs the same staged flow.
+5. If you diagnose a failure interactively with Codex `Computer Use`, use `press_key`, not `type_text`.
+6. For browse keys whose semantic names may map incorrectly on macOS, prefer:
+   - `./scripts/press-macos-key.swift equal --activate com.apple.TextEdit`
+   - `./scripts/press-macos-key.swift minus --activate com.apple.TextEdit`
+7. If the candidate panel seems missing, inspect all displays. The panel may render on another monitor even when the host app stays on the current one.
 
 ## 🧠 Architecture
 

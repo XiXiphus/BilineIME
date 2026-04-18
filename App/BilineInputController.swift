@@ -9,6 +9,19 @@ import OSLog
 
 @objc(BilineInputController)
 final class BilineInputController: IMKInputController {
+    #if DEBUG
+        private enum SmokeDefaults {
+            static let previewDelayMs = "SmokePreviewDelayMs"
+            static let previewDebounceMs = "SmokePreviewDebounceMs"
+
+            static func milliseconds(forKey key: String, fallback: Int) -> Duration {
+                let value = UserDefaults.standard.integer(forKey: key)
+                let resolved = value > 0 ? value : fallback
+                return .milliseconds(resolved)
+            }
+        }
+    #endif
+
     private struct RoutedKeySignature: Equatable {
         let keyCode: UInt16
         let text: String
@@ -24,15 +37,34 @@ final class BilineInputController: IMKInputController {
         subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
         category: "input-controller"
     )
+    #if DEBUG
+        private let smokeLogger = Logger(
+            subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
+            category: "smoke"
+        )
+    #endif
 
     private var activeClient: AnyObject?
     private var lastHandledKeySignature: RoutedKeySignature?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let settingsStore = DefaultSettingsStore()
+        #if DEBUG
+            let smokePreviewDelay = SmokeDefaults.milliseconds(
+                forKey: SmokeDefaults.previewDelayMs,
+                fallback: 800
+            )
+            let smokePreviewDebounce = SmokeDefaults.milliseconds(
+                forKey: SmokeDefaults.previewDebounceMs,
+                fallback: 100
+            )
+        #else
+            let smokePreviewDelay: Duration = .zero
+            let smokePreviewDebounce: Duration = .milliseconds(100)
+        #endif
         let previewCoordinator = PreviewCoordinator(
-            provider: MockTranslationProvider(),
-            debounce: .milliseconds(100)
+            provider: MockTranslationProvider(delay: smokePreviewDelay),
+            debounce: smokePreviewDebounce
         )
         self.inputSession = BilingualInputSession(
             settingsStore: settingsStore,
@@ -42,7 +74,13 @@ final class BilineInputController: IMKInputController {
         super.init(server: server, delegate: delegate, client: inputClient)
 
         inputSession.onSnapshotUpdate = { [weak self] snapshot in
-            guard let self, let client = self.activeClient as? IMKTextInput else {
+            guard let self else {
+                return
+            }
+            #if DEBUG
+                self.emitSmokeTelemetry(snapshot: snapshot)
+            #endif
+            guard let client = self.activeClient as? IMKTextInput else {
                 return
             }
             self.render(client: client, snapshot: snapshot)
@@ -263,6 +301,9 @@ final class BilineInputController: IMKInputController {
         switch action {
         case .passThrough:
             return false
+        case .consume:
+            render(client: client)
+            return true
         case .append(let text):
             inputSession.append(text: text)
         case .appendLiteral(let text):
@@ -325,4 +366,16 @@ final class BilineInputController: IMKInputController {
     private func rememberHandled(_ signature: RoutedKeySignature) {
         lastHandledKeySignature = signature
     }
+
+    #if DEBUG
+        private func emitSmokeTelemetry(snapshot: BilingualCompositionSnapshot) {
+            smokeLogger.notice(
+                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public)"
+            )
+        }
+
+        private func smokeValue(_ value: String) -> String {
+            value.isEmpty ? "<empty>" : value.replacingOccurrences(of: " ", with: "␠")
+        }
+    #endif
 }

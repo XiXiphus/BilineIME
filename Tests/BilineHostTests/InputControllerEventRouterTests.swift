@@ -170,6 +170,31 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
+    func testShiftTabConsumesWhenComposingWithoutCandidates() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .rawBufferOnly,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 48,
+                    characters: "\t",
+                    charactersIgnoringModifiers: "\t",
+                    modifierFlags: [.shift]
+                ),
+                state: state
+            ),
+            .consume
+        )
+    }
+
     func testEqualPhysicalKeyExpandsAndAdvancesRowWhenCompact() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(

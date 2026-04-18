@@ -23,12 +23,20 @@ public struct Candidate: Sendable, Equatable, Hashable, Codable, Identifiable {
     public let surface: String
     public let reading: String
     public let score: Int
+    public let consumedTokenCount: Int
 
-    public init(id: String, surface: String, reading: String, score: Int) {
+    public init(
+        id: String,
+        surface: String,
+        reading: String,
+        score: Int,
+        consumedTokenCount: Int = 0
+    ) {
         self.id = id
         self.surface = surface
         self.reading = reading
         self.score = score
+        self.consumedTokenCount = max(0, consumedTokenCount)
     }
 }
 
@@ -39,6 +47,9 @@ public struct CompositionSnapshot: Sendable, Equatable {
     public let selectedIndex: Int
     public let pageIndex: Int
     public let isComposing: Bool
+    public let activeRawInput: String
+    public let remainingRawInput: String
+    public let consumedTokenCount: Int
 
     public init(
         rawInput: String,
@@ -46,7 +57,10 @@ public struct CompositionSnapshot: Sendable, Equatable {
         candidates: [Candidate],
         selectedIndex: Int,
         pageIndex: Int,
-        isComposing: Bool
+        isComposing: Bool,
+        activeRawInput: String = "",
+        remainingRawInput: String = "",
+        consumedTokenCount: Int = 0
     ) {
         self.rawInput = rawInput
         self.markedText = markedText
@@ -54,6 +68,9 @@ public struct CompositionSnapshot: Sendable, Equatable {
         self.selectedIndex = selectedIndex
         self.pageIndex = pageIndex
         self.isComposing = isComposing
+        self.activeRawInput = activeRawInput
+        self.remainingRawInput = remainingRawInput
+        self.consumedTokenCount = consumedTokenCount
     }
 
     public static let idle = CompositionSnapshot(
@@ -62,7 +79,10 @@ public struct CompositionSnapshot: Sendable, Equatable {
         candidates: [],
         selectedIndex: 0,
         pageIndex: 0,
-        isComposing: false
+        isComposing: false,
+        activeRawInput: "",
+        remainingRawInput: "",
+        consumedTokenCount: 0
     )
 }
 

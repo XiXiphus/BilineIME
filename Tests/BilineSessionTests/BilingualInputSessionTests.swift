@@ -50,8 +50,7 @@ final class BilingualInputSessionTests: XCTestCase {
         )
 
         session.append(text: "shi")
-        session.togglePresentationMode()
-        session.moveRow(.next)
+        session.expandAndAdvanceRow()
         session.moveColumn(.next)
 
         XCTAssertEqual(session.snapshot.presentationMode, .expanded)
@@ -61,37 +60,183 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "市")
     }
 
-    func testCollapsingExpandedSelectionReturnsToFirstRowSameColumn() {
+    func testMoveRowAdvancesToNextPageWhenReachingBottomRow() {
         let session = DemoFixtures.makeBilingualSession(
             compactColumnCount: 2,
             expandedRowCount: 2
         )
 
         session.append(text: "shi")
-        session.togglePresentationMode()
-        session.moveRow(.next)
+        session.expandAndAdvanceRow()
         session.moveColumn(.next)
-        session.togglePresentationMode()
+        session.browseNextRow()
 
-        XCTAssertEqual(session.snapshot.presentationMode, .compact)
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.presentationMode, .expanded)
         XCTAssertEqual(session.snapshot.selectedRow, 0)
         XCTAssertEqual(session.snapshot.selectedColumn, 1)
         XCTAssertEqual(session.snapshot.selectedFlatIndex, 1)
-        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "时")
+        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "识")
     }
 
-    func testExpandedPresentationShowsSecondRowWhenPageHasMoreThanFiveCandidates() {
+    func testFirstRowHyphenCollapsesAndResetsToFirstColumn() {
+        let session = DemoFixtures.makeBilingualSession(
+            compactColumnCount: 2,
+            expandedRowCount: 2
+        )
+
+        session.append(text: "shi")
+        session.expandAndAdvanceRow()
+        session.browsePreviousRow()
+        session.moveColumn(.next)
+
+        XCTAssertEqual(session.snapshot.presentationMode, .expanded)
+        XCTAssertEqual(session.snapshot.selectedRow, 0)
+        XCTAssertEqual(session.snapshot.selectedColumn, 1)
+
+        session.collapseToCompactAndSelectFirst()
+
+        XCTAssertEqual(session.snapshot.presentationMode, .compact)
+        XCTAssertEqual(session.snapshot.selectedRow, 0)
+        XCTAssertEqual(session.snapshot.selectedColumn, 0)
+        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "是")
+    }
+
+    func testEqualAfterCollapseExpandsFromFirstColumnToNextRow() {
+        let session = DemoFixtures.makeBilingualSession(
+            compactColumnCount: 2,
+            expandedRowCount: 2
+        )
+
+        session.append(text: "shi")
+        session.expandAndAdvanceRow()
+        session.browsePreviousRow()
+        session.moveColumn(.next)
+        session.collapseToCompactAndSelectFirst()
+
+        session.expandAndAdvanceRow()
+
+        XCTAssertEqual(session.snapshot.presentationMode, .expanded)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.selectedColumn, 0)
+        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "事")
+    }
+
+    func testExpandAndAdvanceShowsSecondRowWhenPageHasMoreThanFiveCandidates() {
         let session = DemoFixtures.makeBilingualSession()
 
         session.append(text: "shi")
         XCTAssertEqual(session.snapshot.items.count, 10)
+        XCTAssertEqual(session.snapshot.presentationMode, .compact)
         XCTAssertEqual(session.snapshot.visibleRowCount, 1)
 
-        session.togglePresentationMode()
+        session.expandAndAdvanceRow()
 
         XCTAssertEqual(session.snapshot.presentationMode, .expanded)
-        XCTAssertEqual(session.snapshot.visibleRowCount, 2)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
         XCTAssertEqual(session.snapshot.items(inRow: 1).map(\.candidate.surface), ["识", "诗", "十", "史", "食"])
+    }
+
+    func testTurnPagePreservesSelectedRowAndColumnWhenPossible() {
+        let session = DemoFixtures.makeBilingualSession(
+            compactColumnCount: 2,
+            expandedRowCount: 2
+        )
+
+        session.append(text: "shi")
+        session.expandAndAdvanceRow()
+        session.moveColumn(.next)
+
+        session.turnPage(.next)
+
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.selectedColumn, 1)
+        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "十")
+    }
+
+    func testAppendLiteralSwitchesToRawBufferOnlyComposition() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "-")
+
+        XCTAssertTrue(session.snapshot.isComposing)
+        XCTAssertEqual(session.snapshot.rawInput, "shi-")
+        XCTAssertEqual(session.snapshot.markedText, "shi-")
+        XCTAssertTrue(session.snapshot.items.isEmpty)
+        XCTAssertEqual(session.snapshot.presentationMode, .compact)
+    }
+
+    func testDeletingLiteralBufferRestoresCandidateComposition() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "-")
+        session.deleteBackward()
+
+        XCTAssertTrue(session.snapshot.isComposing)
+        XCTAssertEqual(session.snapshot.rawInput, "shi")
+        XCTAssertFalse(session.snapshot.items.isEmpty)
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "是")
+    }
+
+    func testCommitSelectionCommitsRawBufferWhenNoCandidatesExist() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "-")
+        session.appendLiteral(text: "-")
+
+        XCTAssertEqual(session.commitSelection(), "shi--")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testVisiblePreviewUpdatesToReadyWithoutExtraNavigation() async {
+        let session = DemoFixtures.makeBilingualSession()
+        let ready = expectation(description: "visible preview ready")
+        var didFulfill = false
+
+        session.onSnapshotUpdate = { snapshot in
+            guard !didFulfill else { return }
+            guard snapshot.presentationMode == .compact,
+                snapshot.visibleRowCount == 1,
+                snapshot.items.first?.candidate.surface == "是",
+                snapshot.items.first?.englishText == "is"
+            else {
+                return
+            }
+            didFulfill = true
+            ready.fulfill()
+        }
+
+        session.append(text: "shi")
+
+        await fulfillment(of: [ready], timeout: 1.0)
+    }
+
+    func testCommitChineseSelectionIgnoresEnglishLayer() async {
+        let session = DemoFixtures.makeBilingualSession()
+        let ready = expectation(description: "english preview ready for selected candidate")
+        var didFulfill = false
+
+        session.onSnapshotUpdate = { snapshot in
+            guard !didFulfill else { return }
+            guard snapshot.items.first?.englishText == "is" else {
+                return
+            }
+            didFulfill = true
+            ready.fulfill()
+        }
+
+        session.append(text: "shi")
+        session.toggleActiveLayer()
+
+        await fulfillment(of: [ready], timeout: 1.0)
+
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
+        XCTAssertEqual(session.commitChineseSelection(), "是")
+        XCTAssertEqual(session.snapshot, .idle)
     }
 
     func testEnglishCommitUsesReadyPreviewText() async {

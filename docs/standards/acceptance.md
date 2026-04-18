@@ -15,12 +15,14 @@
 ## App shell
 
 - The custom candidate panel renders up to `5` columns per row and up to `5` rows per page for the current candidate page.
-- Compact mode shows only the first visible row; expanded mode shows all real rows on the current page, without padding empty cells or rows.
-- Each candidate cell keeps Chinese on the top line and English on the bottom line, with strict left alignment inside the same column.
+- Compact mode shows only the first visible row; expanded mode shows all real visible rows on the current page, without padding empty cells or rows.
+- The panel keeps all visible Chinese rows together in the top block and all visible English rows together in the bottom block, with strict left alignment inside the same column.
 - The custom candidate panel anchors to the host-provided line-height rectangle.
 - When the host does not provide a fresh valid caret rect, the candidate panel may reuse the current session's last valid rect, but never falls back to mouse position.
 - `Shift` toggles the active layer without changing the selected row or column.
-- `+` toggles between compact and expanded presentation.
+- `=` or `]` expand from compact mode and jump to the next candidate row; in expanded mode they continue browsing downward by row.
+- `-` or `[` browse upward by row; when already on the first expanded row, they collapse to compact mode and reset the selection to the first item.
+- `+` does not trigger candidate expansion, browsing, or collapse behavior.
 - Committing a candidate inserts the active layer text and clears composition.
 - English preview state never changes Chinese candidate order or paging.
 - `Backspace`, arrows, paging keys, and digits pass through to the host when Biline is not composing.

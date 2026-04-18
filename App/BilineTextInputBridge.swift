@@ -19,11 +19,6 @@ final class BilineTextInputBridge {
             return
         }
 
-        guard !snapshot.items.isEmpty else {
-            candidatePanel.hide()
-            return
-        }
-
         guard let anchorRect = resolveAnchorRect(for: client) else {
             candidatePanel.hide()
             return

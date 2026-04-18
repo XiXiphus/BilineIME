@@ -7,9 +7,10 @@ This document turns the current product idea into a concrete implementation plan
 It intentionally treats **Mode 1** as the only first-phase target:
 
 - Chinese composition remains the primary workflow
-- candidates are rendered as a bilingual matrix: compact mode shows up to `2x5`, expanded mode shows up to `5x5`
+- candidates are rendered as a bilingual matrix for the current page, with compact mode showing the first row and expanded mode showing all real visible rows up to `5x5`, with Chinese rows grouped above English rows
 - `Shift` toggles the active commit layer between Chinese and English
-- `+` expands or collapses the current candidate page
+- `=` / `]` expand from compact mode and jump to the next candidate row; `-` / `[` move to the previous candidate row and collapse back to the compact first item when already on the first row
+- `+` is treated as an ordinary non-candidate key and has no special candidate-window behavior
 - translation never blocks typing
 
 Mode 2 remains a later extension and is documented here only as a deferred architecture concern.
@@ -29,7 +30,7 @@ Mode 2 remains a later extension and is documented here only as a deferred archi
 
 ### Out Of Scope
 
-- reversible sentence-level translation triggered by `=`
+- reversible sentence-level translation triggered by candidate browse keys
 - tracking committed document ranges after composition ends
 - backspace-driven restoration of earlier source text
 - simultaneous bilingual pair commit formats
@@ -403,8 +404,8 @@ The input method works like a real IME even without translation.
 - add `PreviewCoordinator`
 - add async `TranslationProvider`
 - show a custom bilingual candidate panel for the visible page
-- support compact and expanded presentation for the same page, with at most `5` columns and at most `5` rows per page
-- support `Shift`-based layer switching, `+` expansion, and active-layer commit
+- support a whole-page bilingual matrix, with at most `5` columns and at most `5` rows per page
+- support `Shift`-based layer switching, `=`/`]` next-row browsing, `-`/`[` previous-row browsing, and active-layer commit
 - ignore stale results
 - add target language setting
 

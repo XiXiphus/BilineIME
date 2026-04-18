@@ -28,7 +28,7 @@ final class BilineCandidatePanelController {
         anchorRect: NSRect,
         windowLevel: NSWindow.Level
     ) {
-        guard snapshot.isComposing, !snapshot.items.isEmpty else {
+        guard snapshot.isComposing, !snapshot.rawInput.isEmpty else {
             hide()
             return
         }
@@ -78,8 +78,8 @@ private final class BilineCandidatePanelView: NSView {
     override var isFlipped: Bool { true }
 
     private let contentInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
-    private let groupSpacing: CGFloat = 10
-    private let languageRowSpacing: CGFloat = 6
+    private let blockSpacing: CGFloat = 8
+    private let rowSpacing: CGFloat = 4
     private let columnSpacing: CGFloat = 6
     private let rowInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
     private let segmentPadding = NSEdgeInsets(top: 5, left: 6, bottom: 5, right: 6)
@@ -93,8 +93,14 @@ private final class BilineCandidatePanelView: NSView {
     }
 
     var preferredSize: NSSize {
-        guard !snapshot.items.isEmpty else {
+        guard !snapshot.rawInput.isEmpty else {
             return NSSize(width: 360, height: 0)
+        }
+
+        if snapshot.items.isEmpty {
+            let width = contentInsets.left + rawBufferRowPreferredWidth + contentInsets.right
+            let height = contentInsets.top + chineseRowHeight + contentInsets.bottom
+            return NSSize(width: ceil(width), height: ceil(height))
         }
 
         let widths = columnWidths()
@@ -106,22 +112,55 @@ private final class BilineCandidatePanelView: NSView {
             + widestRowWidth
             + contentInsets.right
         let height = contentInsets.top
-            + CGFloat(rowCount) * groupHeight
-            + CGFloat(max(0, rowCount - 1)) * groupSpacing
+            + blockHeight(rowHeight: chineseRowHeight, rowCount: rowCount)
+            + blockSpacing
+            + blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
             + contentInsets.bottom
 
         return NSSize(width: ceil(width), height: ceil(height))
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        guard !snapshot.items.isEmpty else { return }
+        guard !snapshot.rawInput.isEmpty else { return }
+
+        if snapshot.items.isEmpty {
+            let rawRect = NSRect(
+                x: contentInsets.left,
+                y: contentInsets.top,
+                width: rawBufferRowPreferredWidth,
+                height: chineseRowHeight
+            )
+            drawRowContainer(in: rawRect)
+            drawRawBufferRow(in: rawRect)
+            return
+        }
 
         let widths = columnWidths()
         let rowCount = snapshot.visibleRowCount
         guard rowCount > 0 else { return }
 
+        let containerWidth = (0..<rowCount)
+            .map { totalWidth(forRow: $0, columnWidths: widths) }
+            .max() ?? 0
+        let chineseBlockRect = NSRect(
+            x: contentInsets.left,
+            y: contentInsets.top,
+            width: containerWidth,
+            height: blockHeight(rowHeight: chineseRowHeight, rowCount: rowCount)
+        )
+        let englishBlockRect = NSRect(
+            x: contentInsets.left,
+            y: chineseBlockRect.maxY + blockSpacing,
+            width: containerWidth,
+            height: blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
+        )
+
+        drawRowContainer(in: chineseBlockRect)
+        drawRowContainer(in: englishBlockRect)
+
         for row in 0..<rowCount {
-            drawCandidateGroup(row: row, columnWidths: widths)
+            drawChineseRow(row: row, in: chineseBlockRect, columnWidths: widths)
+            drawEnglishRow(row: row, in: englishBlockRect, columnWidths: widths)
         }
     }
 
@@ -133,8 +172,14 @@ private final class BilineCandidatePanelView: NSView {
         ceil(englishFont.ascender - englishFont.descender) + rowInsets.top + rowInsets.bottom
     }
 
-    private var groupHeight: CGFloat {
-        chineseRowHeight + languageRowSpacing + englishRowHeight
+    private var rawBufferRowPreferredWidth: CGFloat {
+        let textWidth = rawBufferLine(active: true).size().width
+        return rowInsets.left + textWidth + segmentPadding.left + segmentPadding.right + 4 + rowInsets.right
+    }
+
+    private func blockHeight(rowHeight: CGFloat, rowCount: Int) -> CGFloat {
+        guard rowCount > 0 else { return 0 }
+        return CGFloat(rowCount) * rowHeight + CGFloat(max(0, rowCount - 1)) * rowSpacing
     }
 
     private func columnWidths() -> [CGFloat] {
@@ -164,65 +209,78 @@ private final class BilineCandidatePanelView: NSView {
         return widths
     }
 
-    private func drawCandidateGroup(row: Int, columnWidths: [CGFloat]) {
-        let originY = contentInsets.top + CGFloat(row) * (groupHeight + groupSpacing)
-        let totalWidth = totalWidth(forRow: row, columnWidths: columnWidths)
-        let chineseRowRect = NSRect(
-            x: contentInsets.left,
-            y: originY,
-            width: totalWidth,
+    private func drawChineseRow(row: Int, in blockRect: NSRect, columnWidths: [CGFloat]) {
+        let rowRect = NSRect(
+            x: blockRect.minX,
+            y: blockRect.minY + CGFloat(row) * (chineseRowHeight + rowSpacing),
+            width: blockRect.width,
             height: chineseRowHeight
         )
-        let englishRowRect = NSRect(
-            x: contentInsets.left,
-            y: chineseRowRect.maxY + languageRowSpacing,
-            width: totalWidth,
-            height: englishRowHeight
-        )
 
-        drawRowContainer(in: chineseRowRect)
-        drawRowContainer(in: englishRowRect)
-
-        var originX = chineseRowRect.minX + rowInsets.left
+        var originX = rowRect.minX + rowInsets.left
         let rowColumnCount = snapshot.items(inRow: row).count
         for column in 0..<rowColumnCount {
             let width = columnWidths[column]
-            let segmentRect = NSRect(x: originX, y: 0, width: width, height: 0)
+            let segmentRect = NSRect(x: originX, y: rowRect.minY, width: width, height: rowRect.height)
 
             if let item = snapshot.item(row: row, column: column) {
                 let isSelected = row == snapshot.selectedRow && column == snapshot.selectedColumn
                 let isChineseActive = isSelected && snapshot.activeLayer == .chinese
-                let isEnglishActive = isSelected && snapshot.activeLayer == .english
 
-                let chineseSegmentRect = NSRect(
+                let segmentDrawingRect = NSRect(
                     x: segmentRect.minX,
-                    y: chineseRowRect.minY + rowInsets.top / 2,
+                    y: rowRect.minY + rowInsets.top / 2,
                     width: segmentRect.width,
-                    height: chineseRowRect.height - rowInsets.top
-                )
-                let englishSegmentRect = NSRect(
-                    x: segmentRect.minX,
-                    y: englishRowRect.minY + rowInsets.top / 2,
-                    width: segmentRect.width,
-                    height: englishRowRect.height - rowInsets.top
+                    height: rowRect.height - rowInsets.top
                 )
 
                 drawSelectionPill(
-                    in: chineseSegmentRect,
+                    in: segmentDrawingRect,
                     selected: isSelected,
                     active: isChineseActive
                 )
+
+                candidateLine(column: column, item: item, active: isChineseActive).draw(
+                    in: inset(rect: segmentDrawingRect, insets: segmentPadding)
+                )
+            }
+
+            originX += width + columnSpacing
+        }
+    }
+
+    private func drawEnglishRow(row: Int, in blockRect: NSRect, columnWidths: [CGFloat]) {
+        let rowRect = NSRect(
+            x: blockRect.minX,
+            y: blockRect.minY + CGFloat(row) * (englishRowHeight + rowSpacing),
+            width: blockRect.width,
+            height: englishRowHeight
+        )
+
+        var originX = rowRect.minX + rowInsets.left
+        let rowColumnCount = snapshot.items(inRow: row).count
+        for column in 0..<rowColumnCount {
+            let width = columnWidths[column]
+            let segmentRect = NSRect(x: originX, y: rowRect.minY, width: width, height: rowRect.height)
+
+            if let item = snapshot.item(row: row, column: column) {
+                let isSelected = row == snapshot.selectedRow && column == snapshot.selectedColumn
+                let isEnglishActive = isSelected && snapshot.activeLayer == .english
+                let segmentDrawingRect = NSRect(
+                    x: segmentRect.minX,
+                    y: rowRect.minY + rowInsets.top / 2,
+                    width: segmentRect.width,
+                    height: rowRect.height - rowInsets.top
+                )
+
                 drawSelectionPill(
-                    in: englishSegmentRect,
+                    in: segmentDrawingRect,
                     selected: isSelected,
                     active: isEnglishActive
                 )
 
-                candidateLine(column: column, item: item, active: isChineseActive).draw(
-                    in: inset(rect: chineseSegmentRect, insets: segmentPadding)
-                )
                 englishLine(column: column, item: item, active: isEnglishActive).draw(
-                    in: inset(rect: englishSegmentRect, insets: segmentPadding)
+                    in: inset(rect: segmentDrawingRect, insets: segmentPadding)
                 )
             }
 
@@ -241,6 +299,18 @@ private final class BilineCandidatePanelView: NSView {
             + rowWidths.reduce(0, +)
             + CGFloat(max(0, rowColumnCount - 1)) * columnSpacing
             + rowInsets.right
+    }
+
+    private func drawRawBufferRow(in rect: NSRect) {
+        let pillRect = NSRect(
+            x: rect.minX + rowInsets.left,
+            y: rect.minY + rowInsets.top / 2,
+            width: rect.width - rowInsets.left - rowInsets.right,
+            height: rect.height - rowInsets.top
+        )
+
+        drawSelectionPill(in: pillRect, selected: true, active: true)
+        rawBufferLine(active: true).draw(in: inset(rect: pillRect, insets: segmentPadding))
     }
 
     private func drawRowContainer(in rect: NSRect) {
@@ -329,6 +399,16 @@ private final class BilineCandidatePanelView: NSView {
         case .unavailable:
             return "Preview unavailable"
         }
+    }
+
+    private func rawBufferLine(active: Bool) -> NSAttributedString {
+        NSAttributedString(
+            string: snapshot.rawInput,
+            attributes: [
+                .font: chineseFont,
+                .foregroundColor: active ? NSColor.white : NSColor.labelColor,
+            ]
+        )
     }
 
     private func inset(rect: NSRect, insets: NSEdgeInsets) -> NSRect {

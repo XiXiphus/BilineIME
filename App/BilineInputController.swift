@@ -25,7 +25,7 @@ final class BilineInputController: IMKInputController {
         category: "input-controller"
     )
 
-    private weak var activeClient: AnyObject?
+    private var activeClient: AnyObject?
     private var lastHandledKeySignature: RoutedKeySignature?
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
@@ -65,6 +65,12 @@ final class BilineInputController: IMKInputController {
     ) -> Bool {
         guard let client = sender as? IMKTextInput else {
             return false
+        }
+
+        let clientObject = client as AnyObject
+        if activeClient !== clientObject {
+            textInputBridge.clearAnchorCache()
+            activeClient = clientObject
         }
 
         let text = string ?? ""
@@ -122,7 +128,7 @@ final class BilineInputController: IMKInputController {
             }
         }
 
-        return routeAndApply(
+        let handled = routeAndApply(
             event: InputControllerEvent(
                 type: event.type == .flagsChanged ? .flagsChanged : .keyDown,
                 keyCode: event.keyCode,
@@ -133,6 +139,18 @@ final class BilineInputController: IMKInputController {
             client: client,
             loggingSource: "handle"
         )
+
+        if handled, event.type == .keyDown {
+            let signature = RoutedKeySignature(
+                keyCode: event.keyCode,
+                text: event.characters ?? event.charactersIgnoringModifiers ?? "",
+                modifiersRawValue: modifierFlags(from: event).rawValue,
+                timestamp: ProcessInfo.processInfo.systemUptime
+            )
+            rememberHandled(signature)
+        }
+
+        return handled
     }
 
     override func deactivateServer(_ sender: Any!) {
@@ -217,6 +235,7 @@ final class BilineInputController: IMKInputController {
                 canDeleteBackward: inputSession.canDeleteBackward,
                 hasCandidates: inputSession.hasCandidates,
                 compactColumnCount: inputSession.snapshot.compactColumnCount,
+                selectedRow: inputSession.snapshot.selectedRow,
                 isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded
             )
         )
@@ -236,6 +255,15 @@ final class BilineInputController: IMKInputController {
             return true
         case .append(let text):
             inputSession.append(text: text)
+        case .commitChineseAndInsert(let text):
+            let committedText = inputSession.commitChineseSelection()
+            if let committedText, !committedText.isEmpty {
+                textInputBridge.insertCommittedText(committedText, into: client)
+            }
+            textInputBridge.insertCommittedText(text, into: client)
+            textInputBridge.clearAnchorCache()
+            render(client: client)
+            return true
         case .deleteBackward:
             inputSession.deleteBackward()
         case .commit:
@@ -245,14 +273,18 @@ final class BilineInputController: IMKInputController {
             textInputBridge.clearAnchorCache()
         case .moveColumn(let direction):
             inputSession.moveColumn(direction)
-        case .moveRow(let direction):
-            inputSession.moveRow(direction)
+        case .browseNextRow:
+            inputSession.browseNextRow()
+        case .browsePreviousRow:
+            inputSession.browsePreviousRow()
+        case .expandAndAdvanceRow:
+            inputSession.expandAndAdvanceRow()
+        case .collapseToCompactAndSelectFirst:
+            inputSession.collapseToCompactAndSelectFirst()
         case .turnPage(let direction):
             inputSession.turnPage(direction)
         case .toggleLayer:
             inputSession.toggleActiveLayer()
-        case .togglePresentation:
-            inputSession.togglePresentationMode()
         case .selectColumn(let columnIndex):
             inputSession.selectColumn(at: columnIndex)
             return commitSelection(using: client)

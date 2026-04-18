@@ -136,7 +136,7 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     public private(set) var snapshot: BilingualCompositionSnapshot = .idle
     public var canDeleteBackward: Bool { !rawInput.isEmpty }
-    public var hasCandidates: Bool { !engineSnapshot.candidates.isEmpty }
+    public var hasCandidates: Bool { !snapshot.items.isEmpty }
 
     private let settingsStore: any SettingsStore
     private let previewCoordinator: PreviewCoordinator
@@ -168,13 +168,19 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     public func append(text: String) {
         rawInput.append(contentsOf: normalize(text))
-        updateEngineSnapshot(engineSession.updateInput(rawInput))
+        refreshCompositionState()
+    }
+
+    public func appendLiteral(text: String) {
+        guard !text.isEmpty else { return }
+        rawInput.append(contentsOf: text)
+        refreshCompositionState()
     }
 
     public func deleteBackward() {
         guard !rawInput.isEmpty else { return }
         rawInput.removeLast()
-        updateEngineSnapshot(engineSession.updateInput(rawInput))
+        refreshCompositionState()
     }
 
     public func moveSelection(_ direction: SelectionDirection) {
@@ -186,30 +192,34 @@ public final class BilingualInputSession: @unchecked Sendable {
 
         let delta = direction == .next ? 1 : -1
         let targetColumn = currentSelectedColumn + delta
-        selectCandidate(row: currentSelectedRow, column: targetColumn, clampColumn: false)
+        selectCandidate(
+            row: currentSelectedRowForSelection,
+            column: targetColumn,
+            clampColumn: false
+        )
     }
 
     public func moveRow(_ direction: SelectionDirection) {
-        guard engineSnapshot.isComposing else { return }
-        guard presentationMode == .expanded else {
-            publishSnapshot()
-            return
+        switch direction {
+        case .next:
+            browseNextRow()
+        case .previous:
+            browsePreviousRow()
         }
-
-        let delta = direction == .next ? 1 : -1
-        let targetRow = currentSelectedRow + delta
-        guard targetRow >= 0, targetRow < currentRowCount else {
-            publishSnapshot()
-            return
-        }
-
-        let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
-        selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
     }
 
     public func turnPage(_ direction: PageDirection) {
         guard engineSnapshot.isComposing else { return }
-        updateEngineSnapshot(engineSession.turnPage(direction))
+        guard !engineSnapshot.candidates.isEmpty else {
+            publishSnapshot()
+            return
+        }
+
+        moveToAdjacentPage(
+            direction: direction,
+            preferredColumn: currentSelectedColumn,
+            preferredRow: currentSelectedRow
+        )
     }
 
     public func selectCandidate(at localIndex: Int) {
@@ -219,22 +229,79 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     public func selectColumn(at columnIndex: Int) {
         guard engineSnapshot.isComposing else { return }
-        selectCandidate(row: currentSelectedRowForSelection, column: columnIndex, clampColumn: false)
+        selectCandidate(
+            row: currentSelectedRowForSelection,
+            column: columnIndex,
+            clampColumn: false
+        )
     }
 
-    public func togglePresentationMode() {
+    public func expandAndAdvanceRow() {
         guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
 
-        switch presentationMode {
-        case .compact:
-            presentationMode = .expanded
-            publishSnapshot()
-        case .expanded:
-            presentationMode = .compact
-            let firstRowCount = max(1, candidateCount(inRow: 0))
-            let targetColumn = min(currentSelectedColumn, firstRowCount - 1)
-            selectCandidate(row: 0, column: targetColumn, clampColumn: true)
+        let currentColumn = currentSelectedColumn
+        presentationMode = .expanded
+
+        let nextRow = 1
+        if nextRow < currentRowCount {
+            let targetColumn = min(currentColumn, max(0, candidateCount(inRow: nextRow) - 1))
+            selectCandidate(row: nextRow, column: targetColumn, clampColumn: true)
+            return
         }
+
+        moveToAdjacentPage(
+            direction: .next,
+            preferredColumn: currentColumn,
+            preferredRow: 0
+        )
+    }
+
+    public func browseNextRow() {
+        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
+            publishSnapshot()
+            return
+        }
+
+        presentationMode = .expanded
+        let targetRow = currentSelectedRow + 1
+        if targetRow < currentRowCount {
+            let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
+            selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
+            return
+        }
+
+        moveToAdjacentPage(direction: .next, preferredColumn: currentSelectedColumn, preferredRow: 0)
+    }
+
+    public func browsePreviousRow() {
+        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
+            publishSnapshot()
+            return
+        }
+
+        guard presentationMode == .expanded else {
+            publishSnapshot()
+            return
+        }
+
+        if currentSelectedRow == 0 {
+            collapseToCompactAndSelectFirst()
+            return
+        }
+
+        let targetRow = currentSelectedRow - 1
+        let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
+        selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
+    }
+
+    public func collapseToCompactAndSelectFirst() {
+        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
+            publishSnapshot()
+            return
+        }
+
+        presentationMode = .compact
+        selectCandidate(row: 0, column: 0, clampColumn: true)
     }
 
     public func toggleActiveLayer() {
@@ -244,17 +311,36 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func commitSelection() -> String? {
+        commitSelection(for: activeLayer)
+    }
+
+    public func commitChineseSelection() -> String? {
+        commitSelection(for: .chinese)
+    }
+
+    private func commitSelection(for layer: ActiveLayer) -> String? {
         guard engineSnapshot.isComposing else { return nil }
 
+        if engineSnapshot.candidates.isEmpty {
+            let committedText = rawInput
+            rawInput = ""
+            engineSnapshot = engineSession.reset()
+            activeLayer = .chinese
+            presentationMode = .compact
+            clearPreviews()
+            publishSnapshot()
+            return committedText.isEmpty ? nil : committedText
+        }
+
         let englishSelection = currentItem?.englishText
-        if activeLayer == .english, englishSelection == nil {
+        if layer == .english, englishSelection == nil {
             publishSnapshot()
             return nil
         }
 
         let commitResult = engineSession.commitSelected()
         let committedText: String
-        switch activeLayer {
+        switch layer {
         case .chinese:
             committedText = commitResult.committedText
         case .english:
@@ -314,9 +400,46 @@ public final class BilingualInputSession: @unchecked Sendable {
         return snapshot.items[currentSelectedFlatIndex]
     }
 
+    private var hasValidQueryInput: Bool {
+        !rawInput.isEmpty && rawInput.allSatisfy { $0.isLetter || $0 == "'" }
+    }
+
+    private func refreshCompositionState() {
+        guard !rawInput.isEmpty else {
+            engineSnapshot = engineSession.reset()
+            activeLayer = .chinese
+            presentationMode = .compact
+            clearPreviews()
+            publishSnapshot()
+            return
+        }
+
+        guard hasValidQueryInput else {
+            clearPreviews()
+            activeLayer = .chinese
+            presentationMode = .compact
+            engineSnapshot = CompositionSnapshot(
+                rawInput: rawInput,
+                markedText: rawInput,
+                candidates: [],
+                selectedIndex: 0,
+                pageIndex: 0,
+                isComposing: true
+            )
+            publishSnapshot()
+            return
+        }
+
+        presentationMode = .compact
+        updateEngineSnapshot(engineSession.updateInput(rawInput))
+    }
+
     private func updateEngineSnapshot(_ newSnapshot: CompositionSnapshot) {
         let previousCandidateIDs = visibleCandidateIDs(for: engineSnapshot)
         engineSnapshot = newSnapshot
+        if rawInput != engineSnapshot.rawInput {
+            rawInput = engineSnapshot.rawInput
+        }
 
         if !engineSnapshot.isComposing {
             activeLayer = .chinese
@@ -373,6 +496,34 @@ public final class BilingualInputSession: @unchecked Sendable {
         }
 
         moveEngineSelection(to: targetIndex)
+    }
+
+    private func moveToAdjacentPage(
+        direction: PageDirection,
+        preferredColumn: Int,
+        preferredRow: Int?
+    ) {
+        let previousPageIndex = engineSnapshot.pageIndex
+        let newSnapshot = engineSession.turnPage(direction)
+
+        guard newSnapshot.pageIndex != previousPageIndex else {
+            publishSnapshot()
+            return
+        }
+
+        updateEngineSnapshot(newSnapshot)
+
+        let targetRow: Int
+        switch direction {
+        case .next:
+            targetRow = preferredRow ?? 0
+        case .previous:
+            targetRow = preferredRow ?? max(0, currentRowCount - 1)
+        }
+
+        let clampedRow = min(max(0, targetRow), max(0, currentRowCount - 1))
+        let clampedColumn = min(preferredColumn, max(0, candidateCount(inRow: clampedRow) - 1))
+        selectCandidate(row: clampedRow, column: clampedColumn, clampColumn: true)
     }
 
     private func reconcilePreviews(
@@ -489,6 +640,22 @@ public final class BilingualInputSession: @unchecked Sendable {
     private func makeSnapshot() -> BilingualCompositionSnapshot {
         guard engineSnapshot.isComposing else {
             return .idle
+        }
+
+        guard !engineSnapshot.candidates.isEmpty else {
+            return BilingualCompositionSnapshot(
+                rawInput: rawInput,
+                markedText: rawInput,
+                items: [],
+                pageIndex: 0,
+                activeLayer: .chinese,
+                presentationMode: .compact,
+                selectedRow: 0,
+                selectedColumn: 0,
+                compactColumnCount: compactColumnCount,
+                expandedRowCount: expandedRowCount,
+                isComposing: true
+            )
         }
 
         let items = engineSnapshot.candidates.map { candidate in

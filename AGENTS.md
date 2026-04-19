@@ -19,11 +19,13 @@ Always run this sequence:
 The smoke test baseline is:
 
 - use `TextEdit` as the first host
-- switch to `BilineIME Dev` with `./scripts/select-input-source.sh select io.github.xixiphus.inputmethod.BilineIME.dev.pinyin`
+- switch the host app to `BilineIME Dev` manually
 - confirm the current source with `./scripts/select-input-source.sh current`
 - use `./scripts/smoke-ime.sh prepare` to confirm the system is actually ready before any scripted key injection
+- use `./scripts/smoke-ime.sh observe` for passive user-driven reproduction capture
+- use `./scripts/smoke-ime.sh probe <name>` for one focused active scenario
 - for browse keys whose semantic names may map incorrectly on macOS, prefer `./scripts/press-macos-key.swift`
-- if candidate UI may render on another monitor, capture or inspect all displays instead of trusting a single app-local screenshot
+- if candidate UI may render on another monitor, capture or inspect all displays instead of trusting a single app-local screenshot or host accessibility tree
 
 When diagnosing a failure interactively inside Codex, use the `Computer Use` plugin as a follow-up tool rather than the primary smoke-test entrypoint.
 

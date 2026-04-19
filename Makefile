@@ -7,12 +7,13 @@ CONFIGURATION ?= Debug
 .PHONY: bootstrap project test build-ime build-ime-release install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime smoke-ime verify-ime format verify
 
 bootstrap:
-	brew install xcodegen swift-format
+	brew install xcodegen swift-format cmake boost
 
 project:
 	xcodegen generate
 
 test:
+	./scripts/build-librime.sh
 	swift test
 
 build-ime: project
@@ -47,7 +48,8 @@ smoke-ime:
 	./scripts/smoke-ime.sh run
 
 verify-ime:
-	swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests'
+	./scripts/build-librime.sh
+	swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests|BilineRimeTests'
 	$(MAKE) build-ime
 	$(MAKE) install-ime
 	$(MAKE) smoke-ime

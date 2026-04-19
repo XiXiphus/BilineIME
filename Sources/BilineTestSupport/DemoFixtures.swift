@@ -55,6 +55,8 @@ private struct DemoSettingsStore: SettingsStore {
     let previewEnabled: Bool
     let compactColumnCount: Int
     let expandedRowCount: Int
+    let fuzzyPinyinEnabled: Bool = false
+    let characterForm: CharacterForm = .simplified
 
     var pageSize: Int {
         compactColumnCount * expandedRowCount

@@ -1,0 +1,50 @@
+import BilineCore
+import BilinePreview
+import BilineRime
+import XCTest
+
+final class RimeCandidateEngineTests: XCTestCase {
+    private let runtimeLibraryPath = URL(fileURLWithPath: NSHomeDirectory())
+        .appendingPathComponent("Library/Caches/BilineIME/RimeVendor/1.16.1/lib/librime.1.dylib")
+
+    private func makeSession(characterForm: CharacterForm = .simplified) throws -> any CandidateEngineSession {
+        guard FileManager.default.fileExists(atPath: runtimeLibraryPath.path) else {
+            throw XCTSkip("librime runtime has not been built yet.")
+        }
+        let factory = try RimeCandidateEngineFactory(
+            fuzzyPinyinEnabled: false,
+            characterForm: characterForm
+        )
+        return factory.makeSession(config: EngineConfig(pageSize: 25))
+    }
+
+    func testPhraseCandidateRanksAheadOfShortPrefix() throws {
+        let session = try makeSession()
+        let snapshot = session.updateInput("haopingguo")
+
+        XCTAssertFalse(snapshot.candidates.isEmpty)
+        XCTAssertEqual(snapshot.candidates.first?.surface, "好苹果")
+        XCTAssertEqual(snapshot.remainingRawInput, "")
+        XCTAssertEqual(snapshot.consumedTokenCount, 3)
+    }
+
+    func testSelectingPrefixCandidateLeavesTailAfterCommit() throws {
+        let session = try makeSession()
+        _ = session.updateInput("haopingguo")
+
+        var current = session.updateInput("haopingguo")
+        guard let targetIndex = current.candidates.firstIndex(where: { $0.surface == "好" }) else {
+            XCTFail("Expected prefix candidate 好 to exist.")
+            return
+        }
+
+        while current.selectedIndex < targetIndex {
+            current = session.moveSelection(.next)
+        }
+
+        let result = session.commitSelected()
+        XCTAssertEqual(result.committedText, "好")
+        XCTAssertEqual(result.snapshot.rawInput, "pingguo")
+        XCTAssertEqual(result.snapshot.remainingRawInput, "")
+    }
+}

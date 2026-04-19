@@ -2,9 +2,16 @@ import BilineHost
 import BilineSession
 import Cocoa
 @preconcurrency import InputMethodKit
+import OSLog
 
 final class BilineTextInputBridge {
     private let anchorTracker = CandidateAnchorTracker()
+    private let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
+        category: "bridge"
+    )
+    private var didLogFirstPanelShow = false
+    private var didLogMissingAnchor = false
 
     func render(
         snapshot: BilingualCompositionSnapshot,
@@ -20,10 +27,21 @@ final class BilineTextInputBridge {
         }
 
         guard let anchorRect = resolveAnchorRect(for: client) else {
+            if !didLogMissingAnchor {
+                didLogMissingAnchor = true
+                logger.info("Candidate panel hidden because anchor rect could not be resolved")
+            }
             candidatePanel.hide()
             return
         }
 
+        if !didLogFirstPanelShow {
+            didLogFirstPanelShow = true
+            didLogMissingAnchor = false
+            logger.info(
+                "Candidate panel rendering anchorX=\(anchorRect.origin.x, privacy: .public) anchorY=\(anchorRect.origin.y, privacy: .public) itemCount=\(snapshot.items.count)"
+            )
+        }
         candidatePanel.render(
             snapshot: snapshot,
             anchorRect: anchorRect,
@@ -40,9 +58,13 @@ final class BilineTextInputBridge {
 
     func clearAnchorCache() {
         anchorTracker.clear()
+        didLogFirstPanelShow = false
+        didLogMissingAnchor = false
     }
 
     func clearComposition(in client: IMKTextInput) {
+        didLogFirstPanelShow = false
+        didLogMissingAnchor = false
         if let textClient = client as? NSTextInputClient {
             textClient.unmarkText()
             return

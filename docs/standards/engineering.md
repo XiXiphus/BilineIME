@@ -39,10 +39,15 @@
   - `make smoke-ime`
 - `make smoke-ime` is the default real-host smoke-test entry.
 - `scripts/smoke-ime.sh prepare` must succeed before any scripted key injection starts.
-- `scripts/smoke-ime.sh run` is the intrusive phase; only run it after `prepare` confirms the current source is really `BilineIME Dev`.
+- `prepare` only validates the current host state. It must not switch the input source on the user's behalf.
+- The host app input source must already be `BilineIME Dev` before `observe`, `probe`, or `run` starts.
+- `observe` is the passive capture mode for user-driven reproduction.
+- `probe <name>` is the active single-scenario mode for short, focused IME checks.
+- `run` is a curated probe bundle, not a full system-takeover macro.
 - The baseline smoke-test host is `TextEdit`.
 - For browse keys whose automation-layer key names are ambiguous on macOS, prefer `scripts/press-macos-key.swift` so the smoke test uses the exact physical virtual key code.
-- When validating candidate UI, do not trust a single app-local screenshot. The candidate panel may appear on another display, so check all active displays before concluding the UI is missing or misplaced.
+- When validating candidate UI, do not trust the host accessibility tree alone. Candidate visibility is judged from full-screen screenshots across all active displays.
+- `Computer Use` is for focus recovery, permission UI, and manual reproduction support. It is not the primary evidence source for candidate visibility.
 
 ### IME Smoke Baseline
 
@@ -78,8 +83,11 @@
 `scripts/smoke-ime.sh` supports:
 
 - `prepare`
+- `observe`
+- `probe <name>`
 - `run`
-- `case <name>`
+- `status`
+- `stop`
 
 ## Dependency policy
 

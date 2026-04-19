@@ -5,6 +5,11 @@ public enum TargetLanguage: String, Sendable, Codable, CaseIterable {
     case english = "en"
 }
 
+public enum CharacterForm: String, Sendable, Codable, CaseIterable {
+    case simplified
+    case traditional
+}
+
 public protocol TranslationProvider: Sendable {
     var providerIdentifier: String { get }
     func translate(_ text: String, target: TargetLanguage) async throws -> String
@@ -15,6 +20,8 @@ public protocol SettingsStore: Sendable {
     var previewEnabled: Bool { get }
     var compactColumnCount: Int { get }
     var expandedRowCount: Int { get }
+    var fuzzyPinyinEnabled: Bool { get }
+    var characterForm: CharacterForm { get }
     var pageSize: Int { get }
 }
 

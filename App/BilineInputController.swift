@@ -2,6 +2,7 @@ import BilineCore
 import BilineHost
 import BilineMocks
 import BilinePreview
+import BilineRime
 import BilineSession
 import Cocoa
 @preconcurrency import InputMethodKit
@@ -46,6 +47,8 @@ final class BilineInputController: IMKInputController {
 
     private var activeClient: AnyObject?
     private var lastHandledKeySignature: RoutedKeySignature?
+    private var didLogFirstHandledKey = false
+    private var didLogFirstComposingSnapshot = false
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let settingsStore = DefaultSettingsStore()
@@ -66,9 +69,15 @@ final class BilineInputController: IMKInputController {
             provider: MockTranslationProvider(delay: smokePreviewDelay),
             debounce: smokePreviewDebounce
         )
+        let engineFactory: any CandidateEngineFactory
+        do {
+            engineFactory = try RimeCandidateEngineFactory.appDefault(settingsStore: settingsStore)
+        } catch {
+            fatalError("Unable to initialize Rime engine: \(error)")
+        }
         self.inputSession = BilingualInputSession(
             settingsStore: settingsStore,
-            engineFactory: FixtureCandidateEngineFactory.demo(),
+            engineFactory: engineFactory,
             previewCoordinator: previewCoordinator
         )
         super.init(server: server, delegate: delegate, client: inputClient)
@@ -80,6 +89,12 @@ final class BilineInputController: IMKInputController {
             #if DEBUG
                 self.emitSmokeTelemetry(snapshot: snapshot)
             #endif
+            if snapshot.isComposing, !self.didLogFirstComposingSnapshot {
+                self.didLogFirstComposingSnapshot = true
+                self.logger.info(
+                    "First composing snapshot rawInput=\(snapshot.rawInput, privacy: .public) remainingRawInput=\(snapshot.remainingRawInput, privacy: .public) candidateCount=\(snapshot.items.count) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public)"
+                )
+            }
             guard let client = self.activeClient as? IMKTextInput else {
                 return
             }
@@ -200,6 +215,8 @@ final class BilineInputController: IMKInputController {
         candidatePanel.hide()
         eventRouter.reset()
         lastHandledKeySignature = nil
+        didLogFirstHandledKey = false
+        didLogFirstComposingSnapshot = false
         activeClient = nil
         super.deactivateServer(sender)
     }
@@ -291,6 +308,12 @@ final class BilineInputController: IMKInputController {
         )
 
         #if DEBUG
+            if !didLogFirstHandledKey, event.type == .keyDown, action != .passThrough {
+                didLogFirstHandledKey = true
+                logger.info(
+                    "First handled key keyCode=\(event.keyCode) chars=\(event.characters ?? "", privacy: .public) charsIgnoring=\(event.charactersIgnoringModifiers ?? "", privacy: .public) action=\(String(describing: action), privacy: .public)"
+                )
+            }
             if inputSession.snapshot.isComposing, action == .passThrough {
                 logger.info(
                     "[\(loggingSource, privacy: .public)] unhandled composing event type=\(String(describing: event.type), privacy: .public) keyCode=\(event.keyCode) chars=\(event.characters ?? "", privacy: .public) charsIgnoring=\(event.charactersIgnoringModifiers ?? "", privacy: .public) modifiers=\(event.modifierFlags.rawValue)"
@@ -369,8 +392,12 @@ final class BilineInputController: IMKInputController {
 
     #if DEBUG
         private func emitSmokeTelemetry(snapshot: BilingualCompositionSnapshot) {
+            let selectedCandidate = snapshot.item(
+                row: snapshot.selectedRow,
+                column: snapshot.selectedColumn
+            )?.candidate.surface ?? "<none>"
             smokeLogger.notice(
-                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public)"
+                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public)"
             )
         }
 

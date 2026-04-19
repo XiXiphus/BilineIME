@@ -2,6 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/ime-paths.sh"
 PROJECT_NAME="${PROJECT_NAME:-BilineIME}"
 SCHEME="${SCHEME:-BilineIMEDev}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
@@ -10,6 +11,7 @@ TEAM_ID="$("$ROOT_DIR/scripts/detect-dev-team.sh" || true)"
 
 cd "$ROOT_DIR"
 
+./scripts/build-librime.sh
 ./scripts/scrub-macos-metadata.sh
 xcodegen generate --quiet
 
@@ -33,3 +35,5 @@ else
 fi
 
 xcodebuild "${BUILD_ARGS[@]}" build
+
+./scripts/embed-rime-runtime.sh "$DEV_BUILD_APP_PATH" "$DEV_XCENT_PATH"

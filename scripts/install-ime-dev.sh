@@ -18,7 +18,7 @@ QUIET=1 ./scripts/uninstall-ime.sh
 mkdir -p "$DEV_INSTALL_ROOT"
 rm -rf "$DEV_INSTALL_PATH"
 ditto "$DEV_BUILD_APP_PATH" "$DEV_INSTALL_PATH"
-xattr -cr "$DEV_INSTALL_PATH"
+xattr -cr "$DEV_INSTALL_PATH" || true
 
 for path in "${STALE_DEV_PATHS[@]}"; do
   "$LSREGISTER" -u "$path" >/dev/null 2>&1 || true

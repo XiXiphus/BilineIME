@@ -17,6 +17,8 @@ final class BilineAppDelegate: NSObject, NSApplicationDelegate {
             name: connectionName,
             bundleIdentifier: Bundle.main.bundleIdentifier
         )
-        logger.info("BilineIME server initialized")
+        logger.info(
+            "BilineIME server initialized bundleIdentifier=\(Bundle.main.bundleIdentifier ?? "<nil>", privacy: .public) connectionName=\(connectionName ?? "<nil>", privacy: .public)"
+        )
     }
 }

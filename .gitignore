@@ -66,6 +66,16 @@ __pycache__/
 # Node (optional tooling)
 node_modules/
 
+# Vendored Rime build artifacts
+Vendor/librime/build*/
+Vendor/librime/build
+Vendor/librime/deps/boost-*/
+Vendor/librime/deps/build/
+Vendor/librime/include/
+Vendor/librime/lib/
+Vendor/librime/bin/
+Vendor/librime/dist/
+
 # Editors
 .idea/
 *.swp

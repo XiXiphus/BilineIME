@@ -27,6 +27,7 @@ trap cleanup EXIT
 
 cd "$ROOT_DIR"
 
+./scripts/build-librime.sh
 ./scripts/scrub-macos-metadata.sh
 xcodegen generate --quiet
 xcodebuild \
@@ -35,6 +36,8 @@ xcodebuild \
   -configuration "$CONFIGURATION" \
   -derivedDataPath "$DERIVED_DATA" \
   build
+
+./scripts/embed-rime-runtime.sh "$RELEASE_BUILD_APP_PATH" "$RELEASE_XCENT_PATH"
 
 if [[ ! -d "$RELEASE_BUILD_APP_PATH" ]]; then
   echo "Built release app not found at $RELEASE_BUILD_APP_PATH" >&2

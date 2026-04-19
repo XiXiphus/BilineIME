@@ -10,6 +10,7 @@ let package = Package(
         .library(name: "BilineCore", targets: ["BilineCore"]),
         .library(name: "BilineHost", targets: ["BilineHost"]),
         .library(name: "BilinePreview", targets: ["BilinePreview"]),
+        .library(name: "BilineRime", targets: ["BilineRime"]),
         .library(name: "BilineSession", targets: ["BilineSession"]),
         .library(name: "BilineMocks", targets: ["BilineMocks"]),
         .library(name: "BilineTestSupport", targets: ["BilineTestSupport"]),
@@ -25,6 +26,22 @@ let package = Package(
         .target(
             name: "BilinePreview",
             dependencies: ["BilineCore"]
+        ),
+        .target(
+            name: "CBilineRime",
+            path: "Sources/CBilineRime",
+            publicHeadersPath: "include",
+            cSettings: [
+                .headerSearchPath("../../Vendor/librime/src"),
+                .headerSearchPath("../../Vendor/librime/include"),
+            ]
+        ),
+        .target(
+            name: "BilineRime",
+            dependencies: ["BilineCore", "BilinePreview", "CBilineRime"],
+            resources: [
+                .process("Resources"),
+            ]
         ),
         .target(
             name: "BilineSession",
@@ -44,6 +61,10 @@ let package = Package(
         .testTarget(
             name: "BilineCoreTests",
             dependencies: ["BilineCore", "BilineMocks", "BilineTestSupport"]
+        ),
+        .testTarget(
+            name: "BilineRimeTests",
+            dependencies: ["BilineRime", "BilineCore"]
         ),
         .testTarget(
             name: "BilineHostTests",

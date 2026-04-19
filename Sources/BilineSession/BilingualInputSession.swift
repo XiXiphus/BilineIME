@@ -52,6 +52,7 @@ public struct BilingualCandidateItem: Sendable, Equatable, Identifiable {
 
 public struct BilingualCompositionSnapshot: Sendable, Equatable {
     public let rawInput: String
+    public let remainingRawInput: String
     public let displayRawInput: String
     public let markedText: String
     public let items: [BilingualCandidateItem]
@@ -66,6 +67,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
 
     public init(
         rawInput: String,
+        remainingRawInput: String,
         displayRawInput: String,
         markedText: String,
         items: [BilingualCandidateItem],
@@ -79,6 +81,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         isComposing: Bool
     ) {
         self.rawInput = rawInput
+        self.remainingRawInput = remainingRawInput
         self.displayRawInput = displayRawInput
         self.markedText = markedText
         self.items = items
@@ -94,6 +97,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
 
     public static let idle = BilingualCompositionSnapshot(
         rawInput: "",
+        remainingRawInput: "",
         displayRawInput: "",
         markedText: "",
         items: [],
@@ -384,13 +388,26 @@ public final class BilingualInputSession: @unchecked Sendable {
             return nil
         }
 
+        let engineCommit = engineSession.commitSelected()
+
         let committedText = finalizedCurrentSelectionText(
             for: layer,
-            englishSelection: englishSelection
+            englishSelection: englishSelection,
+            engineCommittedText: engineCommit.committedText
         )
         guard !committedText.isEmpty else {
             publishSnapshot()
             return nil
+        }
+
+        if engineCommit.snapshot.isComposing {
+            rawInput = engineCommit.snapshot.rawInput
+            activeLayer = layer
+            hasEverExpandedInCurrentComposition = false
+            presentationMode = .compact
+            clearPreviews()
+            updateEngineSnapshot(engineCommit.snapshot)
+            return committedText
         }
 
         if !engineSnapshot.remainingRawInput.isEmpty {
@@ -501,12 +518,13 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     private func finalizedCurrentSelectionText(
         for layer: ActiveLayer,
-        englishSelection: String?
+        englishSelection: String?,
+        engineCommittedText: String
     ) -> String {
         guard let item = currentItem else { return "" }
         switch layer {
         case .chinese:
-            return item.candidate.surface
+            return engineCommittedText.isEmpty ? item.candidate.surface : engineCommittedText
         case .english:
             return englishSelection ?? ""
         }
@@ -725,6 +743,7 @@ public final class BilingualInputSession: @unchecked Sendable {
         if engineSnapshot.candidates.isEmpty {
             return BilingualCompositionSnapshot(
                 rawInput: rawInput,
+                remainingRawInput: rawInput,
                 displayRawInput: renderedRawInput,
                 markedText: renderedRawInput,
                 items: [],
@@ -748,6 +767,7 @@ public final class BilingualInputSession: @unchecked Sendable {
 
         return BilingualCompositionSnapshot(
             rawInput: engineSnapshot.rawInput,
+            remainingRawInput: engineSnapshot.remainingRawInput,
             displayRawInput: renderedRawInput,
             markedText: renderedRawInput,
             items: items,

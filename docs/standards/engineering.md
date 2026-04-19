@@ -45,6 +45,7 @@
 - `probe <name>` is the active single-scenario mode for short, focused IME checks.
 - `run` is a curated probe bundle, not a full system-takeover macro.
 - The baseline smoke-test host is `TextEdit`.
+- Active probes should default to `CGEvent` / HID injection. `System Events` is only a fallback path for a small set of unstable keys such as `Esc` and `Backspace`.
 - For browse keys whose automation-layer key names are ambiguous on macOS, prefer `scripts/press-macos-key.swift` so the smoke test uses the exact physical virtual key code.
 - When validating candidate UI, do not trust the host accessibility tree alone. Candidate visibility is judged from full-screen screenshots across all active displays.
 - `Computer Use` is for focus recovery, permission UI, and manual reproduction support. It is not the primary evidence source for candidate visibility.

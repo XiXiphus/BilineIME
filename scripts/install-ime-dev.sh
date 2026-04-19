@@ -6,6 +6,19 @@ source "$ROOT_DIR/scripts/ime-paths.sh"
 
 cd "$ROOT_DIR"
 
+wait_for_exit() {
+  local executable="$1"
+  local attempts=0
+  while pgrep -x "$executable" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [[ $attempts -ge 20 ]]; then
+      echo "Timed out waiting for $executable to exit." >&2
+      return 1
+    fi
+    sleep 0.25
+  done
+}
+
 ./scripts/build-ime-dev.sh
 
 if [[ ! -d "$DEV_BUILD_APP_PATH" ]]; then
@@ -18,6 +31,7 @@ QUIET=1 ./scripts/uninstall-ime.sh
 mkdir -p "$DEV_INSTALL_ROOT"
 rm -rf "$DEV_INSTALL_PATH"
 ditto "$DEV_BUILD_APP_PATH" "$DEV_INSTALL_PATH"
+chmod -R u+w "$DEV_INSTALL_PATH" >/dev/null 2>&1 || true
 xattr -cr "$DEV_INSTALL_PATH" || true
 
 for path in "${STALE_DEV_PATHS[@]}"; do
@@ -28,6 +42,8 @@ done
 
 pkill -x "$DEV_EXECUTABLE" >/dev/null 2>&1 || true
 killall TextInputMenuAgent >/dev/null 2>&1 || true
+killall imklaunchagent >/dev/null 2>&1 || true
+wait_for_exit "$DEV_EXECUTABLE" || true
 sleep 1
 
 ATTEMPTS=0

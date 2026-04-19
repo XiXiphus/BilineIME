@@ -8,7 +8,7 @@ final class BilineAppDelegate: NSObject, NSApplicationDelegate {
         subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
         category: "app"
     )
-    private(set) var server = IMKServer()
+    private(set) var server: IMKServer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         let connectionName =

@@ -24,6 +24,7 @@ The smoke test baseline is:
 - use `./scripts/smoke-ime.sh prepare` to confirm the system is actually ready before any scripted key injection
 - use `./scripts/smoke-ime.sh observe` for passive user-driven reproduction capture
 - use `./scripts/smoke-ime.sh probe <name>` for one focused active scenario
+- active probe injection should default to CGEvent/HID; only use `System Events` as a fallback for keys that prove unstable
 - for browse keys whose semantic names may map incorrectly on macOS, prefer `./scripts/press-macos-key.swift`
 - if candidate UI may render on another monitor, capture or inspect all displays instead of trusting a single app-local screenshot or host accessibility tree
 

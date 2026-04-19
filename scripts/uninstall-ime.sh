@@ -12,6 +12,19 @@ log() {
   fi
 }
 
+wait_for_exit() {
+  local executable="$1"
+  local attempts=0
+  while pgrep -x "$executable" >/dev/null 2>&1; do
+    attempts=$((attempts + 1))
+    if [[ $attempts -ge 20 ]]; then
+      log "Timed out waiting for $executable to exit."
+      return 1
+    fi
+    sleep 0.25
+  done
+}
+
 run_ls_unregister() {
   "$LSREGISTER" -u "$1" >/dev/null 2>&1 || true
 }
@@ -66,6 +79,11 @@ if [[ "$REMOVE_RELEASE" == "1" ]]; then
   pkill -x "$RELEASE_EXECUTABLE" >/dev/null 2>&1 || true
 fi
 killall TextInputMenuAgent >/dev/null 2>&1 || true
+killall imklaunchagent >/dev/null 2>&1 || true
+wait_for_exit "$DEV_EXECUTABLE" || true
+if [[ "$REMOVE_RELEASE" == "1" ]]; then
+  wait_for_exit "$RELEASE_EXECUTABLE" || true
+fi
 sleep 1
 
 log "BilineIME dev lane removed."

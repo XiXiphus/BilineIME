@@ -27,6 +27,8 @@ TOTAL_PROBES=0
 TELEMETRY_STREAM_PID=""
 SYSTEM_STREAM_PID=""
 PROBE_TELEMETRY_OFFSET=0
+LAST_FAILURE_KIND=""
+LAST_FAILURE_DETAIL=""
 
 mkdir -p "$OUTPUT_ROOT"
 
@@ -98,6 +100,43 @@ current_input_source() {
   "$ROOT_DIR/select-input-source.sh" current 2>/dev/null || true
 }
 
+host_focus_snapshot() {
+  osascript <<'EOF' 2>/dev/null
+tell application "System Events"
+  set frontProcessName to ""
+  try
+    set frontProcessName to name of first application process whose frontmost is true
+  end try
+
+  if frontProcessName is not "TextEdit" then
+    return frontProcessName & "|<none>|<none>"
+  end if
+
+  tell process "TextEdit"
+    set focusedElement to missing value
+    try
+      set focusedElement to value of attribute "AXFocusedUIElement"
+    end try
+
+    if focusedElement is missing value then
+      return "TextEdit|<missing>|<missing>"
+    end if
+
+    set roleText to "<missing>"
+    set descText to "<missing>"
+    try
+      set roleText to value of attribute "AXRole" of focusedElement as text
+    end try
+    try
+      set descText to value of attribute "AXDescription" of focusedElement as text
+    end try
+
+    return frontProcessName & "|" & roleText & "|" & descText
+  end tell
+end tell
+EOF
+}
+
 display_count() {
   swift -e 'import AppKit; print(NSScreen.screens.count)'
 }
@@ -144,8 +183,8 @@ EOF
 }
 
 clear_composition() {
-  "$PRESS_KEY" escape --system-events >/dev/null 2>&1 || true
-  "$PRESS_KEY" escape --system-events >/dev/null 2>&1 || true
+  "$PRESS_KEY" escape --mode system-events >/dev/null 2>&1 || true
+  "$PRESS_KEY" escape --mode system-events >/dev/null 2>&1 || true
   sleep 0.2
 }
 
@@ -191,9 +230,33 @@ is_app_running() {
 }
 
 has_recent_imk_failure() {
-  local lines
-  lines="$(log show --last 90s --style compact --predicate 'process == "BilineIMEDev" OR eventMessage CONTAINS[c] "IMKServer" OR eventMessage CONTAINS[c] "mach-register" OR eventMessage CONTAINS[c] "could not register"' 2>/dev/null || true)"
-  printf '%s\n' "$lines" | rg -q 'deny\(1\) mach-register|could not register|\[IMKServer _createConnection\]: \*Failed\*'
+  [[ -f "$SYSTEM_LOG_FILE" ]] || return 1
+
+  local last_failure=""
+  local last_recovery=""
+  local biline_lines=""
+
+  biline_lines="$(grep -F 'BilineIMEDev[' "$SYSTEM_LOG_FILE" || true)"
+
+  last_failure="$(
+    printf '%s\n' "$biline_lines" \
+      | rg 'deny\(1\) mach-register|could not register|\[IMKServer _createConnection\]: \*Failed\*' \
+      | tail -n 1 \
+      | cut -c 1-23 \
+      || true
+  )"
+
+  last_recovery="$(
+    printf '%s\n' "$biline_lines" \
+      | rg 'SMOKE .*isComposing=true|First handled key|First composing snapshot|First candidate panel render|InputMethodKit\) Setting marked text' \
+      | tail -n 1 \
+      | cut -c 1-23 \
+      || true
+  )"
+
+  [[ -n "$last_failure" ]] || return 1
+  [[ -z "$last_recovery" ]] && return 0
+  [[ "$last_failure" > "$last_recovery" ]]
 }
 
 latest_telemetry_line() {
@@ -211,6 +274,10 @@ latest_telemetry_field() {
     return 1
   fi
   printf '%s\n' "$line" | tr ' ' '\n' | rg "^${key}=" | tail -n 1 | cut -d= -f2-
+}
+
+write_system_snapshot() {
+  log show --last 90s --style compact --predicate 'process == "BilineIMEDev" OR eventMessage CONTAINS[c] "IMKServer" OR eventMessage CONTAINS[c] "InputMethodKit" OR eventMessage CONTAINS[c] "mach-register" OR eventMessage CONTAINS[c] "could not register" OR eventMessage CONTAINS[c] "First handled key" OR eventMessage CONTAINS[c] "First composing snapshot" OR eventMessage CONTAINS[c] "First candidate panel render" OR eventMessage CONTAINS[c] "Missing anchor"' >"$SYSTEM_LOG_FILE" 2>/dev/null || true
 }
 
 mark_probe_offsets() {
@@ -249,6 +316,16 @@ expect_field() {
     sleep 0.1
   done
 
+  case "$key" in
+    rawInput|compositionMode|isComposing|candidateCount|selectedCandidate|activeLayer|selectedRow|selectedColumn)
+      LAST_FAILURE_KIND="ime-not-composing"
+      LAST_FAILURE_DETAIL="expected_${key}=${expected} actual=${actual:-<missing>}"
+      ;;
+    *)
+      LAST_FAILURE_KIND="probe-mismatch"
+      LAST_FAILURE_DETAIL="expected_${key}=${expected} actual=${actual:-<missing>}"
+      ;;
+  esac
   echo "expected telemetry ${key}=${expected}, got ${actual:-<missing>}" >&2
   return 1
 }
@@ -267,8 +344,30 @@ expect_host_text() {
     sleep 0.1
   done
 
+  LAST_FAILURE_KIND="commit-mismatch"
+  LAST_FAILURE_DETAIL="expected_host=${expected} actual=${actual}"
   echo "expected host text [$expected], got [${actual}]" >&2
   return 1
+}
+
+expect_host_text_stable() {
+  local expected="$1"
+  local duration_ms="${2:-1200}"
+  local interval_ms=100
+  local checks=$((duration_ms / interval_ms))
+  local actual=""
+  local index
+
+  for ((index = 0; index < checks; index++)); do
+    actual="$(read_host_text)"
+    if [[ "$actual" != "$expected" ]]; then
+      LAST_FAILURE_KIND="commit-mismatch"
+      LAST_FAILURE_DETAIL="expected_stable_host=${expected} actual=${actual}"
+      echo "expected stable host text [$expected], got [${actual}]" >&2
+      return 1
+    fi
+    sleep 0.1
+  done
 }
 
 write_prepare_result() {
@@ -297,6 +396,8 @@ prepare_environment() {
   activate_textedit
   write_input_source
   write_host_text
+  : >"$TELEMETRY_FILE"
+  write_system_snapshot
   capture_displays "$OUTPUT_ROOT"
 
   local current_source=""; current_source="$(current_input_source)"
@@ -327,16 +428,42 @@ EOF
 
 assert_probe_ready() {
   assert_not_stopped
-  activate_textedit
-  if ! is_target_input_source_active; then
-    echo "Current input source is [$(current_input_source)], not [$TARGET_SOURCE_ID]." >&2
-    return 1
-  fi
-  if ! is_app_running; then
-    echo "$APP_PROCESS is not running." >&2
-    return 1
-  fi
-  return 0
+  local attempts=0
+  while true; do
+    if ! is_target_input_source_active; then
+      LAST_FAILURE_KIND="input-source-not-ready"
+      LAST_FAILURE_DETAIL="current_source=$(current_input_source)"
+      echo "Current input source is [$(current_input_source)], not [$TARGET_SOURCE_ID]." >&2
+      return 1
+    fi
+    if ! is_app_running; then
+      LAST_FAILURE_KIND="ime-not-running"
+      LAST_FAILURE_DETAIL="process=$APP_PROCESS"
+      echo "$APP_PROCESS is not running." >&2
+      return 1
+    fi
+    local snapshot=""
+    snapshot="$(host_focus_snapshot || true)"
+    local front_process="${snapshot%%|*}"
+    local rest="${snapshot#*|}"
+    local focused_role="${rest%%|*}"
+    local focused_desc="${rest#*|}"
+    if [[ "$front_process" == "TextEdit" && "$focused_role" == "AXTextArea" ]]; then
+      return 0
+    fi
+
+    attempts=$((attempts + 1))
+    if [[ $attempts -ge 2 ]]; then
+      LAST_FAILURE_KIND="host-not-ready"
+      LAST_FAILURE_DETAIL="front_process=${front_process:-<missing>} focused_role=${focused_role:-<missing>} focused_desc=${focused_desc:-<missing>}"
+      echo "TextEdit input focus is not ready: ${LAST_FAILURE_DETAIL}" >&2
+      return 1
+    fi
+
+    activate_textedit
+    focus_text_view
+    sleep 0.2
+  done
 }
 
 capture_probe_state() {
@@ -347,6 +474,7 @@ capture_probe_state() {
   cp "$HOST_FILE" "$target_dir/host.txt"
   cp "$INPUT_SOURCE_FILE" "$target_dir/input-source.txt"
   printf '%s\n' "$(latest_telemetry_line || true)" >"$target_dir/last-telemetry.txt"
+  cp "$SYSTEM_LOG_FILE" "$target_dir/system.log" 2>/dev/null || true
   capture_displays "$target_dir"
 }
 
@@ -373,6 +501,8 @@ write_probe_report() {
     echo "input_source=$(current_input_source)"
     echo "host_text=$(read_host_text)"
     echo "last_telemetry=$(latest_telemetry_line || true)"
+    echo "failure_kind=${LAST_FAILURE_KIND:-<none>}"
+    echo "failure_detail=${LAST_FAILURE_DETAIL:-<none>}"
     echo "evidence=$CURRENT_PROBE_DIR"
   } >"$target"
 }
@@ -380,8 +510,7 @@ write_probe_report() {
 smoke_key() {
   assert_not_stopped
   assert_probe_ready
-  focus_text_view
-  "$PRESS_KEY" "$@" --system-events
+  "$PRESS_KEY" "$@" --mode cg-event
   sleep 0.2
 }
 
@@ -398,25 +527,30 @@ begin_probe() {
   CURRENT_PROBE="$1"
   CURRENT_PROBE_DIR="$OUTPUT_ROOT/$CURRENT_PROBE"
   mkdir -p "$CURRENT_PROBE_DIR"
+  LAST_FAILURE_KIND=""
+  LAST_FAILURE_DETAIL=""
   clear_document
+  activate_textedit
+  focus_text_view
   assert_probe_ready
   mark_probe_offsets
 }
 
 run_probe() {
-  local probe="$1"
+  local probe_function="$1"
+  local probe_alias="$2"
   TOTAL_PROBES=$((TOTAL_PROBES + 1))
-  begin_probe "$probe"
+  begin_probe "$probe_alias"
 
-  if "$probe"; then
+  if "$probe_function"; then
     capture_probe_state "$CURRENT_PROBE_DIR"
-    write_probe_report "pass" "$probe"
-    printf 'PASS %s\n' "$probe" | tee -a "$SUMMARY_FILE"
+    write_probe_report "pass" "$probe_alias"
+    printf 'PASS %s\n' "$probe_alias" | tee -a "$SUMMARY_FILE"
   else
     FAILED_PROBES=$((FAILED_PROBES + 1))
     capture_probe_state "$CURRENT_PROBE_DIR"
-    write_probe_report "fail" "$probe"
-    printf 'FAIL %s\n' "$probe" | tee -a "$SUMMARY_FILE"
+    write_probe_report "fail" "$probe_alias"
+    printf 'FAIL %s\n' "$probe_alias" | tee -a "$SUMMARY_FILE"
     return 1
   fi
 }
@@ -468,6 +602,82 @@ probe_phrase_hao_ping_guo_english() {
   expect_field isComposing false || return 1
 }
 
+probe_phrase_ni_hao_chinese() {
+  smoke_type_word nihao
+  smoke_key space
+  expect_host_text '你好' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_ni_hao_english() {
+  smoke_type_word nihao
+  smoke_key tab --shift
+  sleep 1.2
+  expect_field activeLayer english || return 1
+  smoke_key space
+  expect_host_text 'hello' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_zhong_guo_chinese() {
+  smoke_type_word zhongguo
+  smoke_key space
+  expect_host_text '中国' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_zhong_guo_english() {
+  smoke_type_word zhongguo
+  smoke_key tab --shift
+  sleep 1.2
+  expect_field activeLayer english || return 1
+  smoke_key space
+  expect_host_text 'China' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_wo_men_chinese() {
+  smoke_type_word women
+  smoke_key space
+  expect_host_text '我们' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_shi_jie_chinese() {
+  smoke_type_word shijie
+  smoke_key space
+  expect_host_text '世界' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_shi_jian_chinese() {
+  smoke_type_word shijian
+  smoke_key space
+  expect_host_text '时间' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_shu_ru_fa_chinese() {
+  smoke_type_word shurufa
+  smoke_key space
+  expect_host_text '输入法' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_shuang_yu_chinese() {
+  smoke_type_word shuangyu
+  smoke_key space
+  expect_host_text '双语' || return 1
+  expect_field isComposing false || return 1
+}
+
+probe_phrase_ce_shi_chinese() {
+  smoke_type_word ceshi
+  smoke_key space
+  expect_host_text '测试' || return 1
+  expect_field isComposing false || return 1
+}
+
 probe_prefix_hao_english_tail() {
   smoke_type_word haopingguo
   smoke_key tab --shift
@@ -481,19 +691,75 @@ probe_prefix_hao_english_tail() {
   expect_field activeLayer english || return 1
 }
 
+probe_digit_select_zhegea_no_repeat() {
+  smoke_type_word zhegea
+  smoke_key 1
+  local committed=""
+  committed="$(read_host_text)"
+  if [[ -z "$committed" ]]; then
+    LAST_FAILURE_KIND="commit-mismatch"
+    LAST_FAILURE_DETAIL="expected_non_empty_host_after_digit_select actual=<empty>"
+    echo "expected non-empty host text after digit select, got empty" >&2
+    return 1
+  fi
+  expect_field isComposing false || return 1
+  expect_host_text_stable "$committed" 1500 || return 1
+}
+
+resolve_probe_function() {
+  local alias="$1"
+  case "$alias" in
+    type-shi) echo "probe_type_shi" ;;
+    browse-equal) echo "probe_browse_equal" ;;
+    browse-minus) echo "probe_browse_minus" ;;
+    comma-commit) echo "probe_comma_commit" ;;
+    phrase-hao-ping-guo-chinese) echo "probe_phrase_hao_ping_guo_chinese" ;;
+    phrase-hao-ping-guo-english) echo "probe_phrase_hao_ping_guo_english" ;;
+    phrase-ni-hao-chinese) echo "probe_phrase_ni_hao_chinese" ;;
+    phrase-ni-hao-english) echo "probe_phrase_ni_hao_english" ;;
+    phrase-zhong-guo-chinese) echo "probe_phrase_zhong_guo_chinese" ;;
+    phrase-zhong-guo-english) echo "probe_phrase_zhong_guo_english" ;;
+    phrase-wo-men-chinese) echo "probe_phrase_wo_men_chinese" ;;
+    phrase-shi-jie-chinese) echo "probe_phrase_shi_jie_chinese" ;;
+    phrase-shi-jian-chinese) echo "probe_phrase_shi_jian_chinese" ;;
+    phrase-shu-ru-fa-chinese) echo "probe_phrase_shu_ru_fa_chinese" ;;
+    phrase-shuang-yu-chinese) echo "probe_phrase_shuang_yu_chinese" ;;
+    phrase-ce-shi-chinese) echo "probe_phrase_ce_shi_chinese" ;;
+    prefix-hao-english-tail) echo "probe_prefix_hao_english_tail" ;;
+    digit-select-zhegea-no-repeat) echo "probe_digit_select_zhegea_no_repeat" ;;
+    *) return 1 ;;
+  esac
+}
+
 run_selected_probes() {
   local probes=(
-    probe_type_shi
-    probe_browse_equal
-    probe_browse_minus
-    probe_phrase_hao_ping_guo_chinese
-    probe_phrase_hao_ping_guo_english
+    type-shi
+    browse-equal
+    browse-minus
+    comma-commit
+    phrase-ni-hao-chinese
+    phrase-ni-hao-english
+    phrase-zhong-guo-chinese
+    phrase-zhong-guo-english
+    phrase-wo-men-chinese
+    phrase-shi-jie-chinese
+    phrase-shi-jian-chinese
+    phrase-hao-ping-guo-chinese
+    phrase-hao-ping-guo-english
+    phrase-shu-ru-fa-chinese
+    phrase-shuang-yu-chinese
+    phrase-ce-shi-chinese
+    prefix-hao-english-tail
+    digit-select-zhegea-no-repeat
   )
 
-  local probe
-  for probe in "${probes[@]}"; do
+  local probe_alias probe_function
+  for probe_alias in "${probes[@]}"; do
     assert_not_stopped
-    run_probe "$probe"
+    probe_function="$(resolve_probe_function "$probe_alias")"
+    if ! run_probe "$probe_function" "$probe_alias"; then
+      :
+    fi
   done
 }
 
@@ -534,21 +800,22 @@ prepare_command() {
 }
 
 probe_command() {
-  local probe_name="$1"
+  local probe_alias="$1"
   CURRENT_MODE="probe"
   refresh_lock_mode
   rm -f "$STOP_FILE" >/dev/null 2>&1 || true
   print_control_hint
 
-  if ! declare -F "$probe_name" >/dev/null 2>&1; then
-    echo "Unknown probe: $probe_name" >&2
+  local probe_function=""
+  if ! probe_function="$(resolve_probe_function "$probe_alias")"; then
+    echo "Unknown probe: $probe_alias" >&2
     exit 1
   fi
 
   prepare_environment
   start_log_streams
   : >"$SUMMARY_FILE"
-  run_probe "$probe_name"
+  run_probe "$probe_function" "$probe_alias"
   printf 'total=%d failed=%d output=%s\n' "$TOTAL_PROBES" "$FAILED_PROBES" "$OUTPUT_ROOT" | tee -a "$SUMMARY_FILE"
   [[ "$FAILED_PROBES" -eq 0 ]]
 }

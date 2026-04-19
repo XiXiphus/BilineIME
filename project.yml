@@ -93,7 +93,7 @@ targets:
               tsInputModeScriptKey: smSimpChinese
           tsVisibleInputModeOrderedArrayKey:
             - io.github.xixiphus.inputmethod.BilineIME.dev.pinyin
-        InputMethodConnectionName: group.io.github.xixiphus.inputmethod.BilineIME.dev.Connection
+        InputMethodConnectionName: io.github.xixiphus.inputmethod.BilineIME.dev_Connection
         InputMethodServerModeDictionary: *devInputModeDict
     settings:
       base:
@@ -126,7 +126,7 @@ targets:
               tsInputModeScriptKey: smSimpChinese
           tsVisibleInputModeOrderedArrayKey:
             - io.github.xixiphus.inputmethod.BilineIME.pinyin
-        InputMethodConnectionName: group.io.github.xixiphus.inputmethod.BilineIME.Connection
+        InputMethodConnectionName: io.github.xixiphus.inputmethod.BilineIME_Connection
         InputMethodServerModeDictionary: *releaseInputModeDict
     settings:
       base:

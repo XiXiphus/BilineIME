@@ -216,17 +216,18 @@ Recommended baseline:
 4. `observe` is the passive mode for user-driven reproduction:
    - `./scripts/smoke-ime.sh observe`
 5. `probe <name>` runs one short active probe and records screenshots, telemetry, system logs, host text, and input source:
-   - `./scripts/smoke-ime.sh probe probe_type_shi`
+   - `./scripts/smoke-ime.sh probe type-shi`
 6. `make smoke-ime` keeps the default staged flow.
 7. If you diagnose a failure interactively with Codex `Computer Use`, use it to focus the host or handle system UI. Candidate visibility should still be judged from full-screen screenshots, not only the host AX tree.
 8. For browse keys whose semantic names may map incorrectly on macOS, prefer:
    - `./scripts/press-macos-key.swift equal --activate com.apple.TextEdit`
    - `./scripts/press-macos-key.swift minus --activate com.apple.TextEdit`
+   - active probes now default to `CGEvent` injection; `System Events` is only a fallback for a small set of unstable keys such as `Esc` or `Backspace`
 9. The smoke script exposes manual stop controls:
    - `./scripts/smoke-ime.sh status`
    - `./scripts/smoke-ime.sh stop`
    - `Ctrl-C`
-7. If the candidate panel seems missing, inspect all displays. The panel may render on another monitor even when the host app stays on the current one.
+10. If the candidate panel seems missing, inspect all displays. The panel may render on another monitor even when the host app stays on the current one.
 
 ## 🧠 Architecture
 

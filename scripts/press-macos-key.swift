@@ -4,9 +4,15 @@ import ApplicationServices
 import Foundation
 
 struct Arguments {
+    enum InjectionMode: String {
+        case auto
+        case cgEvent = "cg-event"
+        case systemEvents = "system-events"
+    }
+
     var key: String
     var activateTarget: String?
-    var useSystemEvents = false
+    var injectionMode: InjectionMode = .auto
     var shift = false
     var control = false
     var option = false
@@ -77,7 +83,7 @@ func parseArguments() throws -> Arguments {
     guard let first = iterator.next() else {
         throw CLIError.usage(
             """
-            Usage: ./scripts/press-macos-key.swift <key> [--shift] [--control] [--option] [--command] [--fn] [--repeat N] [--delay-ms N]
+            Usage: ./scripts/press-macos-key.swift <key> [--mode cg-event|system-events|auto] [--shift] [--control] [--option] [--command] [--fn] [--repeat N] [--delay-ms N]
             Example: ./scripts/press-macos-key.swift equal
             Example: ./scripts/press-macos-key.swift 9 --shift
             """
@@ -90,8 +96,13 @@ func parseArguments() throws -> Arguments {
         switch argument {
         case "--shift":
             parsed.shift = true
+        case "--mode":
+            guard let value = iterator.next(), let mode = Arguments.InjectionMode(rawValue: value) else {
+                throw CLIError.invalidValue("--mode")
+            }
+            parsed.injectionMode = mode
         case "--system-events":
-            parsed.useSystemEvents = true
+            parsed.injectionMode = .systemEvents
         case "--control":
             parsed.control = true
         case "--option":
@@ -192,7 +203,17 @@ func postKey(arguments: Arguments) throws {
         throw CLIError.unknownKey(arguments.key)
     }
 
-    if arguments.useSystemEvents || arguments.key == "delete" || arguments.key == "backspace" {
+    let shouldUseSystemEvents: Bool
+    switch arguments.injectionMode {
+    case .cgEvent:
+        shouldUseSystemEvents = false
+    case .systemEvents:
+        shouldUseSystemEvents = true
+    case .auto:
+        shouldUseSystemEvents = arguments.key == "delete" || arguments.key == "backspace" || arguments.key == "escape" || arguments.key == "esc"
+    }
+
+    if shouldUseSystemEvents {
         try postViaSystemEvents(arguments: arguments, keyCode: keyCode)
         return
     }

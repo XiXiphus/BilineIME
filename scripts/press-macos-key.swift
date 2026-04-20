@@ -72,6 +72,8 @@ private let keyCodes: [String: CGKeyCode] = [
     "grave": 50, "`": 50,
     "delete": 51, "backspace": 51,
     "escape": 53, "esc": 53,
+    "pageup": 116, "page-up": 116,
+    "pagedown": 121, "page-down": 121,
     "left": 123, "arrowleft": 123,
     "right": 124, "arrowright": 124,
     "down": 125, "arrowdown": 125,

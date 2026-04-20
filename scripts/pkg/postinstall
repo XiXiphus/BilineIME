@@ -16,7 +16,8 @@ cat <<'EOF'
 BilineIME was installed to /Library/Input Methods/BilineIME.app
 
 If this is the first install, or if input-source metadata changed, log out and log back in
-before adding BilineIME in Keyboard > Input Sources.
+before adding BilineIME in Keyboard > Input Sources. The install is not fully verified
+until a host app such as TextEdit actually launches BilineIME and accepts input.
 EOF
 
 exit 0

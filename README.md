@@ -214,7 +214,7 @@ Recommended baseline:
 2. Prefer the staged flow:
    - `./scripts/smoke-ime.sh prepare`
    - `./scripts/smoke-ime.sh run`
-3. `prepare` is non-intrusive. It only verifies that the current host is already using `BilineIME Dev`, that the IME process is running, and that recent IMK logs are clean.
+3. `prepare` is non-intrusive. It only verifies that the current host is already using `BilineIME Dev`, that the IME process is running, and that recent IMK logs are clean. If it fails, inspect `failure_kind` in the generated `prepare.txt`.
 4. `observe` is the passive mode for user-driven reproduction:
    - `./scripts/smoke-ime.sh observe`
 5. `probe <name>` runs one short active probe and records screenshots, telemetry, system logs, host text, and input source:
@@ -230,6 +230,21 @@ Recommended baseline:
    - `./scripts/smoke-ime.sh stop`
    - `Ctrl-C`
 10. If the candidate panel seems missing, inspect all displays. The panel may render on another monitor even when the host app stays on the current one.
+
+### Release First-Install Smoke Test
+
+Release install readiness requires a real host check, not only a visible TIS row.
+After installing the package into `/Library/Input Methods`, log out and back in
+if macOS requires it, add/select `BilineIME`, then run:
+
+```bash
+make diagnose-ime-release
+make smoke-ime-release
+```
+
+The release is not usable until TextEdit actually launches `BilineIME` and the
+release smoke run passes. If TextEdit binds to ABC or Apple's SCIM endpoint,
+treat it as an install/registration failure.
 
 ## 🧠 Architecture
 

@@ -329,8 +329,13 @@ public actor TranslationPreviewScheduler {
             return
         }
 
+        // The keys are priority-ordered by flushPendingBatch; start the head
+        // request before fan-out so visible prefetches cannot take its rate slot.
+        let firstRequestKey = requestKeys[0]
+        await runSingle(requestKey: firstRequestKey)
+
         await withTaskGroup(of: Void.self) { group in
-            for requestKey in requestKeys {
+            for requestKey in requestKeys.dropFirst() {
                 group.addTask {
                     await self.runSingle(requestKey: requestKey)
                 }

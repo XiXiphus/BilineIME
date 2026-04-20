@@ -87,6 +87,7 @@ private final class BilineCandidatePanelView: NSView {
     private let segmentBreathingRoom: CGFloat = 2
     private let chineseFont = NSFont.systemFont(ofSize: 16, weight: .semibold)
     private let englishFont = NSFont.systemFont(ofSize: 13, weight: .regular)
+    private let fallbackFontResolver = SystemFallbackFontResolver()
 
     override var intrinsicContentSize: NSSize {
         preferredSize
@@ -379,13 +380,23 @@ private final class BilineCandidatePanelView: NSView {
         item: BilingualCandidateItem,
         active: Bool
     ) -> NSAttributedString {
-        NSAttributedString(
-            string: "\(column + 1) \(item.candidate.surface)",
+        let text = "\(column + 1) \(item.candidate.surface)"
+        let attributed = NSMutableAttributedString(
+            string: text,
             attributes: [
                 .font: chineseFont,
                 .foregroundColor: active ? NSColor.white : NSColor.labelColor,
             ]
         )
+        let prefixLength = "\(column + 1) ".count
+        for run in fallbackFontResolver.runs(for: item.candidate.surface, baseFont: chineseFont) {
+            attributed.addAttribute(
+                .font,
+                value: run.font,
+                range: NSRange(location: prefixLength + run.range.location, length: run.range.length)
+            )
+        }
+        return attributed
     }
 
     private func englishLine(

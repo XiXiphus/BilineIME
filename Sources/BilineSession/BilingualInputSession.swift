@@ -152,16 +152,20 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
 public final class BilingualInputSession: @unchecked Sendable {
     public var onSnapshotUpdate: ((BilingualCompositionSnapshot) -> Void)?
 
-    public private(set) var snapshot: BilingualCompositionSnapshot = .idle
-    public var canDeleteBackward: Bool { !rawInput.isEmpty }
-    public var hasCandidates: Bool { !snapshot.items.isEmpty }
+    public var snapshot: BilingualCompositionSnapshot {
+        withStateLock { currentSnapshot }
+    }
+    public var canDeleteBackward: Bool { withStateLock { !rawInput.isEmpty } }
+    public var hasCandidates: Bool { withStateLock { !currentSnapshot.items.isEmpty } }
     public private(set) var compositionMode: CompositionMode = .candidateCompact
     public private(set) var hasEverExpandedInCurrentComposition = false
 
+    private let stateLock = NSRecursiveLock()
     private let settingsStore: any SettingsStore
     private let previewCoordinator: PreviewCoordinator
     private var engineSession: any CandidateEngineSession
 
+    private var currentSnapshot: BilingualCompositionSnapshot = .idle
     private var engineSnapshot: CompositionSnapshot = .idle
     private var rawInput = ""
     private var activeLayer: ActiveLayer = .chinese
@@ -183,26 +187,34 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     deinit {
-        clearPreviews()
+        withStateLock {
+            clearPreviews()
+        }
     }
 
     public func append(text: String) {
-        let normalized = normalize(text)
-        guard !normalized.isEmpty else { return }
-        rawInput.append(contentsOf: normalized)
-        refreshCompositionState()
+        withStateLock {
+            let normalized = normalize(text)
+            guard !normalized.isEmpty else { return }
+            rawInput.append(contentsOf: normalized)
+            refreshCompositionState()
+        }
     }
 
     public func appendLiteral(text: String) {
-        guard !text.isEmpty else { return }
-        rawInput.append(contentsOf: text)
-        refreshCompositionState()
+        withStateLock {
+            guard !text.isEmpty else { return }
+            rawInput.append(contentsOf: text)
+            refreshCompositionState()
+        }
     }
 
     public func deleteBackward() {
-        guard canDeleteBackward else { return }
-        rawInput.removeLast()
-        refreshCompositionState()
+        withStateLock {
+            guard !rawInput.isEmpty else { return }
+            rawInput.removeLast()
+            refreshCompositionState()
+        }
     }
 
     public func moveSelection(_ direction: SelectionDirection) {
@@ -210,15 +222,17 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func moveColumn(_ direction: SelectionDirection) {
-        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
+        withStateLock {
+            guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
 
-        let delta = direction == .next ? 1 : -1
-        let targetColumn = currentSelectedColumn + delta
-        selectCandidate(
-            row: currentSelectedRowForSelection,
-            column: targetColumn,
-            clampColumn: false
-        )
+            let delta = direction == .next ? 1 : -1
+            let targetColumn = currentSelectedColumn + delta
+            selectCandidate(
+                row: currentSelectedRowForSelection,
+                column: targetColumn,
+                clampColumn: false
+            )
+        }
     }
 
     public func moveRow(_ direction: SelectionDirection) {
@@ -231,103 +245,125 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func turnPage(_ direction: PageDirection) {
-        guard engineSnapshot.isComposing else { return }
-        guard !engineSnapshot.candidates.isEmpty else {
-            publishSnapshot()
-            return
-        }
+        withStateLock {
+            guard engineSnapshot.isComposing else { return }
+            guard !engineSnapshot.candidates.isEmpty else {
+                publishSnapshot()
+                return
+            }
 
-        moveToAdjacentPage(
-            direction: direction,
-            preferredColumn: currentSelectedColumn,
-            preferredRow: currentSelectedRow
-        )
+            moveToAdjacentPage(
+                direction: direction,
+                preferredColumn: currentSelectedColumn,
+                preferredRow: currentSelectedRow
+            )
+        }
     }
 
     public func selectCandidate(at localIndex: Int) {
-        guard localIndex >= 0, localIndex < engineSnapshot.candidates.count else { return }
-        moveEngineSelection(to: localIndex)
+        withStateLock {
+            guard localIndex >= 0, localIndex < engineSnapshot.candidates.count else { return }
+            moveEngineSelection(to: localIndex)
+        }
     }
 
     public func selectColumn(at columnIndex: Int) {
-        guard engineSnapshot.isComposing else { return }
-        selectCandidate(
-            row: currentSelectedRowForSelection,
-            column: columnIndex,
-            clampColumn: false
-        )
+        withStateLock {
+            guard engineSnapshot.isComposing else { return }
+            selectCandidate(
+                row: currentSelectedRowForSelection,
+                column: columnIndex,
+                clampColumn: false
+            )
+        }
     }
 
     public func expandAndAdvanceRow() {
-        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
+        withStateLock {
+            guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
 
-        let currentColumn = currentSelectedColumn
-        hasEverExpandedInCurrentComposition = true
-        compositionMode = .candidateExpanded
-        presentationMode = .expanded
+            let currentColumn = currentSelectedColumn
+            hasEverExpandedInCurrentComposition = true
+            compositionMode = .candidateExpanded
+            presentationMode = .expanded
 
-        let nextRow = 1
-        if nextRow < currentRowCount {
-            let targetColumn = min(currentColumn, max(0, candidateCount(inRow: nextRow) - 1))
-            selectCandidate(row: nextRow, column: targetColumn, clampColumn: true)
-            return
+            let nextRow = 1
+            if nextRow < currentRowCount {
+                let targetColumn = min(currentColumn, max(0, candidateCount(inRow: nextRow) - 1))
+                selectCandidate(row: nextRow, column: targetColumn, clampColumn: true)
+                return
+            }
+
+            moveToAdjacentPage(
+                direction: .next,
+                preferredColumn: currentColumn,
+                preferredRow: 0
+            )
         }
-
-        moveToAdjacentPage(
-            direction: .next,
-            preferredColumn: currentColumn,
-            preferredRow: 0
-        )
     }
 
     public func browseNextRow() {
-        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
-            publishSnapshot()
-            return
-        }
+        withStateLock {
+            guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
+                publishSnapshot()
+                return
+            }
 
-        compositionMode = .candidateExpanded
-        presentationMode = .expanded
-        let targetRow = currentSelectedRow + 1
-        if targetRow < currentRowCount {
-            let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
-            selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
-            return
-        }
+            compositionMode = .candidateExpanded
+            presentationMode = .expanded
+            let targetRow = currentSelectedRow + 1
+            if targetRow < currentRowCount {
+                let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
+                selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
+                return
+            }
 
-        moveToAdjacentPage(direction: .next, preferredColumn: currentSelectedColumn, preferredRow: 0)
+            moveToAdjacentPage(direction: .next, preferredColumn: currentSelectedColumn, preferredRow: 0)
+        }
     }
 
     public func browsePreviousRow() {
-        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
-            publishSnapshot()
-            return
-        }
+        withStateLock {
+            guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
+                publishSnapshot()
+                return
+            }
 
-        guard presentationMode == .expanded else {
-            publishSnapshot()
-            return
-        }
+            guard presentationMode == .expanded else {
+                publishSnapshot()
+                return
+            }
 
-        if currentSelectedRow == 0 {
-            collapseToCompactAndSelectFirst()
-            return
-        }
+            if currentSelectedRow == 0 {
+                if engineSnapshot.pageIndex > 0 {
+                    moveToAdjacentPage(
+                        direction: .previous,
+                        preferredColumn: currentSelectedColumn,
+                        preferredRow: nil
+                    )
+                } else {
+                    collapseToCompactAndSelectFirst()
+                }
+                return
+            }
 
-        let targetRow = currentSelectedRow - 1
-        let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
-        selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
+            let targetRow = currentSelectedRow - 1
+            let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
+            selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
+        }
     }
 
     public func collapseToCompactAndSelectFirst() {
-        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
-            publishSnapshot()
-            return
-        }
+        withStateLock {
+            guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else {
+                publishSnapshot()
+                return
+            }
 
-        compositionMode = .candidateCompact
-        presentationMode = .compact
-        selectCandidate(row: 0, column: 0, clampColumn: true)
+            compositionMode = .candidateCompact
+            presentationMode = .compact
+            selectCandidate(row: 0, column: 0, clampColumn: true)
+        }
     }
 
     public func setActiveLayer(_ layer: ActiveLayer) {
@@ -353,11 +389,15 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func commitSelection() -> String? {
-        commitSelection(for: activeLayer)
+        withStateLock {
+            commitSelection(for: activeLayer)
+        }
     }
 
     public func commitChineseSelection() -> String? {
-        commitSelection(for: .chinese)
+        withStateLock {
+            commitSelection(for: .chinese)
+        }
     }
 
     public func renderCommittedText(_ text: String) -> String {
@@ -365,7 +405,9 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func cancel() {
-        resetCompositionState()
+        withStateLock {
+            resetCompositionState()
+        }
     }
 
     private func commitSelection(for layer: ActiveLayer) -> String? {
@@ -471,10 +513,10 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private var currentItem: BilingualCandidateItem? {
-        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < snapshot.items.count else {
+        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < currentSnapshot.items.count else {
             return nil
         }
-        return snapshot.items[currentSelectedFlatIndex]
+        return currentSnapshot.items[currentSelectedFlatIndex]
     }
 
     private var hasValidQueryInput: Bool {
@@ -482,16 +524,20 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private func setActiveLayerOnCurrentThread(_ layer: ActiveLayer) {
-        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
-        guard activeLayer != layer else { return }
-        activeLayer = layer
-        publishSnapshot()
+        withStateLock {
+            guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
+            guard activeLayer != layer else { return }
+            activeLayer = layer
+            publishSnapshot()
+        }
     }
 
     private func toggleActiveLayerOnCurrentThread() {
-        guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
-        activeLayer = activeLayer == .chinese ? .english : .chinese
-        publishSnapshot()
+        withStateLock {
+            guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
+            activeLayer = activeLayer == .chinese ? .english : .chinese
+            publishSnapshot()
+        }
     }
 
     private func refreshCompositionState() {
@@ -546,6 +592,12 @@ public final class BilingualInputSession: @unchecked Sendable {
         case .english:
             return englishSelection ?? ""
         }
+    }
+
+    private func withStateLock<T>(_ body: () throws -> T) rethrows -> T {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return try body()
     }
 
     private func updateEngineSnapshot(_ newSnapshot: CompositionSnapshot) {
@@ -679,6 +731,7 @@ public final class BilingualInputSession: @unchecked Sendable {
 
         let requestID = candidate.id
         let targetLanguage = settingsStore.targetLanguage
+        let selectionRevision = engineSnapshot.pageIndex
         let priority: PreviewRequestPriority =
             candidate.id == currentSelectedCandidateID ? .selected : .visible
         previewTasks[candidate.id] = Task { [weak self, previewCoordinator, sessionID] in
@@ -687,7 +740,7 @@ public final class BilingualInputSession: @unchecked Sendable {
             let initialState = await previewCoordinator.startPreview(
                 sessionID: sessionID,
                 requestID: requestID,
-                selectionRevision: engineSnapshot.pageIndex,
+                selectionRevision: selectionRevision,
                 candidate: candidate,
                 targetLanguage: targetLanguage,
                 priority: priority
@@ -702,7 +755,7 @@ public final class BilingualInputSession: @unchecked Sendable {
             let resolvedState = await previewCoordinator.resolvePreview(
                 sessionID: sessionID,
                 requestID: requestID,
-                selectionRevision: engineSnapshot.pageIndex,
+                selectionRevision: selectionRevision,
                 candidate: candidate,
                 targetLanguage: targetLanguage,
                 priority: priority
@@ -719,34 +772,36 @@ public final class BilingualInputSession: @unchecked Sendable {
         for candidateID: String,
         candidate: Candidate
     ) {
-        guard visibleCandidateIDs(for: engineSnapshot).contains(candidateID) else {
-            return
-        }
+        withStateLock {
+            guard visibleCandidateIDs(for: engineSnapshot).contains(candidateID) else {
+                return
+            }
 
-        switch state {
-        case .idle:
-            previewStates[candidateID] = .loading
-        case .loading:
-            previewStates[candidateID] = .loading
-        case .failed:
-            previewStates[candidateID] = .failed
-        case .ready(_, let preview):
-            previewStates[candidateID] = .ready(preview)
-        }
+            switch state {
+            case .idle:
+                previewStates[candidateID] = .loading
+            case .loading:
+                previewStates[candidateID] = .loading
+            case .failed:
+                previewStates[candidateID] = .failed
+            case .ready(_, let preview):
+                previewStates[candidateID] = .ready(preview)
+            }
 
-        if case .ready = state {
-            previewTasks.removeValue(forKey: candidateID)
-        }
+            if case .ready = state {
+                previewTasks.removeValue(forKey: candidateID)
+            }
 
-        if case .failed = state {
-            previewTasks.removeValue(forKey: candidateID)
-        }
+            if case .failed = state {
+                previewTasks.removeValue(forKey: candidateID)
+            }
 
-        if candidate.id == currentSelectedCandidateID {
-            publishSnapshot()
-        } else {
-            snapshot = makeSnapshot()
-            onSnapshotUpdate?(snapshot)
+            if candidate.id == currentSelectedCandidateID {
+                publishSnapshot()
+            } else {
+                currentSnapshot = makeSnapshot()
+                onSnapshotUpdate?(currentSnapshot)
+            }
         }
     }
 
@@ -809,8 +864,8 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private func publishSnapshot() {
-        snapshot = makeSnapshot()
-        onSnapshotUpdate?(snapshot)
+        currentSnapshot = makeSnapshot()
+        onSnapshotUpdate?(currentSnapshot)
     }
 
     private func clearPreviews() {

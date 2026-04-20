@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-TARGET="${1:-release}"
+TARGET="${1:-dev}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "$ROOT_DIR/scripts/ime-paths.sh"
 
@@ -102,6 +102,14 @@ echo "CURRENT_SOURCE=$CURRENT_SOURCE"
 echo
 echo "== Running Processes =="
 /usr/bin/pgrep -fl "$EXECUTABLE|$BUNDLE_ID" || true
+
+echo
+echo "== Alibaba Translation Provider =="
+if [[ "$TARGET" == "release" ]]; then
+  BILINE_DEFAULTS_DOMAIN="$RELEASE_BUNDLE_ID" "$ROOT_DIR/scripts/configure-aliyun-credentials.sh" status
+else
+  BILINE_DEFAULTS_DOMAIN="$DEV_BUNDLE_ID" "$ROOT_DIR/scripts/configure-aliyun-credentials.sh" status
+fi
 
 echo
 echo "== Recent Logs =="

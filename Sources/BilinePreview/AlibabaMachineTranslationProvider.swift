@@ -279,6 +279,9 @@ public actor AlibabaMachineTranslationProvider: BatchTranslationProvider {
         let request = try makeRequest(texts: texts)
         let response = try await transport.send(request)
         guard (200..<300).contains(response.statusCode) else {
+            if let serviceError = try? parseServiceError(response.data) {
+                throw serviceError
+            }
             throw AlibabaMachineTranslationError.httpStatus(response.statusCode)
         }
         return try parseResponse(response.data, sourceTexts: texts)
@@ -325,20 +328,7 @@ public actor AlibabaMachineTranslationProvider: BatchTranslationProvider {
         }
 
         if let code = root.codeValue, code != "200" {
-            let message = root.messageValue ?? "Alibaba Machine Translation error"
-            if code.localizedCaseInsensitiveContains("Throttling")
-                || code.localizedCaseInsensitiveContains("Limit")
-            {
-                throw AlibabaMachineTranslationError.throttled(code: code, message: message)
-            }
-            if code.localizedCaseInsensitiveContains("Auth")
-                || code.localizedCaseInsensitiveContains("Forbidden")
-                || code.localizedCaseInsensitiveContains("AccessKey")
-                || code == "403"
-            {
-                throw AlibabaMachineTranslationError.authenticationFailed(code: code, message: message)
-            }
-            throw AlibabaMachineTranslationError.serviceError(code: code, message: message)
+            throw classifyServiceError(code: code, message: root.messageValue)
         }
 
         guard let translatedList = root["TranslatedList"] as? [[String: Any]] else {
@@ -358,6 +348,35 @@ public actor AlibabaMachineTranslationProvider: BatchTranslationProvider {
             results[sourceTexts[sourceIndex]] = translated
         }
         return results
+    }
+
+    private func parseServiceError(_ data: Data) throws -> AlibabaMachineTranslationError {
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let code = root.codeValue
+        else {
+            throw AlibabaMachineTranslationError.invalidResponse
+        }
+        return classifyServiceError(code: code, message: root.messageValue)
+    }
+
+    private func classifyServiceError(
+        code: String,
+        message: String?
+    ) -> AlibabaMachineTranslationError {
+        let resolvedMessage = message ?? "Alibaba Machine Translation error"
+        if code.localizedCaseInsensitiveContains("Throttling")
+            || code.localizedCaseInsensitiveContains("Limit")
+        {
+            return AlibabaMachineTranslationError.throttled(code: code, message: resolvedMessage)
+        }
+        if code.localizedCaseInsensitiveContains("Auth")
+            || code.localizedCaseInsensitiveContains("Forbidden")
+            || code.localizedCaseInsensitiveContains("AccessKey")
+            || code == "403"
+        {
+            return AlibabaMachineTranslationError.authenticationFailed(code: code, message: resolvedMessage)
+        }
+        return AlibabaMachineTranslationError.serviceError(code: code, message: resolvedMessage)
     }
 
     private func orderedUnique(_ texts: [String]) -> [String] {

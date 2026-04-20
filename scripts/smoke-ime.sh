@@ -2,13 +2,16 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TARGET_SOURCE_ID="io.github.xixiphus.inputmethod.BilineIME.dev.pinyin"
+TARGET_SOURCE_ID="${TARGET_SOURCE_ID:-io.github.xixiphus.inputmethod.BilineIME.dev.pinyin}"
 TEXTEDIT_BUNDLE_ID="com.apple.TextEdit"
-APP_PROCESS="BilineIMEDev"
+APP_PROCESS="${APP_PROCESS:-BilineIMEDev}"
 PRESS_KEY="$ROOT_DIR/press-macos-key.swift"
-SMOKE_DEFAULTS_DOMAIN="io.github.xixiphus.inputmethod.BilineIME.dev"
+SMOKE_DEFAULTS_DOMAIN="${SMOKE_DEFAULTS_DOMAIN:-io.github.xixiphus.inputmethod.BilineIME.dev}"
+SMOKE_DISPLAY_NAME="${SMOKE_DISPLAY_NAME:-BilineIME Dev}"
 OUTPUT_ROOT="${SMOKE_OUTPUT_ROOT:-/tmp/biline-ime-smoke/$(date +%Y%m%d-%H%M%S)-$$}"
-RIME_SMOKE_USER_DIR="$OUTPUT_ROOT/rime-user"
+SMOKE_RUN_ID="$(basename "$OUTPUT_ROOT")"
+RIME_SMOKE_CONTAINER_ROOT="$HOME/Library/Containers/$SMOKE_DEFAULTS_DOMAIN/Data/Library/Application Support/BilineIME/SmokeRime"
+RIME_SMOKE_USER_DIR="$RIME_SMOKE_CONTAINER_ROOT/$SMOKE_RUN_ID/rime-user"
 SUMMARY_FILE="$OUTPUT_ROOT/summary.txt"
 PREPARE_FILE="$OUTPUT_ROOT/prepare.txt"
 HOST_FILE="$OUTPUT_ROOT/host.txt"
@@ -29,11 +32,19 @@ SYSTEM_STREAM_PID=""
 PROBE_TELEMETRY_OFFSET=0
 LAST_FAILURE_KIND=""
 LAST_FAILURE_DETAIL=""
+SMOKE_DEFAULTS_WRITTEN=0
 
 mkdir -p "$OUTPUT_ROOT"
 
 cleanup() {
   rm -f "$STOP_FILE" >/dev/null 2>&1 || true
+
+  if [[ "${SMOKE_DEFAULTS_WRITTEN:-0}" == "1" ]]; then
+    defaults delete "$SMOKE_DEFAULTS_DOMAIN" SmokePreviewDelayMs >/dev/null 2>&1 || true
+    defaults delete "$SMOKE_DEFAULTS_DOMAIN" SmokePreviewDebounceMs >/dev/null 2>&1 || true
+    defaults delete "$SMOKE_DEFAULTS_DOMAIN" SmokeRimeUserDataDir >/dev/null 2>&1 || true
+    defaults delete "$SMOKE_DEFAULTS_DOMAIN" SmokeRimeResetUserData >/dev/null 2>&1 || true
+  fi
 
   if [[ -n "${TELEMETRY_STREAM_PID:-}" ]]; then
     kill "$TELEMETRY_STREAM_PID" >/dev/null 2>&1 || true
@@ -259,6 +270,21 @@ has_recent_imk_failure() {
   [[ "$last_failure" > "$last_recovery" ]]
 }
 
+has_recent_sandbox_write_denial() {
+  [[ -f "$SYSTEM_LOG_FILE" ]] || return 1
+  rg -q 'deny\(1\).*file-write-create .*rime-user|Operation not permitted.*rime-user' "$SYSTEM_LOG_FILE"
+}
+
+has_recent_ime_crash() {
+  [[ -f "$SYSTEM_LOG_FILE" ]] || return 1
+  rg -q "ReportCrash.*${APP_PROCESS}|Fatal error: Unable to initialize Biline|Trace/BPT trap" "$SYSTEM_LOG_FILE"
+}
+
+host_bound_to_scim() {
+  [[ -f "$SYSTEM_LOG_FILE" ]] || return 1
+  rg -q 'SCIM_Extension|com\.apple\.inputmethod\.SCIM' "$SYSTEM_LOG_FILE"
+}
+
 latest_telemetry_line() {
   if [[ ! -f "$TELEMETRY_FILE" ]]; then
     return 1
@@ -277,7 +303,7 @@ latest_telemetry_field() {
 }
 
 write_system_snapshot() {
-  log show --last 90s --style compact --predicate 'process == "BilineIMEDev" OR eventMessage CONTAINS[c] "IMKServer" OR eventMessage CONTAINS[c] "InputMethodKit" OR eventMessage CONTAINS[c] "mach-register" OR eventMessage CONTAINS[c] "could not register" OR eventMessage CONTAINS[c] "First handled key" OR eventMessage CONTAINS[c] "First composing snapshot" OR eventMessage CONTAINS[c] "First candidate panel render" OR eventMessage CONTAINS[c] "Missing anchor"' >"$SYSTEM_LOG_FILE" 2>/dev/null || true
+  log show --last 90s --style compact --predicate 'process == "BilineIMEDev" OR process == "BilineIME" OR process == "SCIM_Extension" OR eventMessage CONTAINS[c] "IMKServer" OR eventMessage CONTAINS[c] "InputMethodKit" OR eventMessage CONTAINS[c] "mach-register" OR eventMessage CONTAINS[c] "could not register" OR eventMessage CONTAINS[c] "First handled key" OR eventMessage CONTAINS[c] "First composing snapshot" OR eventMessage CONTAINS[c] "First candidate panel render" OR eventMessage CONTAINS[c] "Missing anchor" OR eventMessage CONTAINS[c] "rime-user" OR eventMessage CONTAINS[c] "ReportCrash"' >"$SYSTEM_LOG_FILE" 2>/dev/null || true
 }
 
 mark_probe_offsets() {
@@ -292,10 +318,10 @@ start_log_streams() {
   : >"$TELEMETRY_FILE"
   : >"$SYSTEM_LOG_FILE"
 
-  log stream --style compact --predicate 'process == "BilineIMEDev" AND category == "smoke"' >"$TELEMETRY_FILE" 2>&1 &
+  log stream --style compact --predicate 'process == "BilineIMEDev" OR process == "BilineIME"' >"$TELEMETRY_FILE" 2>&1 &
   TELEMETRY_STREAM_PID=$!
 
-  log stream --style compact --predicate 'process == "BilineIMEDev" OR eventMessage CONTAINS[c] "IMKServer" OR eventMessage CONTAINS[c] "InputMethodKit" OR eventMessage CONTAINS[c] "mach-register" OR eventMessage CONTAINS[c] "could not register" OR eventMessage CONTAINS[c] "First handled key" OR eventMessage CONTAINS[c] "First composing snapshot" OR eventMessage CONTAINS[c] "First candidate panel render" OR eventMessage CONTAINS[c] "Missing anchor"' >"$SYSTEM_LOG_FILE" 2>&1 &
+  log stream --style compact --predicate 'process == "BilineIMEDev" OR process == "BilineIME" OR process == "SCIM_Extension" OR eventMessage CONTAINS[c] "IMKServer" OR eventMessage CONTAINS[c] "InputMethodKit" OR eventMessage CONTAINS[c] "mach-register" OR eventMessage CONTAINS[c] "could not register" OR eventMessage CONTAINS[c] "First handled key" OR eventMessage CONTAINS[c] "First composing snapshot" OR eventMessage CONTAINS[c] "First candidate panel render" OR eventMessage CONTAINS[c] "Missing anchor" OR eventMessage CONTAINS[c] "rime-user" OR eventMessage CONTAINS[c] "ReportCrash"' >"$SYSTEM_LOG_FILE" 2>&1 &
   SYSTEM_STREAM_PID=$!
 
   sleep 1
@@ -370,6 +396,25 @@ expect_host_text_stable() {
   done
 }
 
+expect_host_text_ascii() {
+  local attempts="${1:-50}"
+  local actual=""
+  local index
+
+  for ((index = 0; index < attempts; index++)); do
+    actual="$(read_host_text)"
+    if [[ -n "$actual" && "$actual" =~ [A-Za-z] ]]; then
+      return 0
+    fi
+    sleep 0.1
+  done
+
+  LAST_FAILURE_KIND="translation-preview-not-ready"
+  LAST_FAILURE_DETAIL="expected_non_empty_ascii_host actual=${actual:-<empty>}"
+  echo "expected non-empty ASCII host text, got [${actual:-<empty>}]" >&2
+  return 1
+}
+
 write_prepare_result() {
   local status="$1"
   local current_source="$2"
@@ -382,8 +427,54 @@ write_prepare_result() {
     echo "target_source=$TARGET_SOURCE_ID"
     echo "app_running=$app_running"
     echo "recent_imk_failure=$recent_failure"
+    echo "failure_kind=${LAST_FAILURE_KIND:-<none>}"
+    echo "failure_detail=${LAST_FAILURE_DETAIL:-<none>}"
     echo "output=$OUTPUT_ROOT"
   } | tee "$PREPARE_FILE"
+}
+
+classify_prepare_failure() {
+  local current_source="$1"
+  local app_running="$2"
+  local recent_failure="$3"
+
+  LAST_FAILURE_KIND="unknown"
+  LAST_FAILURE_DETAIL="current_source=${current_source:-<missing>} app_running=$app_running recent_imk_failure=$recent_failure"
+
+  if [[ "$current_source" != "$TARGET_SOURCE_ID" ]]; then
+    LAST_FAILURE_KIND="input-source-not-ready"
+    LAST_FAILURE_DETAIL="current_source=${current_source:-<missing>} target_source=$TARGET_SOURCE_ID"
+    return
+  fi
+
+  if has_recent_sandbox_write_denial; then
+    LAST_FAILURE_KIND="sandbox-write-denied"
+    LAST_FAILURE_DETAIL="rime_user_dir=$RIME_SMOKE_USER_DIR"
+    return
+  fi
+
+  if has_recent_ime_crash; then
+    LAST_FAILURE_KIND="ime-crashed"
+    LAST_FAILURE_DETAIL="process=$APP_PROCESS; inspect $SYSTEM_LOG_FILE and latest DiagnosticReports"
+    return
+  fi
+
+  if [[ "$app_running" != "1" ]] && host_bound_to_scim; then
+    LAST_FAILURE_KIND="host-bound-to-scim"
+    LAST_FAILURE_DETAIL="TextEdit appears to be using Apple's SCIM endpoint instead of $APP_PROCESS"
+    return
+  fi
+
+  if [[ "$app_running" != "1" ]]; then
+    LAST_FAILURE_KIND="ime-not-running"
+    LAST_FAILURE_DETAIL="process=$APP_PROCESS"
+    return
+  fi
+
+  if [[ "$recent_failure" != "0" ]]; then
+    LAST_FAILURE_KIND="recent-imk-failure"
+    LAST_FAILURE_DETAIL="inspect $SYSTEM_LOG_FILE"
+  fi
 }
 
 prepare_environment() {
@@ -392,6 +483,7 @@ prepare_environment() {
   defaults write "$SMOKE_DEFAULTS_DOMAIN" SmokePreviewDebounceMs -int 100 >/dev/null 2>&1 || true
   defaults write "$SMOKE_DEFAULTS_DOMAIN" SmokeRimeUserDataDir -string "$RIME_SMOKE_USER_DIR" >/dev/null 2>&1 || true
   defaults write "$SMOKE_DEFAULTS_DOMAIN" SmokeRimeResetUserData -bool true >/dev/null 2>&1 || true
+  SMOKE_DEFAULTS_WRITTEN=1
 
   activate_textedit
   write_input_source
@@ -413,14 +505,19 @@ prepare_environment() {
   fi
 
   if [[ "$current_source" == "$TARGET_SOURCE_ID" && "$app_running" == "1" && "$recent_failure" == "0" ]]; then
+    LAST_FAILURE_KIND=""
+    LAST_FAILURE_DETAIL=""
     write_prepare_result "ready" "$current_source" "$app_running" "$recent_failure"
     return 0
   fi
 
+  classify_prepare_failure "$current_source" "$app_running" "$recent_failure"
   write_prepare_result "not-ready" "$current_source" "$app_running" "$recent_failure"
   cat <<EOF >&2
 IME smoke precheck failed.
-Switch TextEdit to BilineIME Dev manually and ensure the IME is actually active, then rerun:
+failure_kind=${LAST_FAILURE_KIND:-unknown}
+failure_detail=${LAST_FAILURE_DETAIL:-unknown}
+Switch TextEdit to $SMOKE_DISPLAY_NAME manually and ensure the IME is actually active, then rerun:
   ./scripts/smoke-ime.sh prepare
 EOF
   return 1
@@ -706,6 +803,35 @@ probe_digit_select_zhegea_no_repeat() {
   expect_host_text_stable "$committed" 1500 || return 1
 }
 
+probe_aliyun_preview_nihao() {
+  smoke_type_word nihao
+  smoke_key tab --shift
+  expect_field activeLayer english || return 1
+  sleep 1.6
+  smoke_key space
+  expect_host_text_ascii 50 || return 1
+}
+
+probe_aliyun_preview_haopingguo() {
+  smoke_type_word haopingguo
+  smoke_key tab --shift
+  expect_field activeLayer english || return 1
+  sleep 1.6
+  smoke_key space
+  expect_host_text_ascii 50 || return 1
+}
+
+probe_candidate_list_nihao() {
+  smoke_type_word nihao
+  expect_field rawInput nihao || return 1
+  latest_telemetry_field visibleCandidates >"$CURRENT_PROBE_DIR/visible-candidates.txt" || return 1
+  [[ -s "$CURRENT_PROBE_DIR/visible-candidates.txt" ]] || {
+    LAST_FAILURE_KIND="candidate-list-missing"
+    LAST_FAILURE_DETAIL="visibleCandidates=<empty>"
+    return 1
+  }
+}
+
 resolve_probe_function() {
   local alias="$1"
   case "$alias" in
@@ -727,6 +853,9 @@ resolve_probe_function() {
     phrase-ce-shi-chinese) echo "probe_phrase_ce_shi_chinese" ;;
     prefix-hao-english-tail) echo "probe_prefix_hao_english_tail" ;;
     digit-select-zhegea-no-repeat) echo "probe_digit_select_zhegea_no_repeat" ;;
+    aliyun-preview-nihao) echo "probe_aliyun_preview_nihao" ;;
+    aliyun-preview-haopingguo) echo "probe_aliyun_preview_haopingguo" ;;
+    candidate-list-nihao) echo "probe_candidate_list_nihao" ;;
     *) return 1 ;;
   esac
 }
@@ -751,6 +880,22 @@ run_selected_probes() {
     phrase-ce-shi-chinese
     prefix-hao-english-tail
     digit-select-zhegea-no-repeat
+  )
+
+  local probe_alias probe_function
+  for probe_alias in "${probes[@]}"; do
+    assert_not_stopped
+    probe_function="$(resolve_probe_function "$probe_alias")"
+    if ! run_probe "$probe_function" "$probe_alias"; then
+      :
+    fi
+  done
+}
+
+run_aliyun_probes() {
+  local probes=(
+    aliyun-preview-nihao
+    aliyun-preview-haopingguo
   )
 
   local probe_alias probe_function
@@ -833,6 +978,19 @@ run_command() {
   [[ "$FAILED_PROBES" -eq 0 ]]
 }
 
+aliyun_command() {
+  CURRENT_MODE="aliyun"
+  refresh_lock_mode
+  rm -f "$STOP_FILE" >/dev/null 2>&1 || true
+  print_control_hint
+  prepare_environment
+  start_log_streams
+  : >"$SUMMARY_FILE"
+  run_aliyun_probes
+  printf 'total=%d failed=%d output=%s\n' "$TOTAL_PROBES" "$FAILED_PROBES" "$OUTPUT_ROOT" | tee -a "$SUMMARY_FILE"
+  [[ "$FAILED_PROBES" -eq 0 ]]
+}
+
 status_command() {
   if [[ -d "$LOCK_DIR" ]]; then
     echo "running"
@@ -891,8 +1049,11 @@ main() {
     run)
       run_command
       ;;
+    aliyun)
+      aliyun_command
+      ;;
     *)
-      echo "usage: $0 [prepare|observe|probe <name>|run|status|stop]" >&2
+      echo "usage: $0 [prepare|observe|probe <name>|run|aliyun|status|stop]" >&2
       exit 1
       ;;
   esac

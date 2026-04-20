@@ -159,6 +159,63 @@ final class TranslationPreviewSchedulerTests: XCTestCase {
         XCTAssertEqual(stats.startedTexts.first, "选中")
     }
 
+    func testSelectedRequestIsNotDelayedByVisibleBatchRateLimit() async throws {
+        let provider = InstrumentedTranslationProvider(delay: .zero)
+        let scheduler = TranslationPreviewScheduler(
+            provider: provider,
+            configuration: TranslationPreviewScheduler.Configuration(
+                maxConcurrentRequests: 4,
+                maxRequestsPerSecond: 1,
+                requestTimeout: .seconds(3),
+                rateLimitBackoff: .milliseconds(50),
+                batchWindow: .milliseconds(60),
+                maxBatchSize: 8
+            )
+        )
+        let visibleTasks = (0..<7).map { index in
+            Task {
+                let text = "普通\(index)"
+                let key = PreviewRequestKey(
+                    sourceText: text,
+                    targetLanguage: .english,
+                    providerIdentifier: provider.providerIdentifier
+                )
+                return try await scheduler.translate(
+                    text,
+                    target: .english,
+                    requestKey: key,
+                    priority: .visible
+                )
+            }
+        }
+        try await Task.sleep(for: .milliseconds(10))
+        let selectedKey = PreviewRequestKey(
+            sourceText: "选中",
+            targetLanguage: .english,
+            providerIdentifier: provider.providerIdentifier
+        )
+        let start = ContinuousClock.now
+
+        let selectedValue = try await scheduler.translate(
+            "选中",
+            target: .english,
+            requestKey: selectedKey,
+            priority: .selected
+        )
+
+        let elapsed = start.duration(to: .now)
+        XCTAssertEqual(selectedValue, "[en] 选中")
+        XCTAssertLessThan(elapsed.secondsApproximation, 0.8)
+
+        for task in visibleTasks {
+            task.cancel()
+            _ = try? await task.value
+        }
+
+        let stats = await provider.stats()
+        XCTAssertEqual(stats.startedTexts.first, "选中")
+    }
+
     func testCancellingOneSubscriberDoesNotCancelSharedProviderJob() async throws {
         let provider = InstrumentedTranslationProvider(delay: .milliseconds(20))
         let scheduler = TranslationPreviewScheduler(

@@ -209,6 +209,28 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "十")
     }
 
+    func testBrowsePreviousRowFromFirstRowOnLaterPageTurnsToPreviousPage() {
+        let session = DemoFixtures.makeBilingualSession(
+            compactColumnCount: 2,
+            expandedRowCount: 2
+        )
+
+        session.append(text: "shi")
+        session.expandAndAdvanceRow()
+        session.browseNextRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.selectedRow, 0)
+
+        session.browsePreviousRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 0)
+        XCTAssertEqual(session.snapshot.presentationMode, .expanded)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.selectedColumn, 0)
+        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "事")
+    }
+
     func testAppendLiteralSwitchesToRawBufferOnlyComposition() {
         let session = DemoFixtures.makeBilingualSession()
 

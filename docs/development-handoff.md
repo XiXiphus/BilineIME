@@ -109,35 +109,36 @@ Create a RAM user for development rather than using the main account key:
 - Permission: start with Aliyun Machine Translation access for development; later
   tighten to the smallest policy that still allows batch translation.
 
-Store credentials locally. Prefer Keychain for the key material:
+Store credentials locally in Keychain. Do not pass secrets as command-line
+arguments, because shell history and process listings are easy to leak from a
+public project workflow.
 
 ```bash
-security add-generic-password \
-  -s BilineIME.AlibabaMachineTranslation \
-  -a accessKeyId \
-  -w '<ACCESS_KEY_ID>' \
-  -U
-
-security add-generic-password \
-  -s BilineIME.AlibabaMachineTranslation \
-  -a accessKeySecret \
-  -w '<ACCESS_KEY_SECRET>' \
-  -U
+make configure-aliyun-credentials
 ```
 
-Enable the provider for the dev IME:
+The helper prompts with hidden input, writes only the key material to Keychain,
+and writes non-secret provider defaults to the dev IME domain:
+
+```text
+BilineTranslationProvider=aliyun
+BilineAlibabaRegionId=cn-hangzhou
+BilineAlibabaEndpoint=https://mt.cn-hangzhou.aliyuncs.com
+```
+
+Check credential presence without printing secrets:
 
 ```bash
-defaults write io.github.xixiphus.inputmethod.BilineIME.dev BilineTranslationProvider aliyun
-defaults write io.github.xixiphus.inputmethod.BilineIME.dev BilineAlibabaRegionId cn-hangzhou
-defaults write io.github.xixiphus.inputmethod.BilineIME.dev BilineAlibabaEndpoint 'https://mt.cn-hangzhou.aliyuncs.com'
-killall cfprefsd >/dev/null 2>&1 || true
+make aliyun-credentials-status
 ```
 
 Do not commit credentials. Do not paste production secrets into docs, tests, or
 commits. If a key was shared in chat or logs, rotate it after validation.
+Do not use `BilineAlibabaAccessKeyId` or `BilineAlibabaAccessKeySecret` defaults
+for normal development; those fallback keys are intentionally not part of the
+public setup flow.
 
-Optional local verification without printing secrets:
+Optional direct local verification without printing secrets:
 
 ```bash
 python3 - <<'PY'
@@ -194,6 +195,19 @@ The script must only verify this; it must not switch the input source for you.
 ./scripts/smoke-ime.sh observe
 ```
 
+For release package first-install validation, the same rule applies to the
+release source. Install the package, log out and back in if macOS requires it,
+add/select `BilineIME`, then verify that TextEdit actually launches the release
+IME process and passes:
+
+```bash
+make diagnose-ime-release
+make smoke-ime-release
+```
+
+Seeing a Biline entry in TIS is not enough. The host must bind to the Biline
+InputMethodKit endpoint, not ABC or Apple's SCIM endpoint.
+
 Use focused probes only after `prepare` passes:
 
 ```bash
@@ -217,6 +231,8 @@ screen:
 
 - User manually switches the host app to `BilineIME Dev`.
 - `prepare` is non-intrusive and must not type keys.
+- `prepare` records a concrete failure kind for source mismatch, IME crash,
+  SCIM fallback, sandbox write denial, and IME process launch failure.
 - `observe` is passive and records user-driven behavior.
 - `probe` is active and should stay short.
 - Candidate panel visibility is proven by all-display screenshots, not only by

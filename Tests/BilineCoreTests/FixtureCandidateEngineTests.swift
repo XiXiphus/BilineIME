@@ -37,6 +37,17 @@ final class FixtureCandidateEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.candidates.map(\.surface), ["事", "市"])
     }
 
+    func testTurnPageCanMoveBackToPreviousChunk() {
+        let session = DemoFixtures.makeSession(pageSize: 2)
+
+        _ = session.updateInput("shi")
+        _ = session.turnPage(.next)
+        let snapshot = session.turnPage(.previous)
+
+        XCTAssertEqual(snapshot.pageIndex, 0)
+        XCTAssertEqual(snapshot.candidates.map(\.surface), ["是", "时"])
+    }
+
     func testCommitResetsCompositionState() {
         let session = DemoFixtures.makeSession(pageSize: 5)
 

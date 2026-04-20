@@ -51,6 +51,7 @@ public struct InputControllerState: Sendable, Equatable {
     public let canDeleteBackward: Bool
     public let hasCandidates: Bool
     public let compactColumnCount: Int
+    public let pageIndex: Int
     public let selectedRow: Int
     public let isExpandedPresentation: Bool
     public let hasEverExpandedInCurrentComposition: Bool
@@ -61,6 +62,7 @@ public struct InputControllerState: Sendable, Equatable {
         canDeleteBackward: Bool,
         hasCandidates: Bool,
         compactColumnCount: Int,
+        pageIndex: Int = 0,
         selectedRow: Int = 0,
         isExpandedPresentation: Bool = false,
         hasEverExpandedInCurrentComposition: Bool = false
@@ -70,6 +72,7 @@ public struct InputControllerState: Sendable, Equatable {
         self.canDeleteBackward = canDeleteBackward
         self.hasCandidates = hasCandidates
         self.compactColumnCount = max(1, compactColumnCount)
+        self.pageIndex = max(0, pageIndex)
         self.selectedRow = max(0, selectedRow)
         self.isExpandedPresentation = isExpandedPresentation
         self.hasEverExpandedInCurrentComposition = hasEverExpandedInCurrentComposition
@@ -284,7 +287,9 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             if matchedNextRow {
                 return .browseNextRow
             }
-            return state.selectedRow == 0 ? .collapseToCompactAndSelectFirst : .browsePreviousRow
+            return state.selectedRow == 0 && state.pageIndex == 0
+                ? .collapseToCompactAndSelectFirst
+                : .browsePreviousRow
         case .rawBufferOnly:
             return .appendLiteral(
                 matchedNextRow ? nextRowLiteral(for: event) : previousRowLiteral(for: event)

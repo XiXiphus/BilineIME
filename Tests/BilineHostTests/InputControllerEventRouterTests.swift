@@ -352,6 +352,33 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
+    func testHyphenBrowsesPreviousRowWhenExpandedAtFirstRowOnLaterPage() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateExpanded,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            pageIndex: 1,
+            selectedRow: 0,
+            isExpandedPresentation: true
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 27,
+                    characters: "-",
+                    charactersIgnoringModifiers: "-"
+                ),
+                state: state
+            ),
+            .browsePreviousRow
+        )
+    }
+
     func testHyphenAppendsLiteralWhenCompactAndNeverExpanded() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(

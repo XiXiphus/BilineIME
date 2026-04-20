@@ -43,6 +43,8 @@ final class BilineInputController: IMKInputController {
             subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
             category: "smoke"
         )
+        private let smokeFallbackFontResolver = SystemFallbackFontResolver()
+        private let smokeCandidateFont = NSFont.systemFont(ofSize: 16, weight: .semibold)
     #endif
 
     private var activeClient: AnyObject?
@@ -329,6 +331,7 @@ final class BilineInputController: IMKInputController {
                 canDeleteBackward: inputSession.canDeleteBackward,
                 hasCandidates: inputSession.hasCandidates,
                 compactColumnCount: inputSession.snapshot.compactColumnCount,
+                pageIndex: inputSession.snapshot.pageIndex,
                 selectedRow: inputSession.snapshot.selectedRow,
                 isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded,
                 hasEverExpandedInCurrentComposition: inputSession.hasEverExpandedInCurrentComposition
@@ -427,9 +430,21 @@ final class BilineInputController: IMKInputController {
             let selectedCandidate = selectedItem?.candidate.surface ?? "<none>"
             let selectedCandidateReading = selectedItem?.candidate.reading ?? "<none>"
             let selectedConsumedTokenCount = selectedItem?.candidate.consumedTokenCount ?? 0
+            let visibleCandidates = smokeCandidateList(snapshot)
             smokeLogger.notice(
-                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) selectedCandidateReading=\(self.smokeValue(selectedCandidateReading), privacy: .public) selectedConsumedTokenCount=\(selectedConsumedTokenCount) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public)"
+                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) selectedCandidateReading=\(self.smokeValue(selectedCandidateReading), privacy: .public) selectedConsumedTokenCount=\(selectedConsumedTokenCount) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public) visibleCandidates=\(visibleCandidates, privacy: .public)"
             )
+        }
+
+        private func smokeCandidateList(_ snapshot: BilingualCompositionSnapshot) -> String {
+            snapshot.items.enumerated().map { index, item in
+                let diagnostics = smokeFallbackFontResolver.diagnostics(
+                    for: item.candidate.surface,
+                    baseFont: smokeCandidateFont
+                )
+                return "\(index):\(smokeValue(item.candidate.surface)){\(diagnostics)}"
+            }
+            .joined(separator: "|")
         }
 
         private func smokeValue(_ value: String) -> String {

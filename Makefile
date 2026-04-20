@@ -4,7 +4,7 @@ RELEASE_SCHEME := BilineIME
 DERIVED_DATA := $(HOME)/Library/Caches/BilineIME/DerivedData
 CONFIGURATION ?= Debug
 
-.PHONY: bootstrap project test build-ime build-ime-release install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime smoke-ime verify-ime format verify
+.PHONY: bootstrap project test build-ime build-ime-release install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime diagnose-ime-dev diagnose-ime-release configure-aliyun-credentials aliyun-credentials-status smoke-ime smoke-ime-aliyun smoke-ime-release verify-ime format verify
 
 bootstrap:
 	brew install xcodegen swift-format cmake boost
@@ -41,11 +41,31 @@ package-release:
 package-internal: package-release
 
 diagnose-ime:
-	./scripts/diagnose-ime.sh
+	./scripts/diagnose-ime.sh dev
+
+diagnose-ime-dev:
+	./scripts/diagnose-ime.sh dev
+
+diagnose-ime-release:
+	./scripts/diagnose-ime.sh release
+
+configure-aliyun-credentials:
+	./scripts/configure-aliyun-credentials.sh configure
+
+aliyun-credentials-status:
+	./scripts/configure-aliyun-credentials.sh status
 
 smoke-ime:
 	./scripts/smoke-ime.sh prepare
 	./scripts/smoke-ime.sh run
+
+smoke-ime-aliyun:
+	./scripts/smoke-ime.sh prepare
+	./scripts/smoke-ime.sh aliyun
+
+smoke-ime-release:
+	TARGET_SOURCE_ID=io.github.xixiphus.inputmethod.BilineIME.pinyin APP_PROCESS=BilineIME SMOKE_DEFAULTS_DOMAIN=io.github.xixiphus.inputmethod.BilineIME SMOKE_DISPLAY_NAME=BilineIME ./scripts/smoke-ime.sh prepare
+	TARGET_SOURCE_ID=io.github.xixiphus.inputmethod.BilineIME.pinyin APP_PROCESS=BilineIME SMOKE_DEFAULTS_DOMAIN=io.github.xixiphus.inputmethod.BilineIME SMOKE_DISPLAY_NAME=BilineIME ./scripts/smoke-ime.sh run
 
 verify-ime:
 	./scripts/build-librime.sh

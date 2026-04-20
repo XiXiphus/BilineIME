@@ -36,7 +36,6 @@ xcuserdata/
 
 # XcodeGen-generated support files
 App/Support/Info.plist
-App/Support/BilineIME.entitlements
 
 # CocoaPods (if used)
 Pods/

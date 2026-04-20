@@ -65,9 +65,31 @@ final class BilineInputController: IMKInputController {
             let smokePreviewDelay: Duration = .zero
             let smokePreviewDebounce: Duration = .milliseconds(100)
         #endif
+
+        let selectedTranslationProvider = TranslationProviderFactory.selectedProvider
+        let configuredProvider = TranslationProviderFactory.configuredProvider()
+        let provider: any TranslationProvider
+        let schedulerConfiguration: TranslationPreviewScheduler.Configuration
+        if let configuredProvider {
+            provider = configuredProvider
+            schedulerConfiguration = TranslationProviderFactory.aliyunSchedulerConfiguration
+        } else if selectedTranslationProvider == "aliyun" {
+            provider = UnavailableTranslationProvider()
+            schedulerConfiguration = TranslationPreviewScheduler.Configuration()
+        } else {
+            #if DEBUG
+                provider = MockTranslationProvider(delay: smokePreviewDelay)
+                schedulerConfiguration = TranslationPreviewScheduler.Configuration()
+            #else
+                provider = UnavailableTranslationProvider()
+                schedulerConfiguration = TranslationPreviewScheduler.Configuration()
+            #endif
+        }
+
         let previewCoordinator = PreviewCoordinator(
-            provider: MockTranslationProvider(delay: smokePreviewDelay),
-            debounce: smokePreviewDebounce
+            provider: provider,
+            debounce: smokePreviewDebounce,
+            schedulerConfiguration: schedulerConfiguration
         )
         let engineFactory: any CandidateEngineFactory
         do {

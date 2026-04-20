@@ -1,3 +1,5 @@
+import BilineCore
+import BilinePreview
 import BilineSession
 import BilineTestSupport
 import XCTest
@@ -543,5 +545,267 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.items.map(\.candidate.surface), ["事", "市"])
         XCTAssertEqual(session.snapshot.items.first?.englishText, "matter")
         session.cancel()
+    }
+    func testAppendIgnoresNonAsciiLettersForPinyinQuery() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "你")
+
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testWholePhraseCommitClearsCompositionEvenIfEngineReturnsStaleComposingSnapshot() {
+        let session = makeSessionWithEngine(
+            snapshotsByInput: [
+                "nihao": CompositionSnapshot(
+                rawInput: "nihao",
+                markedText: "nihao",
+                candidates: [
+                    Candidate(
+                        id: "stub:nihao",
+                        surface: "你好",
+                        reading: "ni hao",
+                        score: 1,
+                        consumedTokenCount: 2
+                    )
+                ],
+                selectedIndex: 0,
+                pageIndex: 0,
+                isComposing: true,
+                activeRawInput: "nihao",
+                remainingRawInput: "",
+                consumedTokenCount: 2
+                )
+            ],
+            commitResult: CommitResult(
+                committedText: "你好",
+                snapshot: CompositionSnapshot(
+                    rawInput: "nihao",
+                    markedText: "nihao",
+                    candidates: [
+                        Candidate(
+                            id: "stub:nihao",
+                            surface: "你好",
+                            reading: "ni hao",
+                            score: 1,
+                            consumedTokenCount: 2
+                        )
+                    ],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "nihao",
+                    remainingRawInput: "",
+                    consumedTokenCount: 2
+                )
+            )
+        )
+
+        session.append(text: "nihao")
+
+        XCTAssertEqual(session.commitChineseSelection(), "你好")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testWholePhraseCommitClearsCompositionWhenConsumedSpanCannotBeProven() {
+        let session = makeSessionWithEngine(
+            snapshotsByInput: [
+                "zhegea": CompositionSnapshot(
+                    rawInput: "zhegea",
+                    markedText: "zhegea",
+                    candidates: [
+                        Candidate(
+                            id: "stub:zhegea",
+                            surface: "這個啊",
+                            reading: "",
+                            score: 1,
+                            consumedTokenCount: 0
+                        )
+                    ],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "",
+                    remainingRawInput: "zhegea",
+                    consumedTokenCount: 0
+                )
+            ],
+            commitResult: CommitResult(
+                committedText: "這個啊",
+                snapshot: CompositionSnapshot(
+                    rawInput: "zhegea",
+                    markedText: "zhegea",
+                    candidates: [
+                        Candidate(
+                            id: "stub:zhegea",
+                            surface: "這個啊",
+                            reading: "",
+                            score: 1,
+                            consumedTokenCount: 0
+                        )
+                    ],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "",
+                    remainingRawInput: "zhegea",
+                    consumedTokenCount: 0
+                )
+            )
+        )
+
+        session.append(text: "zhegea")
+
+        XCTAssertEqual(session.commitChineseSelection(), "這個啊")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testWholePhraseCommitDoesNotReuseRemainingRawInputWhenConsumedSpanIsZero() {
+        let session = makeSessionWithEngine(
+            snapshotsByInput: [
+                "shuangyu": CompositionSnapshot(
+                    rawInput: "shuangyu",
+                    markedText: "shuangyu",
+                    candidates: [
+                        Candidate(
+                            id: "stub:shuangyu",
+                            surface: "雙魚",
+                            reading: "",
+                            score: 1,
+                            consumedTokenCount: 0
+                        )
+                    ],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "",
+                    remainingRawInput: "shuangyu",
+                    consumedTokenCount: 0
+                )
+            ],
+            commitResult: CommitResult(
+                committedText: "雙魚",
+                snapshot: .idle
+            )
+        )
+
+        session.append(text: "shuangyu")
+
+        XCTAssertEqual(session.commitChineseSelection(), "雙魚")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testPrefixCommitKeepsTailWhenEngineReturnsIdleSnapshot() {
+        let session = makeSessionWithEngine(
+            snapshotsByInput: [
+                "haopingguo": CompositionSnapshot(
+                rawInput: "haopingguo",
+                markedText: "haopingguo",
+                candidates: [
+                    Candidate(
+                        id: "stub:hao",
+                        surface: "好",
+                        reading: "hao",
+                        score: 1,
+                        consumedTokenCount: 1
+                    )
+                ],
+                selectedIndex: 0,
+                pageIndex: 0,
+                isComposing: true,
+                activeRawInput: "hao",
+                remainingRawInput: "pingguo",
+                consumedTokenCount: 1
+                ),
+                "pingguo": CompositionSnapshot(
+                    rawInput: "pingguo",
+                    markedText: "pingguo",
+                    candidates: [],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "",
+                    remainingRawInput: "pingguo",
+                    consumedTokenCount: 0
+                ),
+            ],
+            commitResult: CommitResult(
+                committedText: "好",
+                snapshot: .idle
+            )
+        )
+
+        session.append(text: "haopingguo")
+
+        XCTAssertEqual(session.commitChineseSelection(), "好")
+        XCTAssertTrue(session.snapshot.isComposing)
+        XCTAssertEqual(session.snapshot.rawInput, "pingguo")
+        XCTAssertEqual(session.snapshot.markedText, "pingguo")
+    }
+
+}
+
+private func makeSessionWithEngine(
+    snapshotsByInput: [String: CompositionSnapshot],
+    commitResult: CommitResult
+) -> BilingualInputSession {
+    BilingualInputSession(
+        settingsStore: StubSettingsStore(),
+        engineFactory: StubEngineFactory(
+            session: StubCandidateEngineSession(
+                snapshotsByInput: snapshotsByInput,
+                commitResult: commitResult
+            )
+        ),
+        previewCoordinator: DemoFixtures.makeCoordinator()
+    )
+}
+
+private struct StubSettingsStore: SettingsStore {
+    let targetLanguage: TargetLanguage = .english
+    let previewEnabled: Bool = true
+    let compactColumnCount: Int = 5
+    let expandedRowCount: Int = 5
+    let fuzzyPinyinEnabled: Bool = false
+    let characterForm: CharacterForm = .simplified
+
+    var pageSize: Int { compactColumnCount * expandedRowCount }
+}
+
+private struct StubEngineFactory: CandidateEngineFactory {
+    let session: StubCandidateEngineSession
+
+    func makeSession(config: EngineConfig) -> any CandidateEngineSession {
+        session
+    }
+}
+
+private final class StubCandidateEngineSession: CandidateEngineSession, @unchecked Sendable {
+    private let snapshotsByInput: [String: CompositionSnapshot]
+    private let commitResultValue: CommitResult
+
+    init(snapshotsByInput: [String: CompositionSnapshot], commitResult: CommitResult) {
+        self.snapshotsByInput = snapshotsByInput
+        self.commitResultValue = commitResult
+    }
+
+    func updateInput(_ rawInput: String) -> CompositionSnapshot {
+        snapshotsByInput[rawInput] ?? .idle
+    }
+
+    func moveSelection(_ direction: SelectionDirection) -> CompositionSnapshot {
+        snapshotsByInput.values.first ?? .idle
+    }
+
+    func turnPage(_ direction: PageDirection) -> CompositionSnapshot {
+        snapshotsByInput.values.first ?? .idle
+    }
+
+    func commitSelected() -> CommitResult {
+        commitResultValue
+    }
+
+    func reset() -> CompositionSnapshot {
+        .idle
     }
 }

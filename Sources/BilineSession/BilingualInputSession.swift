@@ -388,6 +388,11 @@ public final class BilingualInputSession: @unchecked Sendable {
             return nil
         }
 
+        let commitsWholeComposition =
+            item.candidate.consumedTokenCount > 0 && engineSnapshot.remainingRawInput.isEmpty
+        let fallbackTailInput =
+            engineSnapshot.consumedTokenCount > 0 ? engineSnapshot.remainingRawInput : ""
+
         let engineCommit = engineSession.commitSelected()
 
         let committedText = finalizedCurrentSelectionText(
@@ -400,6 +405,19 @@ public final class BilingualInputSession: @unchecked Sendable {
             return nil
         }
 
+        if commitsWholeComposition {
+            resetCompositionState()
+            return committedText
+        }
+
+        if engineSnapshot.consumedTokenCount == 0,
+            engineCommit.snapshot.isComposing,
+            engineCommit.snapshot.rawInput == rawInput
+        {
+            resetCompositionState()
+            return committedText
+        }
+
         if engineCommit.snapshot.isComposing {
             rawInput = engineCommit.snapshot.rawInput
             activeLayer = layer
@@ -410,8 +428,8 @@ public final class BilingualInputSession: @unchecked Sendable {
             return committedText
         }
 
-        if !engineSnapshot.remainingRawInput.isEmpty {
-            rawInput = engineSnapshot.remainingRawInput
+        if !fallbackTailInput.isEmpty {
+            rawInput = fallbackTailInput
             activeLayer = layer
             hasEverExpandedInCurrentComposition = false
             presentationMode = .compact
@@ -460,7 +478,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private var hasValidQueryInput: Bool {
-        !rawInput.isEmpty && rawInput.allSatisfy { $0.isLetter || $0 == "'" }
+        !rawInput.isEmpty && rawInput == normalize(rawInput)
     }
 
     private func setActiveLayerOnCurrentThread(_ layer: ActiveLayer) {
@@ -661,6 +679,8 @@ public final class BilingualInputSession: @unchecked Sendable {
 
         let requestID = candidate.id
         let targetLanguage = settingsStore.targetLanguage
+        let priority: PreviewRequestPriority =
+            candidate.id == currentSelectedCandidateID ? .selected : .visible
         previewTasks[candidate.id] = Task { [weak self, previewCoordinator, sessionID] in
             guard let self else { return }
 
@@ -669,7 +689,8 @@ public final class BilingualInputSession: @unchecked Sendable {
                 requestID: requestID,
                 selectionRevision: engineSnapshot.pageIndex,
                 candidate: candidate,
-                targetLanguage: targetLanguage
+                targetLanguage: targetLanguage,
+                priority: priority
             )
 
             await MainActor.run {
@@ -683,7 +704,8 @@ public final class BilingualInputSession: @unchecked Sendable {
                 requestID: requestID,
                 selectionRevision: engineSnapshot.pageIndex,
                 candidate: candidate,
-                targetLanguage: targetLanguage
+                targetLanguage: targetLanguage,
+                priority: priority
             )
 
             await MainActor.run {
@@ -824,8 +846,22 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private func normalize(_ string: String) -> String {
-        string
-            .lowercased()
-            .filter { $0.isLetter || $0 == "'" }
+        var result = ""
+        result.reserveCapacity(string.count)
+
+        for scalar in string.unicodeScalars {
+            switch scalar.value {
+            case 65...90:
+                result.unicodeScalars.append(UnicodeScalar(scalar.value + 32)!)
+            case 97...122:
+                result.unicodeScalars.append(scalar)
+            case 39:
+                result.append("'")
+            default:
+                continue
+            }
+        }
+
+        return result
     }
 }

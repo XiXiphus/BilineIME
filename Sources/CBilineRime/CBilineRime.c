@@ -1,6 +1,5 @@
 #include "CBilineRime.h"
 
-#include "X11/keysym.h"
 #include <dlfcn.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -44,6 +43,11 @@ static void reset_snapshot(BRimeSnapshot *snapshot) {
     snapshot->isComposing = false;
     snapshot->input = NULL;
     snapshot->schemaID = NULL;
+    snapshot->preedit = NULL;
+    snapshot->compositionLength = 0;
+    snapshot->cursorPosition = 0;
+    snapshot->selectionStart = 0;
+    snapshot->selectionEnd = 0;
     snapshot->pageSize = 0;
     snapshot->pageNo = 0;
     snapshot->isLastPage = true;
@@ -67,6 +71,12 @@ static void copy_snapshot(
     if (!context) {
         return;
     }
+
+    snapshot->preedit = duplicate_string(context->composition.preedit);
+    snapshot->compositionLength = context->composition.length;
+    snapshot->cursorPosition = context->composition.cursor_pos;
+    snapshot->selectionStart = context->composition.sel_start;
+    snapshot->selectionEnd = context->composition.sel_end;
 
     snapshot->pageSize = context->menu.page_size;
     snapshot->pageNo = context->menu.page_no;
@@ -413,6 +423,9 @@ void BRimeFreeSnapshot(BRimeSnapshot *snapshot) {
 
     free(snapshot->schemaID);
     snapshot->schemaID = NULL;
+
+    free(snapshot->preedit);
+    snapshot->preedit = NULL;
 
     if (snapshot->candidates) {
         for (int index = 0; index < snapshot->candidateCount; index++) {

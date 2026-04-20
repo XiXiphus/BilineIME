@@ -71,9 +71,9 @@ final class BilineInputController: IMKInputController {
         )
         let engineFactory: any CandidateEngineFactory
         do {
-            engineFactory = try RimeCandidateEngineFactory.appDefault(settingsStore: settingsStore)
+            engineFactory = try BilinePinyinEngineFactory.appDefault(settingsStore: settingsStore)
         } catch {
-            fatalError("Unable to initialize Rime engine: \(error)")
+            fatalError("Unable to initialize Biline pinyin engine: \(error)")
         }
         self.inputSession = BilingualInputSession(
             settingsStore: settingsStore,
@@ -238,6 +238,12 @@ final class BilineInputController: IMKInputController {
         }
 
         textInputBridge.insertCommittedText(committedText, into: client)
+        #if DEBUG
+            let snapshot = inputSession.snapshot
+            smokeLogger.notice(
+                "SMOKE_COMMIT committedText=\(self.smokeValue(committedText), privacy: .public) postCommitRawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public)"
+            )
+        #endif
         textInputBridge.clearAnchorCache()
         render(client: client)
         return true
@@ -392,12 +398,15 @@ final class BilineInputController: IMKInputController {
 
     #if DEBUG
         private func emitSmokeTelemetry(snapshot: BilingualCompositionSnapshot) {
-            let selectedCandidate = snapshot.item(
+            let selectedItem = snapshot.item(
                 row: snapshot.selectedRow,
                 column: snapshot.selectedColumn
-            )?.candidate.surface ?? "<none>"
+            )
+            let selectedCandidate = selectedItem?.candidate.surface ?? "<none>"
+            let selectedCandidateReading = selectedItem?.candidate.reading ?? "<none>"
+            let selectedConsumedTokenCount = selectedItem?.candidate.consumedTokenCount ?? 0
             smokeLogger.notice(
-                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public)"
+                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) selectedCandidateReading=\(self.smokeValue(selectedCandidateReading), privacy: .public) selectedConsumedTokenCount=\(selectedConsumedTokenCount) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public)"
             )
         }
 

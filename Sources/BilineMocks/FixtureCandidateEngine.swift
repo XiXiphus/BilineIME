@@ -298,9 +298,23 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
     }
 
     private func normalize(_ input: String) -> String {
-        input
-            .lowercased()
-            .filter { $0.isLetter || $0 == "'" }
+        var result = ""
+        result.reserveCapacity(input.count)
+
+        for scalar in input.unicodeScalars {
+            switch scalar.value {
+            case 65...90:
+                result.unicodeScalars.append(UnicodeScalar(scalar.value + 32)!)
+            case 97...122:
+                result.unicodeScalars.append(scalar)
+            case 39:
+                result.append("'")
+            default:
+                continue
+            }
+        }
+
+        return result
     }
 }
 

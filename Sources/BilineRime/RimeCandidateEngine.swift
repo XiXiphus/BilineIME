@@ -60,6 +60,7 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
 
     private var sessionID: BRimeSessionId
     private var rawInput = ""
+    private var requiresSessionReset = false
 
     init(
         schemaID: String,
@@ -83,6 +84,16 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
         guard !normalizedInput.isEmpty else {
             self.rawInput = ""
             return .idle
+        }
+
+        if requiresSessionReset {
+            do {
+                sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
+                requiresSessionReset = false
+            } catch {
+                self.rawInput = normalizedInput
+                return rawBufferSnapshot(for: normalizedInput)
+            }
         }
 
         if normalizedInput != self.rawInput {
@@ -161,30 +172,43 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
 
         let committedText = result.committedText.map { String(cString: $0) }
             .flatMap { $0.isEmpty ? nil : $0 }
-            ?? selectedSurface
+            .map(renderedSurface)
+            ?? renderedSurface(selectedSurface)
 
-        let totalTokenCount = tokenizer.tokenize(rawInput)?.count ?? 0
         let selectedConsumedCount = currentEngineSnapshot.consumedTokenCount
-        let fallbackTailInput = selectedConsumedCount > 0 && selectedConsumedCount < totalTokenCount
-            ? currentEngineSnapshot.remainingRawInput
-            : ""
+        let selectedConsumesWholeInput =
+            selectedConsumedCount > 0 && currentEngineSnapshot.remainingRawInput.isEmpty
+        let couldNotProvePrefix = selectedConsumedCount == 0
+        let fallbackTailInput = selectedConsumedCount > 0 ? currentEngineSnapshot.remainingRawInput : ""
 
         let postCommitInput = result.postCommitSnapshot.input.map { String(cString: $0) } ?? ""
+        let stalePostCommitInput = postCommitInput.isEmpty || postCommitInput == rawInput
         let shouldUseFallbackTail =
             !fallbackTailInput.isEmpty
-            && (postCommitInput.isEmpty || postCommitInput == rawInput)
+            && stalePostCommitInput
 
         let snapshot: CompositionSnapshot
-        if shouldUseFallbackTail {
+        if selectedConsumesWholeInput || (couldNotProvePrefix && stalePostCommitInput) {
+            rawInput = ""
+            do {
+                sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
+                requiresSessionReset = false
+            } catch {
+                requiresSessionReset = true
+            }
+            snapshot = .idle
+        } else if shouldUseFallbackTail {
             rawInput = fallbackTailInput
             do {
                 sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
+                requiresSessionReset = false
                 guard replayInput(fallbackTailInput) else {
                     snapshot = rawBufferSnapshot(for: fallbackTailInput)
                     return CommitResult(committedText: committedText, snapshot: snapshot)
                 }
                 snapshot = makeSnapshot(rawInput: fallbackTailInput)
             } catch {
+                requiresSessionReset = true
                 snapshot = rawBufferSnapshot(for: fallbackTailInput)
             }
         } else if postCommitInput.isEmpty && !result.postCommitSnapshot.isComposing {
@@ -200,6 +224,7 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
 
     func reset() -> CompositionSnapshot {
         rawInput = ""
+        requiresSessionReset = false
         do {
             sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
         } catch {
@@ -230,21 +255,32 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
 
         let candidateCount = Int(snapshot.candidateCount)
         let selectedIndex = max(0, min(Int(snapshot.highlightedIndex), max(candidateCount - 1, 0)))
-        let coverage = lexicon.coverageMap(for: rawInput, tokenizer: tokenizer)
+        let preeditText = snapshot.preedit.map { String(cString: $0) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+            ?? rawInput
 
         var candidates: [Candidate] = []
+        var consumptions: [RimeConsumption] = []
         if let basePointer = snapshot.candidates {
             for index in 0..<candidateCount {
                 let candidate = basePointer[index]
-                let text = candidate.text.map { String(cString: $0) } ?? ""
-                let consumedTokenCount = coverage[text] ?? 0
+                let rawText = candidate.text.map { String(cString: $0) } ?? ""
+                let text = renderedSurface(rawText)
+                let comment = candidate.comment.map { String(cString: $0) } ?? ""
+                let consumption = lexicon.consumption(
+                    forSurface: rawText,
+                    rawInput: rawInput,
+                    comment: comment,
+                    tokenizer: tokenizer
+                )
+                consumptions.append(consumption)
                 candidates.append(
                     Candidate(
                         id: "rime:\(snapshot.pageNo):\(index):\(text)",
                         surface: text,
-                        reading: rawInput,
+                        reading: comment.isEmpty ? rawInput : comment,
                         score: max(0, candidateCount - index),
-                        consumedTokenCount: consumedTokenCount
+                        consumedTokenCount: consumption.tokenCount
                     )
                 )
             }
@@ -254,14 +290,17 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
             return rawBufferSnapshot(for: rawInput)
         }
 
-        let selectedConsumed = candidates[selectedIndex].consumedTokenCount
-        let tokens = tokenizer.tokenize(rawInput) ?? []
+        let selectedConsumption = selectedIndex < consumptions.count
+            ? consumptions[selectedIndex]
+            : RimeConsumption(tokenCount: 0, tokens: tokenizer.tokenize(rawInput) ?? [])
+        let selectedConsumed = selectedConsumption.tokenCount
+        let tokens = selectedConsumption.tokens
         let activeRawInput = selectedConsumed > 0 ? Array(tokens.prefix(selectedConsumed)).joined() : ""
         let remainingRawInput = selectedConsumed > 0 ? Array(tokens.dropFirst(selectedConsumed)).joined() : rawInput
 
         return CompositionSnapshot(
             rawInput: rawInput,
-            markedText: rawInput,
+            markedText: preeditText,
             candidates: candidates,
             selectedIndex: selectedIndex,
             pageIndex: Int(snapshot.pageNo),
@@ -287,9 +326,7 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
     }
 
     private func normalize(_ input: String) -> String {
-        input
-            .lowercased()
-            .filter { $0.isLetter || $0 == "'" }
+        PinyinTokenizer.normalizeInput(input)
     }
 
     private func applyInputTransition(from previousInput: String, to nextInput: String) -> Bool {
@@ -339,5 +376,14 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
             return nil
         }
         return Int32(scalar.value)
+    }
+
+    private func renderedSurface(_ surface: String) -> String {
+        switch settings.characterForm {
+        case .simplified:
+            return surface.applyingRimeLexiconSimplifiedFallbacks()
+        case .traditional:
+            return surface
+        }
     }
 }

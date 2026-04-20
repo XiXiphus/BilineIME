@@ -509,8 +509,8 @@ write_probe_report() {
 
 smoke_key() {
   assert_not_stopped
-  assert_probe_ready
-  "$PRESS_KEY" "$@" --mode cg-event
+  assert_probe_ready || return 1
+  "$PRESS_KEY" "$@" --mode cg-event || return 1
   sleep 0.2
 }
 

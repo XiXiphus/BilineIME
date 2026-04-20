@@ -1,0 +1,200 @@
+# Rime dictionary
+# encoding: utf-8
+
+---
+name: biline_modern_phrases
+version: "0.2"
+sort: by_weight
+use_preset_vocabulary: false
+...
+
+输入法	shu ru fa	4000000
+拼音输入法	pin yin shu ru fa	3900000
+中文输入法	zhong wen shu ru fa	3800000
+简体中文	jian ti zhong wen	3700000
+简体	jian ti	3600000
+候选词	hou xuan ci	3500000
+候选项	hou xuan xiang	3400000
+候选栏	hou xuan lan	3300000
+候选窗口	hou xuan chuang kou	3200000
+双层候选	shuang ceng hou xuan	3100000
+翻译预览	fan yi yu lan	3000000
+英文预览	ying wen yu lan	2900000
+中文候选	zhong wen hou xuan	2800000
+英文候选	ying wen hou xuan	2700000
+中英双语	zhong ying shuang yu	2600000
+双语写作	shuang yu xie zuo	2500000
+现代拼音	xian dai pin yin	2400000
+全拼	quan pin	2300000
+模糊音	mo hu yin	2200000
+词库	ci ku	2100000
+用户词典	yong hu ci dian	2000000
+用户词库	yong hu ci ku	1990000
+词频	ci pin	1980000
+排序	pai xu	1970000
+重码	chong ma	1960000
+标点	biao dian	1950000
+中文标点	zhong wen biao dian	1940000
+全角	quan jiao	1930000
+半角	ban jiao	1920000
+提交	ti jiao	1910000
+上屏	shang ping	1900000
+预编辑	yu bian ji	1890000
+组合输入	zu he shu ru	1880000
+输入体验	shu ru ti yan	1870000
+打字	da zi	1860000
+写作	xie zuo	1850000
+文档	wen dang	1840000
+论文	lun wen	1830000
+摘要	zhai yao	1820000
+实验	shi yan	1810000
+证明	zheng ming	1800000
+定理	ding li	1790000
+引理	yin li	1780000
+推论	tui lun	1770000
+命题	ming ti	1760000
+假设	jia she	1750000
+结论	jie lun	1740000
+算法	suan fa	1730000
+模型	mo xing	1720000
+训练	xun lian	1710000
+推理	tui li	1700000
+测试	ce shi	1690000
+验证	yan zheng	1680000
+数据	shu ju	1670000
+数据集	shu ju ji	1660000
+数据库	shu ju ku	1650000
+样本	yang ben	1640000
+正样本	zheng yang ben	1630000
+负样本	fu yang ben	1620000
+未标注	wei biao zhu	1610000
+未标注数据	wei biao zhu shu ju	1600000
+正未标注学习	zheng wei biao zhu xue xi	1590000
+机器学习	ji qi xue xi	1580000
+深度学习	shen du xue xi	1570000
+人工智能	ren gong zhi neng	1560000
+大语言模型	da yu yan mo xing	1550000
+神经网络	shen jing wang luo	1540000
+软件工程	ruan jian gong cheng	1530000
+计算机科学	ji suan ji ke xue	1520000
+操作系统	cao zuo xi tong	1510000
+系统设计	xi tong she ji	1500000
+架构	jia gou	1490000
+重构	zhong gou	1480000
+接口	jie kou	1470000
+协议	xie yi	1460000
+异步	yi bu	1450000
+缓存	huan cun	1440000
+去抖	qu dou	1430000
+防抖	fang dou	1420000
+延迟	yan chi	1410000
+并发	bing fa	1400000
+线程	xian cheng	1390000
+主线程	zhu xian cheng	1380000
+会话	hui hua	1370000
+状态机	zhuang tai ji	1360000
+事件路由	shi jian lu you	1350000
+按键	an jian	1340000
+退格	tui ge	1330000
+空格	kong ge	1320000
+回车	hui che	1310000
+方向键	fang xiang jian	1300000
+翻页	fan ye	1290000
+上一页	shang yi ye	1280000
+下一页	xia yi ye	1270000
+展开	zhan kai	1260000
+折叠	zhe die	1250000
+选中	xuan zhong	1240000
+高亮	gao liang	1230000
+图层	tu ceng	1220000
+层级	ceng ji	1210000
+中文层	zhong wen ceng	1200000
+英文层	ying wen ceng	1190000
+翻译	fan yi	1180000
+词典	ci dian	1170000
+接口调用	jie kou diao yong	1160000
+网络请求	wang luo qing qiu	1150000
+本地词典	ben di ci dian	1140000
+本地缓存	ben di huan cun	1130000
+配置	pei zhi	1120000
+配置文件	pei zhi wen jian	1110000
+方案	fang an	1100000
+拼音方案	pin yin fang an	1090000
+脚本	jiao ben	1080000
+安装	an zhuang	1070000
+卸载	xie zai	1060000
+修复	xiu fu	1050000
+诊断	zhen duan	1040000
+日志	ri zhi	1030000
+构建	gou jian	1020000
+打包	da bao	1010000
+发布	fa bu	1000000
+开发	kai fa	990000
+调试	tiao shi	980000
+单元测试	dan yuan ce shi	970000
+冒烟测试	mao yan ce shi	960000
+真实宿主	zhen shi su zhu	950000
+文本编辑	wen ben bian ji	940000
+键盘设置	jian pan she zhi	930000
+输入源	shu ru yuan	920000
+候选面板	hou xuan mian ban	910000
+光标	guang biao	900000
+插入点	cha ru dian	890000
+锚点	mao dian	880000
+窗口定位	chuang kou ding wei	870000
+屏幕	ping mu	860000
+显示器	xian shi qi	850000
+菜单栏	cai dan lan	840000
+应用	ying yong	830000
+开发者	kai fa zhe	820000
+项目	xiang mu	810000
+仓库	cang ku	800000
+远程仓库	yuan cheng cang ku	790000
+源码	yuan ma	780000
+文件	wen jian	770000
+压缩包	ya suo bao	760000
+设计文档	she ji wen dang	740000
+验收标准	yan shou biao zhun	730000
+需求	xu qiu	720000
+目标	mu biao	710000
+范围	fan wei	700000
+非目标	fei mu biao	690000
+规划	gui hua	680000
+路线图	lu xian tu	670000
+基础设施	ji chu she shi	660000
+运行时	yun xing shi	650000
+动态库	dong tai ku	640000
+依赖	yi lai	630000
+第三方	di san fang	620000
+许可证	xu ke zheng	610000
+开源	kai yuan	600000
+简体输出	jian ti shu chu	590000
+繁简切换	fan jian qie huan	580000
+传统字形	chuan tong zi xing	570000
+现代词汇	xian dai ci hui	560000
+常用词	chang yong ci	550000
+短语	duan yu	540000
+长句	chang ju	530000
+拼写纠错	pin xie jiu cuo	520000
+缩写	suo xie	510000
+自然语言	zi ran yu yan	500000
+语言学习	yu yan xue xi	490000
+表达检查	biao da jian cha	480000
+写作流	xie zuo liu	470000
+认知流	ren zhi liu	460000
+不打断	bu da duan	450000
+不卡顿	bu ka dun	440000
+稳定	wen ding	430000
+可用	ke yong	420000
+现代	xian dai	410000
+用户体验	yong hu ti yan	400000
+候选质量	hou xuan zhi liang	390000
+词序	ci xu	380000
+首选词	shou xuan ci	370000
+后端	hou duan	360000
+前端	qian duan	350000
+桥接	qiao jie	340000
+封装	feng zhuang	330000
+适配器	shi pei qi	320000
+组合态	zu he tai	310000
+生命周期	sheng ming zhou qi	300000

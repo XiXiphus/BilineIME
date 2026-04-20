@@ -569,4 +569,50 @@ final class InputControllerEventRouterTests: XCTestCase {
             .passThrough
         )
     }
+    func testAsciiLettersNormalizeToLowercasePinyinInput() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 45,
+                    characters: "N",
+                    charactersIgnoringModifiers: "N"
+                ),
+                state: state
+            ),
+            .append("n")
+        )
+    }
+
+    func testNonAsciiLettersDoNotEnterPinyinComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 0,
+                    characters: "你",
+                    charactersIgnoringModifiers: "你"
+                ),
+                state: state
+            ),
+            .passThrough
+        )
+    }
+
 }

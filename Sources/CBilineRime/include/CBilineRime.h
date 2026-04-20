@@ -16,6 +16,11 @@ typedef struct {
     bool isComposing;
     char *input;
     char *schemaID;
+    char *preedit;
+    int compositionLength;
+    int cursorPosition;
+    int selectionStart;
+    int selectionEnd;
     int pageSize;
     int pageNo;
     bool isLastPage;

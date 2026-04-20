@@ -61,12 +61,6 @@ targetTemplates:
         SWIFT_STRICT_CONCURRENCY: minimal
         ENABLE_APP_SANDBOX: YES
         CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
-    postBuildScripts:
-      - name: Strip macOS metadata
-        script: |
-          if [ -d "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME" ]; then
-            xattr -cr "$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME" || true
-          fi
 
 targets:
   BilineIMEDev:

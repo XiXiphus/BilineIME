@@ -82,6 +82,7 @@ final class RimeRuntime: @unchecked Sendable {
             at: [
                 resolvedPaths.sharedDataDir.appendingPathComponent("luna_pinyin.dict.yaml"),
                 resolvedPaths.sharedDataDir.appendingPathComponent("biline_phrases.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent("biline_modern_phrases.dict.yaml"),
             ]
         )
         preparedSettings = settings
@@ -112,8 +113,17 @@ final class RimeRuntime: @unchecked Sendable {
     }
 
     func applySessionOptions(sessionID: BRimeSessionId, settings: RimeSettings) throws {
-        guard BRimeSetOption(sessionID, "zh_simp", settings.characterForm == .simplified) else {
-            throw RimeError.setupFailed(Self.lastError())
+        let requiredOptions: [(String, Bool)] = [
+            ("ascii_mode", false),
+            ("full_shape", false),
+            ("ascii_punct", false),
+            ("zh_simp", true),
+        ]
+
+        for (optionName, enabled) in requiredOptions {
+            guard BRimeSetOption(sessionID, optionName, enabled) else {
+                throw RimeError.setupFailed(Self.lastError())
+            }
         }
     }
 
@@ -206,9 +216,13 @@ private struct RimePaths {
     private func copyBundledData() throws {
         let fileManager = FileManager.default
         let vendorDataDir = vendorDataRoot()
-        let openCCSource = Bundle.main.resourceURL?.appendingPathComponent("RimeRuntime/share/opencc")
-            ?? URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/Caches/BilineIME/RimeVendor/1.16.1/share/opencc")
+        let openCCSource = [
+            Bundle.main.resourceURL?.appendingPathComponent("RimeRuntime/share/opencc"),
+            URL(fileURLWithPath: NSHomeDirectory())
+                .appendingPathComponent("Library/Caches/BilineIME/RimeVendor/1.16.1/share/opencc"),
+        ]
+        .compactMap { $0 }
+        .first { fileManager.fileExists(atPath: $0.path) }
 
         let vendorFiles = [
             "luna_pinyin.dict.yaml",
@@ -231,6 +245,7 @@ private struct RimePaths {
             ("biline_pinyin.schema", "yaml"),
             ("biline_pinyin.dict", "yaml"),
             ("biline_phrases.dict", "yaml"),
+            ("biline_modern_phrases.dict", "yaml"),
         ] {
             let source = Bundle.module.url(
                 forResource: resourceName,
@@ -251,7 +266,7 @@ private struct RimePaths {
             )
         }
 
-        if fileManager.fileExists(atPath: openCCSource.path) {
+        if let openCCSource {
             let destination = sharedDataDir.appendingPathComponent("opencc", isDirectory: true)
             if fileManager.fileExists(atPath: destination.path) {
                 try fileManager.removeItem(at: destination)
@@ -273,6 +288,8 @@ private struct RimePaths {
         let lines = [
             "patch:",
             "  menu/page_size: \(max(1, settings.pageSize))",
+            "  switches/@0/reset: 1",
+            "  simplifier/option_name: zh_simp",
             "  speller/algebra:",
             "    __patch:",
             "      - pinyin:/abbreviation",

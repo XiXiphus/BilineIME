@@ -201,8 +201,28 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             return .passThrough
         }
 
-        let normalized = characters.filter { $0.isLetter || $0 == "'" }
+        let normalized = pinyinInput(from: characters)
         return normalized.isEmpty ? .passThrough : .append(normalized)
+    }
+
+    private func pinyinInput(from text: String) -> String {
+        var result = ""
+        result.reserveCapacity(text.count)
+
+        for scalar in text.unicodeScalars {
+            switch scalar.value {
+            case 65...90:
+                result.unicodeScalars.append(UnicodeScalar(scalar.value + 32)!)
+            case 97...122:
+                result.unicodeScalars.append(scalar)
+            case 39:
+                result.append("'")
+            default:
+                continue
+            }
+        }
+
+        return result
     }
 
     private func candidateColumnIndex(

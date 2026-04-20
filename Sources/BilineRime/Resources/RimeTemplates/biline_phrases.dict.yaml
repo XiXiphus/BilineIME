@@ -3,10 +3,173 @@
 
 ---
 name: biline_phrases
-version: "0.1"
+version: "0.3"
 sort: by_weight
 use_preset_vocabulary: false
 ...
 
-苹果	ping guo	120000
-好苹果	hao ping guo	200000
+好苹果	hao ping guo	5000000
+好	hao	4990000
+苹果	ping guo	4900000
+你好	ni hao	4800000
+您好	nin hao	4700000
+谢谢	xie xie	4600000
+不用谢	bu yong xie	4500000
+没关系	mei guan xi	4400000
+对不起	dui bu qi	4300000
+没问题	mei wen ti	4200000
+可以	ke yi	4100000
+不可以	bu ke yi	4000000
+为什么	wei shen me	3900000
+什么	shen me	3800000
+怎么	zen me	3700000
+怎么样	zen me yang	3600000
+因为	yin wei	3500000
+所以	suo yi	3400000
+如果	ru guo	3300000
+但是	dan shi	3200000
+然后	ran hou	3100000
+现在	xian zai	3000000
+今天	jin tian	2900000
+明天	ming tian	2800000
+昨天	zuo tian	2700000
+上午	shang wu	2600000
+下午	xia wu	2500000
+晚上	wan shang	2400000
+周末	zhou mo	2300000
+这个	zhe ge	2200000
+那个	na ge	2100000
+这里	zhe li	2000000
+那里	na li	1990000
+我们	wo men	1980000
+你们	ni men	1970000
+他们	ta men	1960000
+她们	ta men	1950000
+它们	ta men	1940000
+大家	da jia	1930000
+自己	zi ji	1920000
+朋友	peng you	1910000
+同学	tong xue	1900000
+老师	lao shi	1890000
+学生	xue sheng	1880000
+学校	xue xiao	1870000
+公司	gong si	1860000
+工作	gong zuo	1850000
+学习	xue xi	1840000
+研究	yan jiu	1830000
+论文	lun wen	1820000
+实验	shi yan	1810000
+数据	shu ju	1800000
+代码	dai ma	1790000
+项目	xiang mu	1780000
+系统	xi tong	1770000
+软件	ruan jian	1760000
+工程	gong cheng	1750000
+开发	kai fa	1740000
+测试	ce shi	1730000
+构建	gou jian	1720000
+部署	bu shu	1710000
+安装	an zhuang	1700000
+配置	pei zhi	1690000
+输入	shu ru	1680000
+输出	shu chu	1670000
+输入法	shu ru fa	1660000
+拼音	pin yin	1650000
+候选	hou xuan	1640000
+候选词	hou xuan ci	1630000
+简体	jian ti	1620000
+简体中文	jian ti zhong wen	1610000
+现代拼音	xian dai pin yin	1600000
+用户词典	yong hu ci dian	1590000
+词库	ci ku	1580000
+词频	ci pin	1570000
+排序	pai xu	1560000
+翻译	fan yi	1550000
+预览	yu lan	1540000
+英文预览	ying wen yu lan	1530000
+中文候选	zhong wen hou xuan	1520000
+英文候选	ying wen hou xuan	1510000
+北京	bei jing	1500000
+上海	shang hai	1490000
+广州	guang zhou	1480000
+深圳	shen zhen	1470000
+杭州	hang zhou	1460000
+南京	nan jing	1450000
+成都	cheng du	1440000
+重庆	chong qing	1430000
+武汉	wu han	1420000
+西安	xi an	1410000
+中国	zhong guo	1400000
+美国	mei guo	1390000
+英国	ying guo	1380000
+日本	ri ben	1370000
+韩国	han guo	1360000
+时间	shi jian	1350000
+日期	ri qi	1340000
+会议	hui yi	1330000
+日程	ri cheng	1320000
+计划	ji hua	1310000
+任务	ren wu	1300000
+需求	xu qiu	1290000
+目标	mu biao	1280000
+范围	fan wei	1270000
+问题	wen ti	1260000
+方法	fang fa	1250000
+结果	jie guo	1240000
+结论	jie lun	1230000
+证明	zheng ming	1220000
+定理	ding li	1210000
+假设	jia she	1200000
+概率	gai lv	1190000
+统计	tong ji	1180000
+推断	tui duan	1170000
+分布	fen bu	1160000
+样本	yang ben	1150000
+模型	mo xing	1140000
+算法	suan fa	1130000
+优化	you hua	1120000
+梯度	ti du	1110000
+风险	feng xian	1100000
+损失	sun shi	1090000
+函数	han shu	1080000
+正则化	zheng ze hua	1070000
+机器学习	ji qi xue xi	1060000
+深度学习	shen du xue xi	1050000
+人工智能	ren gong zhi neng	1040000
+大语言模型	da yu yan mo xing	1030000
+神经网络	shen jing wang luo	1020000
+计算机	ji suan ji	1010000
+计算机科学	ji suan ji ke xue	1000000
+软件工程	ruan jian gong cheng	990000
+操作系统	cao zuo xi tong	980000
+数据库	shu ju ku	970000
+数据结构	shu ju jie gou	960000
+编译原理	bian yi yuan li	950000
+网络	wang luo	940000
+接口	jie kou	930000
+服务器	fu wu qi	920000
+客户端	ke hu duan	910000
+浏览器	liu lan qi	900000
+终端	zhong duan	890000
+开源	kai yuan	880000
+许可证	xu ke zheng	870000
+文档	wen dang	860000
+设计文档	she ji wen dang	850000
+架构	jia gou	840000
+状态机	zhuang tai ji	830000
+异步	yi bu	820000
+缓存	huan cun	810000
+并发	bing fa	800000
+线程	xian cheng	790000
+主线程	zhu xian cheng	780000
+快捷键	kuai jie jian	770000
+空格	kong ge	760000
+回车	hui che	750000
+退格	tui ge	740000
+删除	shan chu	730000
+翻页	fan ye	720000
+展开	zhan kai	710000
+折叠	zhe die	700000
+选中	xuan zhong	690000
+提交	ti jiao	680000
+上屏	shang ping	670000

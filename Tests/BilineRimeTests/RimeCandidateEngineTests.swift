@@ -1,6 +1,6 @@
 import BilineCore
 import BilinePreview
-import BilineRime
+@testable import BilineRime
 import XCTest
 
 final class RimeCandidateEngineTests: XCTestCase {
@@ -46,5 +46,35 @@ final class RimeCandidateEngineTests: XCTestCase {
         XCTAssertEqual(result.committedText, "好")
         XCTAssertEqual(result.snapshot.rawInput, "pingguo")
         XCTAssertEqual(result.snapshot.remainingRawInput, "")
+    }
+
+    func testCommittingWholePhraseEndsComposition() throws {
+        let session = try makeSession()
+        _ = session.updateInput("nihao")
+
+        let result = session.commitSelected()
+
+        XCTAssertEqual(result.committedText, "你好")
+        XCTAssertEqual(result.snapshot, .idle)
+    }
+
+    func testCommittingZhegeaChoiceEndsComposition() throws {
+        let session = try makeSession()
+        _ = session.updateInput("zhegea")
+
+        let result = session.commitSelected()
+
+        XCTAssertFalse(result.committedText.isEmpty)
+        XCTAssertEqual(result.snapshot, .idle)
+    }
+
+    func testCommittingTraditionalSurfacePhraseEndsComposition() throws {
+        let session = try makeSession()
+        _ = session.updateInput("zhongguo")
+
+        let result = session.commitSelected()
+
+        XCTAssertEqual(result.committedText, "中国")
+        XCTAssertEqual(result.snapshot, .idle)
     }
 }

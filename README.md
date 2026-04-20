@@ -136,6 +136,8 @@ are intentionally ignored and should be regenerated locally, not committed.
 
 ## 🛠️ Development
 
+New Mac setup and credential handoff: [docs/development-handoff.md](docs/development-handoff.md)
+
 ```bash
 make bootstrap
 make project

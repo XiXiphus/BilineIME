@@ -101,8 +101,6 @@ make build-settings
 make install-ime
 make diagnose-ime
 make repair-ime
-make build-ime-release
-make package-release
 make verify
 ```
 
@@ -114,7 +112,7 @@ What matters most day to day:
 - `make install-ime` runs the level 1 dev lifecycle reinstall for both dev apps.
 - `make diagnose-ime` prints the dev lifecycle snapshot.
 - `make repair-ime` prints a dry-run repair plan unless `CONFIRM=1` is set.
-- `make verify` runs package tests plus both IME build variants.
+- `make verify` runs package tests plus the dev IME and Settings builds.
 
 Build products are generated under `~/Library/Caches/BilineIME/DerivedData`
 instead of the repo tree. `BilineIME.xcodeproj` is generated from `project.yml`
@@ -177,7 +175,7 @@ Active stabilization efforts:
 - Stabilizing simplified and traditional schemas with separate user dictionaries.
 - Improving candidate panel layout resilience for long translations and multi-display anchoring.
 - Refining the Settings app for clear credential management and IME lifecycle diagnostics.
-- Preparing reliable release packaging and first-install validation.
+- Keeping release packaging paused until the dev lifecycle and first-use flow are stable.
 
 Done or mostly in place:
 

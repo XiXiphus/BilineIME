@@ -127,21 +127,21 @@ the consumed span.
 
 ## Installation And Lifecycle
 
-Developer and release installation are separate system states:
+Developer installation is the active workflow:
 
 - `BilineIME Dev` installs into `~/Library/Input Methods`.
 - `BilineSettingsDev.app` installs into `~/Applications`.
-- `BilineIME` release installs into `/Library/Input Methods` through the
-  package flow.
+- `BilineIME` remains as a reserved release target in project configuration,
+  but release packaging is paused.
 
 `bilinectl` is the source of truth for dev lifecycle operations. Make targets
-and compatibility scripts are thin wrappers.
+are thin wrappers.
 
 Repair is separate from install:
 
 - Level 1 reinstalls both dev apps and refreshes Launch Services and text-input
   agents.
-- Level 2 removes Biline app bundles and local input-method state, clears
+- Level 2 removes dev app bundles and local input-method state, clears
   text-input caches, and requires reboot before reinstall.
 - Level 3 performs Level 2 plus Launch Services database reset, and is a last
   resort.
@@ -166,8 +166,8 @@ Settings code is split by responsibility:
   connection test.
 - System actions open macOS Settings or local Rime directories only from user
   button actions.
-- SwiftUI pages are file-scoped by section: status, translation, input,
-  appearance, and advanced, with shared row/card scaffolding kept separate.
+- SwiftUI pages are file-scoped by section: status, translation, and input,
+  with shared row/card scaffolding kept separate.
 
 The Settings app must preserve existing defaults keys, bundle identifiers, and
 credential paths. It should not duplicate IME session rules, candidate behavior,

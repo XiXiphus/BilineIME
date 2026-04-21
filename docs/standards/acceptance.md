@@ -35,11 +35,9 @@
 - `make test` passes.
 - `make project` regenerates the project cleanly.
 - `make build-ime` succeeds on a machine with Xcode installed.
-- `make build-ime-release` succeeds on a machine with Xcode installed.
 - `make install-ime` installs the dev input method into `~/Library/Input Methods` without requiring manual bundle copying.
 - `make install-ime` does not depend on automatic source activation to count as a successful install.
 - IME-facing behavior changes are verified in a real host after install, with `TextEdit` as the baseline host and the user performing all input-source selection, focus, typing, browsing, and commit actions manually.
-- First-install readiness is not satisfied by TIS visibility alone. After a release package install, a fresh user must be able to add/select `BilineIME`, launch the IME process from TextEdit, and complete the manual host cases.
 - Codex and project scripts must not switch input sources, focus TextEdit, inject keys, or drive candidate browsing. Candidate-panel checks use user-provided screenshots across displays when necessary.
 - `make repair-ime` provides a staged recovery path for ghost Biline sources and broken Keyboard settings state.
-- `make package-release` produces an installer package that installs the release input method into `/Library/Input Methods`.
+- Release packaging is intentionally paused; the release target may remain in project configuration, but it has no supported Make/script workflow.

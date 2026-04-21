@@ -44,8 +44,6 @@ public struct DevEnvironmentDiagnostics {
             withBundleIdentifier: BilineAppIdentifier.devSettingsBundle)
         let imeURLs = workspace.urlsForApplications(
             withBundleIdentifier: BilineAppIdentifier.devInputMethodBundle)
-        let releaseURLs = workspace.urlsForApplications(
-            withBundleIdentifier: BilineAppIdentifier.releaseInputMethodBundle)
         let hitoolbox = readHitoolboxState()
         let credentialStatus = BilineCredentialFileStore(
             inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle
@@ -59,7 +57,7 @@ public struct DevEnvironmentDiagnostics {
 
         let settingsPathCount = settingsURLs.count
         let imePathCount = imeURLs.count
-        let staleLS = (settingsURLs + imeURLs + releaseURLs).contains {
+        let staleLS = (settingsURLs + imeURLs).contains {
             !fileManager.fileExists(atPath: $0.path)
         }
         let hasHitoolbox = hitoolbox.contains("io.github.xixiphus.inputmethod.BilineIME")

@@ -57,6 +57,7 @@ public enum BilineOperationError: Error, LocalizedError {
     case commandFailed(String, [String], CommandResult)
     case missingBuildProduct(URL)
     case confirmationRequired(BilineOperationLevel)
+    case confirmationRequiredForAction(String)
     case unsupportedArguments(String)
 
     public var errorDescription: String? {
@@ -68,6 +69,8 @@ public enum BilineOperationError: Error, LocalizedError {
             return "Missing build product at \(url.path)"
         case .confirmationRequired(let level):
             return "Reinstall level \(level.rawValue) requires --confirm."
+        case .confirmationRequiredForAction(let action):
+            return "\(action) requires --confirm."
         case .unsupportedArguments(let message):
             return message
         }

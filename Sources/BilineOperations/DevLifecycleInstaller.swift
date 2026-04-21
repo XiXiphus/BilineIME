@@ -56,21 +56,17 @@ public struct DevLifecycleInstaller {
 
     private func repairLevel2(includeLaunchServicesReset: Bool) throws {
         terminateDevProcesses()
-        _ = try? runner.run("/usr/bin/pkill", ["-x", "BilineIME"], allowFailure: true)
 
         unregister(
             paths.legacyDevInputMethodURLs
                 + paths.legacyDevSettingsURLs
-                + paths.legacyReleaseInputMethodURLs
                 + [
                     paths.devInputMethodInstallURL, paths.devSettingsInstallURL,
-                    paths.releaseInputMethodInstallURL,
                 ]
         )
 
         removeIfExists(paths.devInputMethodInstallURL, useSudo: false)
         removeIfExists(paths.devSettingsInstallURL, useSudo: false)
-        removeIfExists(paths.releaseInputMethodInstallURL, useSudo: true)
 
         _ = try? runner.run(
             paths.rootDirectory.appendingPathComponent("scripts/prune-hitoolbox-sources.sh").path,

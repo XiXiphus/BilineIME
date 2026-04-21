@@ -151,6 +151,10 @@ public struct BilineDefaultsStore: Sendable {
         CFPreferencesSetAppValue(key as CFString, NSNumber(value: value), domain as CFString)
     }
 
+    public func removeValue(forKey key: String) {
+        CFPreferencesSetAppValue(key as CFString, nil, domain as CFString)
+    }
+
     public func synchronize() {
         CFPreferencesAppSynchronize(domain as CFString)
     }

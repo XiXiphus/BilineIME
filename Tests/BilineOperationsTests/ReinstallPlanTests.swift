@@ -27,7 +27,6 @@ final class ReinstallPlanTests: XCTestCase {
         let settingsURLs: [URL]
         let defaultSettingsURL: URL?
         let imeURLs: [URL]
-        let releaseURLs: [URL]
 
         func urlsForApplications(withBundleIdentifier bundleIdentifier: String) -> [URL] {
             switch bundleIdentifier {
@@ -35,8 +34,6 @@ final class ReinstallPlanTests: XCTestCase {
                 return settingsURLs
             case "io.github.xixiphus.inputmethod.BilineIME.dev":
                 return imeURLs
-            case "io.github.xixiphus.inputmethod.BilineIME":
-                return releaseURLs
             default:
                 return []
             }
@@ -68,7 +65,7 @@ final class ReinstallPlanTests: XCTestCase {
 
         XCTAssertTrue(plan.requiresRebootBeforeInstall)
         XCTAssertTrue(
-            rendered.contains("Remove dev IME, dev Settings App, and release IME app bundles only"))
+            rendered.contains("Remove dev IME and dev Settings App bundles only"))
         XCTAssertTrue(rendered.contains("Prune Biline HIToolbox state and clear IntlDataCache"))
         XCTAssertTrue(rendered.contains("Reboot is required before reinstalling dev apps"))
         XCTAssertTrue(
@@ -145,8 +142,7 @@ final class ReinstallPlanTests: XCTestCase {
             workspace: MockWorkspace(
                 settingsURLs: [settingsInstallURL, legacySettingsURL],
                 defaultSettingsURL: settingsInstallURL,
-                imeURLs: [imeInstallURL],
-                releaseURLs: []
+                imeURLs: [imeInstallURL]
             )
         )
 
@@ -182,8 +178,7 @@ final class ReinstallPlanTests: XCTestCase {
             workspace: MockWorkspace(
                 settingsURLs: [settingsInstallURL, legacySettingsURL],
                 defaultSettingsURL: legacySettingsURL,
-                imeURLs: [imeInstallURL],
-                releaseURLs: []
+                imeURLs: [imeInstallURL]
             )
         )
 

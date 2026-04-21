@@ -22,23 +22,21 @@ path or a DerivedData Launch Services record.
 
 - Level 1 reinstalls both dev apps, refreshes Launch Services and text-input
   agents, and preserves credentials, Rime userdb, and defaults.
-- Level 2 removes Biline app bundles and local input-method state, clears
+- Level 2 removes dev app bundles and local input-method state, clears
   `IntlDataCache`, and requires reboot before a Level 1 reinstall.
 - Level 3 performs Level 2 plus a Launch Services database reset and requires
   reboot before a Level 1 reinstall.
 
-Make targets and legacy shell scripts are compatibility wrappers around
-`bilinectl`; they must not grow independent lifecycle logic.
+Make targets are thin wrappers around `bilinectl`; shell scripts remain only
+for low-level build, runtime embedding, and read-only diagnostics.
 
 Real-host validation is manual-only. Codex and scripts must not switch input
 sources, focus host apps, inject keys, browse candidates, or commit text.
 
 ## Consequences
 
-- `make install-ime`, `make install-settings-dev`, and `make reset-dev-apps`
-  all run the same Level 1 dev lifecycle reinstall.
+- `make install-ime` runs the Level 1 dev lifecycle reinstall for both dev apps.
 - `make repair-ime` prints a dry-run plan unless `CONFIRM=1` is provided.
 - Settings App reads the same lifecycle snapshot used by the CLI and shows
   stable-path and repair recommendation state.
-- Release package validation remains separate from day-to-day dev lifecycle
-  repair.
+- Release packaging is paused and has no supported Make or script entrypoint.

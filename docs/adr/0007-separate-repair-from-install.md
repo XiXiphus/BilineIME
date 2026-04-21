@@ -14,11 +14,12 @@ The repository now treats input-method installation and local system repair as t
   - refreshes local registration state
   - does **not** try to force-select the input source
 - `make uninstall-ime`
-  - removes the dev bundle and unregisters the local dev lane
+  - removes the dev IME and dev Settings app bundles
+  - unregisters the local dev lane
   - does **not** try to repair system-wide text-input state
 - `make repair-ime`
   - is the explicit recovery path when Biline leaves ghost input sources, raw ids, blank rows, or broken Keyboard settings state
-  - level 1 removes Biline dev/release bundles and prunes Biline from `HIToolbox`
+  - level 1 reinstalls the dev IME and dev Settings app
   - level 2 clears `IntlDataCache` and requires a reboot
   - level 3 deletes the Launch Services database and requires a reboot
 

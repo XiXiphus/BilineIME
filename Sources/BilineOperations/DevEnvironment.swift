@@ -43,10 +43,6 @@ public struct BilineOperationPaths: Sendable, Equatable {
         BilineAppPath.devSettingsInstallURL
     }
 
-    public var releaseInputMethodInstallURL: URL {
-        URL(fileURLWithPath: "/Library/Input Methods/BilineIME.app", isDirectory: true)
-    }
-
     public var devInputMethodBuildURL: URL {
         derivedData.appendingPathComponent(
             "Build/Products/Debug/BilineIMEDev.app", isDirectory: true)
@@ -74,26 +70,6 @@ public struct BilineOperationPaths: Sendable, Equatable {
                 .appendingPathComponent(
                     "Library/Caches/BilineIME/SettingsDerivedData/Build/Products/Debug/BilineSettingsDev.app",
                     isDirectory: true),
-        ]
-    }
-
-    public var legacyReleaseInputMethodURLs: [URL] {
-        [
-            derivedData.appendingPathComponent(
-                "Build/Products/Release/BilineIME.app", isDirectory: true),
-            rootDirectory.appendingPathComponent(
-                "build/DerivedData/Build/Products/Debug/BilineIME.app", isDirectory: true),
-            rootDirectory.appendingPathComponent(
-                "build/DerivedData/Build/Products/Release/BilineIME.app", isDirectory: true),
-            rootDirectory.appendingPathComponent(
-                "build/DerivedData/Build/Products/Debug 2/BilineIME.app", isDirectory: true),
-            rootDirectory.appendingPathComponent(
-                "build/pkgroot/Library/Input Methods/BilineIME.app", isDirectory: true),
-            FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent(
-                    "Library/Caches/BilineIME/DerivedData/Build/Products/Release/BilineIME.app",
-                    isDirectory: true),
-            releaseInputMethodInstallURL,
         ]
     }
 

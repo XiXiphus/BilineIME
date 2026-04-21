@@ -119,7 +119,7 @@ are easy to leak from a public project workflow.
 
 ```bash
 make build-settings
-make install-settings-dev
+make install-ime
 open "$HOME/Applications/BilineSettingsDev.app"
 ```
 
@@ -150,7 +150,7 @@ Do not launch `BilineSettingsDev.app` from DerivedData. A valid dev install has:
 ~/Applications/BilineSettingsDev.app
 ```
 
-Use `make diagnose-dev-apps` when app registration, current input source, or
+Use `make diagnose-ime` when app registration, current input source, or
 credential status is unclear.
 
 Check credential presence without printing secrets:
@@ -197,17 +197,9 @@ focus TextEdit, type, browse, commit, and report the result manually.
 ./scripts/select-input-source.sh current
 ```
 
-For release package first-install validation, the same rule applies to the
-release source. Install the package, log out and back in if macOS requires it,
-add/select `BilineIME`, then manually verify that TextEdit actually launches the
-release IME process and accepts input:
-
-```bash
-make diagnose-ime-release
-```
-
-Seeing a Biline entry in TIS is not enough. The host must bind to the Biline
-InputMethodKit endpoint, not ABC or Apple's SCIM endpoint.
+Release packaging is paused. The release target remains in `project.yml`, but
+there is no supported Make or script entrypoint for release packaging until the
+dev lifecycle and first-use flow are stable.
 
 Automated probes and key-injection scripts were removed. Do not recreate them
 without an explicit project decision that reverses the manual-only host rule.

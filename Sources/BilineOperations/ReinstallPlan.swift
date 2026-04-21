@@ -105,13 +105,13 @@ public struct DevReinstallPlanner: Sendable {
         var steps = [
             BilinePlanStep(
                 kind: .terminate,
-                summary: "Stop BilineIMEDev, BilineSettingsDev, and release BilineIME if running."),
+                summary: "Stop BilineIMEDev and BilineSettingsDev if they are running."),
             BilinePlanStep(
                 kind: .unregister,
-                summary: "Unregister Biline dev/release IME and Settings App LaunchServices paths."),
+                summary: "Unregister Biline dev IME and Settings App LaunchServices paths."),
             BilinePlanStep(
                 kind: .remove,
-                summary: "Remove dev IME, dev Settings App, and release IME app bundles only."),
+                summary: "Remove dev IME and dev Settings App bundles only."),
             BilinePlanStep(
                 kind: .refresh, summary: "Prune Biline HIToolbox state and clear IntlDataCache."),
             BilinePlanStep(

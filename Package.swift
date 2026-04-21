@@ -98,7 +98,7 @@ let package = Package(
         ),
         .testTarget(
             name: "BilineOperationsTests",
-            dependencies: ["BilineOperations"]
+            dependencies: ["BilineOperations", "BilineSettings"]
         ),
     ]
 )

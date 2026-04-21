@@ -2,17 +2,48 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-source "$ROOT_DIR/scripts/ime-paths.sh"
 PROJECT_NAME="${PROJECT_NAME:-BilineIME}"
 SCHEME="${SCHEME:-BilineIMEDev}"
 CONFIGURATION="${CONFIGURATION:-Debug}"
 DERIVED_DATA="${DERIVED_DATA:-$HOME/Library/Caches/BilineIME/DerivedData}"
-TEAM_ID="$("$ROOT_DIR/scripts/detect-dev-team.sh" || true)"
+DEV_PRODUCT_NAME="BilineIMEDev"
+DEV_BUILD_APP_PATH="$DERIVED_DATA/Build/Products/Debug/$DEV_PRODUCT_NAME.app"
+DEV_XCENT_PATH="$DERIVED_DATA/Build/Intermediates.noindex/$PROJECT_NAME.build/Debug/$DEV_PRODUCT_NAME.build/$DEV_PRODUCT_NAME.app.xcent"
+
+detect_dev_team() {
+  if [[ -n "${BILINE_DEV_TEAM_ID:-}" ]]; then
+    printf '%s\n' "$BILINE_DEV_TEAM_ID"
+    return
+  fi
+
+  local xcode_prefs="${HOME}/Library/Preferences/com.apple.dt.Xcode.plist"
+  if [[ ! -f "$xcode_prefs" ]]; then
+    return
+  fi
+
+  /usr/bin/plutil -p "$xcode_prefs" 2>/dev/null \
+    | /usr/bin/sed -n 's/.*"teamID" => "\(.*\)"/\1/p' \
+    | /usr/bin/head -n 1
+}
+
+scrub_macos_metadata() {
+  xattr -cr \
+    "$ROOT_DIR/App" \
+    "$ROOT_DIR/Sources" \
+    "$ROOT_DIR/Tests" \
+    "$ROOT_DIR/scripts" \
+    "$ROOT_DIR/docs" \
+    "$ROOT_DIR/README.md" \
+    "$ROOT_DIR/project.yml" \
+    2>/dev/null || true
+}
+
+TEAM_ID="$(detect_dev_team || true)"
 
 cd "$ROOT_DIR"
 
 ./scripts/build-librime.sh
-./scripts/scrub-macos-metadata.sh
+scrub_macos_metadata
 xcodegen generate --quiet
 
 BUILD_ARGS=(

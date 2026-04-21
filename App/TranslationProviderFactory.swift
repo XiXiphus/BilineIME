@@ -34,13 +34,18 @@ enum TranslationProviderFactory {
     }
 
     private static func makeAlibabaProvider() -> (any TranslationProvider)? {
-        guard let credentials = AlibabaCredentialResolver.credentials() else {
+        let localRecord = AlibabaCredentialResolver.localCredentialRecord()
+        guard let credentials = localRecord?.credentials ?? AlibabaCredentialResolver.credentials() else {
             return nil
         }
 
         let defaults = UserDefaults.standard
-        let regionId = normalized(defaults.string(forKey: DefaultsKey.regionId)) ?? "cn-hangzhou"
-        let endpoint = normalized(defaults.string(forKey: DefaultsKey.endpoint))
+        let regionId = normalized(defaults.string(forKey: DefaultsKey.regionId))
+            ?? normalized(localRecord?.regionId)
+            ?? "cn-hangzhou"
+        let endpointString = normalized(defaults.string(forKey: DefaultsKey.endpoint))
+            ?? normalized(localRecord?.endpoint)
+        let endpoint = endpointString
             .flatMap(URL.init(string:))
             ?? URL(string: "https://mt.cn-hangzhou.aliyuncs.com")!
 
@@ -70,6 +75,12 @@ enum AlibabaCredentialResolver {
     private enum DefaultsKey {
         static let accessKeyId = "BilineAlibabaAccessKeyId"
         static let accessKeySecret = "BilineAlibabaAccessKeySecret"
+    }
+
+    static func localCredentialRecord() -> AlibabaCredentialFileRecord? {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
+        let fileURL = AlibabaCredentialFileStore.defaultURL(inputMethodBundleIdentifier: bundleIdentifier)
+        return AlibabaCredentialFileStore(fileURL: fileURL).load()
     }
 
     static func credentials() -> AlibabaMachineTranslationCredentials? {

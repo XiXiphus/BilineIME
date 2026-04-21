@@ -1,10 +1,11 @@
 PROJECT_NAME := BilineIME
 DEV_SCHEME := BilineIMEDev
 RELEASE_SCHEME := BilineIME
+SETTINGS_SCHEME := BilineSettingsDev
 DERIVED_DATA := $(HOME)/Library/Caches/BilineIME/DerivedData
 CONFIGURATION ?= Debug
 
-.PHONY: bootstrap project test build-ime build-ime-release install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime diagnose-ime-dev diagnose-ime-release configure-aliyun-credentials aliyun-credentials-status smoke-ime smoke-ime-aliyun smoke-ime-release verify-ime format verify
+.PHONY: bootstrap project test build-ime build-ime-release build-settings install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime diagnose-ime-dev diagnose-ime-release configure-aliyun-credentials aliyun-credentials-status smoke-ime smoke-ime-aliyun smoke-ime-release verify-ime format verify
 
 bootstrap:
 	brew install xcodegen swift-format cmake boost
@@ -21,6 +22,9 @@ build-ime: project
 
 build-ime-release: project
 	./scripts/build-ime-release.sh
+
+build-settings: project
+	xcodebuild -project $(PROJECT_NAME).xcodeproj -scheme $(SETTINGS_SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) build
 
 install-ime:
 	./scripts/install-ime-dev.sh

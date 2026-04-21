@@ -7,6 +7,7 @@ ACCESS_KEY_ID_ACCOUNT="accessKeyId"
 ACCESS_KEY_SECRET_ACCOUNT="accessKeySecret"
 DEFAULT_REGION="cn-hangzhou"
 DEFAULT_ENDPOINT="https://mt.cn-hangzhou.aliyuncs.com"
+CREDENTIAL_FILE="${BILINE_CREDENTIAL_FILE:-$HOME/Library/Containers/$DOMAIN/Data/Library/Application Support/BilineIME/alibaba-credentials.json}"
 
 usage() {
   cat <<EOF
@@ -68,6 +69,31 @@ defaults_value() {
   defaults read "$DOMAIN" "$key" 2>/dev/null || true
 }
 
+credential_file_lengths() {
+  if [[ ! -f "$CREDENTIAL_FILE" ]]; then
+    echo "credential_file=missing"
+    return
+  fi
+  python3 - "$CREDENTIAL_FILE" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+try:
+    data = json.loads(path.read_text())
+except Exception:
+    print("credential_file=unreadable")
+    raise SystemExit(0)
+
+access_key_id = str(data.get("accessKeyId", ""))
+access_key_secret = str(data.get("accessKeySecret", ""))
+print(f"credential_file={path}")
+print(f"credential_file_accessKeyId={len(access_key_id) if access_key_id else 'missing'}")
+print(f"credential_file_accessKeySecret={len(access_key_secret) if access_key_secret else 'missing'}")
+PY
+}
+
 configure() {
   local access_key_id access_key_secret region endpoint
   access_key_id="$(read_secret "Alibaba AccessKey ID: ")"
@@ -105,6 +131,7 @@ status() {
   echo "provider=${provider:-<missing>}"
   echo "region=${region:-<missing>}"
   echo "endpoint=${endpoint:-<missing>}"
+  credential_file_lengths
   echo "keychain_accessKeyId=${access_key_id_length}"
   echo "keychain_accessKeySecret=${access_key_secret_length}"
   if defaults read "$DOMAIN" BilineAlibabaAccessKeyId >/dev/null 2>&1; then
@@ -120,6 +147,7 @@ status() {
 }
 
 clear() {
+  rm -f "$CREDENTIAL_FILE" >/dev/null 2>&1 || true
   security delete-generic-password -s "$SERVICE" -a "$ACCESS_KEY_ID_ACCOUNT" >/dev/null 2>&1 || true
   security delete-generic-password -s "$SERVICE" -a "$ACCESS_KEY_SECRET_ACCOUNT" >/dev/null 2>&1 || true
   defaults delete "$DOMAIN" BilineTranslationProvider >/dev/null 2>&1 || true

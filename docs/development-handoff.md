@@ -109,21 +109,35 @@ Create a RAM user for development rather than using the main account key:
 - Permission: start with Aliyun Machine Translation access for development; later
   tighten to the smallest policy that still allows batch translation.
 
-Store credentials locally in Keychain. Do not pass secrets as command-line
-arguments, because shell history and process listings are easy to leak from a
-public project workflow.
+For normal use, enter credentials in the native settings app. It stores the key
+material in the dev IME container with user-only file permissions, so the IME
+can read it without a cross-process Keychain authorization prompt. Do not pass
+secrets as command-line arguments, because shell history and process listings
+are easy to leak from a public project workflow.
 
 ```bash
-make configure-aliyun-credentials
+make build-settings
+open "$HOME/Library/Caches/BilineIME/DerivedData/Build/Products/Debug/BilineSettingsDev.app"
 ```
 
-The helper prompts with hidden input, writes only the key material to Keychain,
-and writes non-secret provider defaults to the dev IME domain:
+The settings app writes key material to:
+
+```text
+~/Library/Containers/io.github.xixiphus.inputmethod.BilineIME.dev/Data/Library/Application Support/BilineIME/alibaba-credentials.json
+```
+
+It writes non-secret provider defaults to the dev IME domain:
 
 ```text
 BilineTranslationProvider=aliyun
 BilineAlibabaRegionId=cn-hangzhou
 BilineAlibabaEndpoint=https://mt.cn-hangzhou.aliyuncs.com
+```
+
+The older CLI helper remains available as a Keychain fallback for development:
+
+```bash
+make configure-aliyun-credentials
 ```
 
 Check credential presence without printing secrets:
@@ -267,7 +281,8 @@ Alibaba preview always fails:
 
 - Confirm `com.apple.security.network.client` is present in entitlements.
 - Confirm provider defaults are written to the dev domain.
-- Confirm Keychain has both `accessKeyId` and `accessKeySecret`.
+- Confirm the native settings app has saved both AccessKey fields, or confirm
+  the Keychain fallback has both `accessKeyId` and `accessKeySecret`.
 - Confirm the RAM user has machine translation permission.
 - Run live tests only after explicitly opting in with environment variables.
 

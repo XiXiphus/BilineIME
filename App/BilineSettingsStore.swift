@@ -15,10 +15,10 @@ struct DefaultSettingsStore: SettingsStore {
 
     init(
         targetLanguage: TargetLanguage = .english,
-        previewEnabled: Bool = true,
-        compactColumnCount: Int = 5,
-        expandedRowCount: Int = 5,
-        fuzzyPinyinEnabled: Bool = UserDefaults.standard.bool(forKey: "BilineFuzzyPinyinEnabled"),
+        previewEnabled: Bool = Self.boolDefault(forKey: "BilinePreviewEnabled") ?? true,
+        compactColumnCount: Int = Self.integerDefault(forKey: "BilineCompactColumnCount") ?? 5,
+        expandedRowCount: Int = Self.integerDefault(forKey: "BilineExpandedRowCount") ?? 5,
+        fuzzyPinyinEnabled: Bool = Self.boolDefault(forKey: "BilineFuzzyPinyinEnabled") ?? false,
         characterForm: CharacterForm = .simplified
     ) {
         self.targetLanguage = targetLanguage
@@ -27,5 +27,14 @@ struct DefaultSettingsStore: SettingsStore {
         self.expandedRowCount = max(1, expandedRowCount)
         self.fuzzyPinyinEnabled = fuzzyPinyinEnabled
         self.characterForm = .simplified
+    }
+
+    private static func boolDefault(forKey key: String) -> Bool? {
+        UserDefaults.standard.object(forKey: key) as? Bool
+    }
+
+    private static func integerDefault(forKey key: String) -> Int? {
+        let value = UserDefaults.standard.integer(forKey: key)
+        return value > 0 ? value : nil
     }
 }

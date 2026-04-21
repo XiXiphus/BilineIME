@@ -36,6 +36,7 @@ xcuserdata/
 
 # XcodeGen-generated support files
 App/Support/Info.plist
+Companion/Support/Info.plist
 
 # CocoaPods (if used)
 Pods/

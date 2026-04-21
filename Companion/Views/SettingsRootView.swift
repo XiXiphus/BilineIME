@@ -1,3 +1,4 @@
+import BilineCore
 import BilinePreview
 import SwiftUI
 
@@ -180,6 +181,9 @@ struct StatusView: View {
                 SettingsRow(title: "字形输出") {
                     StatusBadge(text: model.characterFormTitle, isPositive: true)
                 }
+                SettingsRow(title: "标点输出") {
+                    StatusBadge(text: model.punctuationFormTitle, isPositive: true)
+                }
                 SettingsRow(title: "设置 App 路径", subtitle: model.settingsAppPath) {
                     StatusBadge(
                         text: model.settingsInstalledAtStablePath ? "稳定路径" : "临时路径",
@@ -294,12 +298,24 @@ struct InputSettingsView: View {
                     .labelsHidden()
                     .frame(width: 160)
                 }
+                SettingsRow(title: "标点输出") {
+                    Picker("", selection: $model.punctuationForm) {
+                        Text("全角").tag(PunctuationForm.fullwidth)
+                        Text("半角").tag(PunctuationForm.halfwidth)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 160)
+                }
                 SettingsRow(title: "模糊拼音") {
                     Toggle("", isOn: $model.fuzzyPinyinEnabled)
                         .labelsHidden()
                 }
                 SettingsRow(title: "已保存字形", subtitle: "defaults: BilineCharacterForm") {
                     StatusBadge(text: model.characterFormDefaultsStatus, isPositive: true)
+                }
+                SettingsRow(title: "已保存标点", subtitle: "defaults: BilinePunctuationForm") {
+                    StatusBadge(text: model.punctuationFormDefaultsStatus, isPositive: true)
                 }
                 SettingsRow(title: "候选列数") {
                     Stepper(value: $model.compactColumnCount, in: 1...5) {

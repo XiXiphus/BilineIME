@@ -15,10 +15,12 @@ public struct BilinePinyinEngineFactory: CandidateEngineFactory, Sendable {
         )
     }
 
-    public static func appDefault(settingsStore: any SettingsStore) throws -> BilinePinyinEngineFactory {
+    public static func appDefault(settingsStore: any SettingsStore) throws
+        -> BilinePinyinEngineFactory
+    {
         try BilinePinyinEngineFactory(
             fuzzyPinyinEnabled: settingsStore.fuzzyPinyinEnabled,
-            characterForm: .simplified
+            characterForm: settingsStore.characterForm
         )
     }
 
@@ -54,7 +56,9 @@ private struct DictionaryCandidate: Sendable, Equatable {
     let tokens: [String]
 }
 
-private final class DictionaryPinyinCandidateEngineSession: CandidateEngineSession, @unchecked Sendable {
+private final class DictionaryPinyinCandidateEngineSession: CandidateEngineSession,
+    @unchecked Sendable
+{
     private let tokenizer: PinyinTokenizer
     private let lexicon: RimeLexicon
     private let pageSize: Int
@@ -128,7 +132,8 @@ private final class DictionaryPinyinCandidateEngineSession: CandidateEngineSessi
         let committed = selected.candidate.surface
         let totalTokenCount = selected.tokens.count
         let consumedTokenCount = selected.candidate.consumedTokenCount
-        let tailInput = consumedTokenCount > 0 && consumedTokenCount < totalTokenCount
+        let tailInput =
+            consumedTokenCount > 0 && consumedTokenCount < totalTokenCount
             ? Array(selected.tokens.dropFirst(consumedTokenCount)).joined()
             : ""
 
@@ -187,11 +192,14 @@ private final class DictionaryPinyinCandidateEngineSession: CandidateEngineSessi
         let pageEnd = min(pageStart + pageSize, allCandidates.count)
         let pageRecords = Array(allCandidates[pageStart..<pageEnd])
         let pageCandidates = pageRecords.map(\.candidate)
-        let localSelectedIndex = max(0, min(selectedGlobalIndex - pageStart, pageCandidates.count - 1))
+        let localSelectedIndex = max(
+            0, min(selectedGlobalIndex - pageStart, pageCandidates.count - 1))
         let selectedConsumedCount = pageRecords[localSelectedIndex].candidate.consumedTokenCount
         let tokens = pageRecords[localSelectedIndex].tokens
-        let activeRawInput = selectedConsumedCount > 0 ? Array(tokens.prefix(selectedConsumedCount)).joined() : ""
-        let remainingRawInput = selectedConsumedCount > 0
+        let activeRawInput =
+            selectedConsumedCount > 0 ? Array(tokens.prefix(selectedConsumedCount)).joined() : ""
+        let remainingRawInput =
+            selectedConsumedCount > 0
             ? Array(tokens.dropFirst(selectedConsumedCount)).joined()
             : rawInput
 
@@ -235,16 +243,22 @@ private enum PinyinResourceLocator {
             bundleResource("luna_pinyin.dict", ext: "yaml", subdirectory: "RimeTemplates"),
         ].compactMap { $0 }
 
-        guard let tokenizerSeed = candidates.first(where: { FileManager.default.fileExists(atPath: $0.path) }) else {
+        guard
+            let tokenizerSeed = candidates.first(where: {
+                FileManager.default.fileExists(atPath: $0.path)
+            })
+        else {
             throw RimeError.missingResource("luna_pinyin.dict.yaml")
         }
 
         let lexiconFiles = [
             tokenizerSeed,
             bundleResource("biline_phrases.dict", ext: "yaml", subdirectory: "RimeTemplates"),
-            bundleResource("biline_modern_phrases.dict", ext: "yaml", subdirectory: "RimeTemplates"),
+            bundleResource(
+                "biline_modern_phrases.dict", ext: "yaml", subdirectory: "RimeTemplates"),
             repoResource("Sources/BilineRime/Resources/RimeTemplates/biline_phrases.dict.yaml"),
-            repoResource("Sources/BilineRime/Resources/RimeTemplates/biline_modern_phrases.dict.yaml"),
+            repoResource(
+                "Sources/BilineRime/Resources/RimeTemplates/biline_modern_phrases.dict.yaml"),
         ].compactMap { $0 }.filter { FileManager.default.fileExists(atPath: $0.path) }
 
         return ResourceURLs(tokenizerSeed: tokenizerSeed, lexiconFiles: lexiconFiles)
@@ -272,8 +286,8 @@ private enum PinyinResourceLocator {
     }
 }
 
-private extension String {
-    func applyingCommonSimplifiedFallbacks() -> String {
+extension String {
+    fileprivate func applyingCommonSimplifiedFallbacks() -> String {
         let table: [Character: String] = [
             "學": "学", "習": "习", "國": "国", "語": "语", "電": "电", "腦": "脑", "網": "网", "絡": "络",
             "軟": "软", "體": "体", "開": "开", "發": "发", "數": "数", "據": "据", "庫": "库", "雲": "云",

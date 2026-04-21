@@ -14,6 +14,7 @@ public enum BilineDefaultsKey {
     public static let expandedRowCount = "BilineExpandedRowCount"
     public static let fuzzyPinyinEnabled = "BilineFuzzyPinyinEnabled"
     public static let characterForm = "BilineCharacterForm"
+    public static let punctuationForm = "BilinePunctuationForm"
 }
 
 public enum BilineAppIdentifier {
@@ -64,7 +65,9 @@ public enum BilineAppPath {
             .appendingPathComponent("alibaba-credentials.json", isDirectory: false)
     }
 
-    public static func inputMethodRuntimeRimeUserDictionaryURL() -> URL {
+    public static func inputMethodRuntimeRimeUserDictionaryURL(characterForm: String = "simplified")
+        -> URL
+    {
         let applicationSupport =
             FileManager.default.urls(
                 for: .applicationSupportDirectory,
@@ -74,7 +77,18 @@ public enum BilineAppPath {
             .appendingPathComponent("Library/Application Support", isDirectory: true)
         return
             applicationSupport
-            .appendingPathComponent("Rime/user/biline_pinyin.userdb", isDirectory: true)
+            .appendingPathComponent(
+                "Rime/user/\(rimeUserDictionaryName(characterForm: characterForm)).userdb",
+                isDirectory: true
+            )
+    }
+
+    public static func rimeSchemaID(characterForm: String) -> String {
+        characterForm == "traditional" ? "biline_pinyin_trad" : "biline_pinyin_simp"
+    }
+
+    public static func rimeUserDictionaryName(characterForm: String) -> String {
+        rimeSchemaID(characterForm: characterForm)
     }
 
     public static func rimeUserDirectory(inputMethodBundleIdentifier: String) -> URL {
@@ -88,6 +102,17 @@ public enum BilineAppPath {
     public static func rimeUserDictionaryURL(inputMethodBundleIdentifier: String) -> URL {
         rimeUserDirectory(inputMethodBundleIdentifier: inputMethodBundleIdentifier)
             .appendingPathComponent("user/biline_pinyin.userdb", isDirectory: true)
+    }
+
+    public static func rimeUserDictionaryURL(
+        inputMethodBundleIdentifier: String,
+        characterForm: String
+    ) -> URL {
+        rimeUserDirectory(inputMethodBundleIdentifier: inputMethodBundleIdentifier)
+            .appendingPathComponent(
+                "user/\(rimeUserDictionaryName(characterForm: characterForm)).userdb",
+                isDirectory: true
+            )
     }
 }
 

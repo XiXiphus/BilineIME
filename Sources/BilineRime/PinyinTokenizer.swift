@@ -33,7 +33,8 @@ struct PinyinTokenizer: Sendable {
             return []
         }
 
-        let chunks = normalizedInput.split(separator: "'", omittingEmptySubsequences: false).map(String.init)
+        let chunks = normalizedInput.split(separator: "'", omittingEmptySubsequences: false).map(
+            String.init)
         var combined: [[String]] = [[]]
 
         for chunk in chunks {
@@ -59,7 +60,8 @@ struct PinyinTokenizer: Sendable {
     func readingTokens(from text: String) -> [String]? {
         let normalized = Self.normalizePinyin(text, keepsSpaces: true)
         guard !normalized.isEmpty else { return [] }
-        let explicitTokens = normalized
+        let explicitTokens =
+            normalized
             .split(whereSeparator: { $0 == " " || $0 == "'" })
             .map(String.init)
             .filter { !$0.isEmpty }
@@ -97,7 +99,8 @@ struct PinyinTokenizer: Sendable {
         }
 
         if keepsSpaces {
-            return result
+            return
+                result
                 .split(whereSeparator: { $0 == " " })
                 .joined(separator: " ")
         }
@@ -173,28 +176,51 @@ struct PinyinTokenizer: Sendable {
 
     private static let standardSyllables: Set<String> = [
         "a", "ai", "an", "ang", "ao",
-        "ba", "bai", "ban", "bang", "bao", "bei", "ben", "beng", "bi", "bian", "biao", "bie", "bin", "bing", "bo", "bu",
-        "ca", "cai", "can", "cang", "cao", "ce", "cen", "ceng", "cha", "chai", "chan", "chang", "chao", "che", "chen", "cheng", "chi", "chong", "chou", "chu", "chua", "chuai", "chuan", "chuang", "chui", "chun", "chuo", "ci", "cong", "cou", "cu", "cuan", "cui", "cun", "cuo",
-        "da", "dai", "dan", "dang", "dao", "de", "dei", "den", "deng", "di", "dia", "dian", "diao", "die", "ding", "diu", "dong", "dou", "du", "duan", "dui", "dun", "duo",
+        "ba", "bai", "ban", "bang", "bao", "bei", "ben", "beng", "bi", "bian", "biao", "bie", "bin",
+        "bing", "bo", "bu",
+        "ca", "cai", "can", "cang", "cao", "ce", "cen", "ceng", "cha", "chai", "chan", "chang",
+        "chao", "che", "chen", "cheng", "chi", "chong", "chou", "chu", "chua", "chuai", "chuan",
+        "chuang", "chui", "chun", "chuo", "ci", "cong", "cou", "cu", "cuan", "cui", "cun", "cuo",
+        "da", "dai", "dan", "dang", "dao", "de", "dei", "den", "deng", "di", "dia", "dian", "diao",
+        "die", "ding", "diu", "dong", "dou", "du", "duan", "dui", "dun", "duo",
         "e", "ei", "en", "eng", "er",
         "fa", "fan", "fang", "fei", "fen", "feng", "fo", "fou", "fu",
-        "ga", "gai", "gan", "gang", "gao", "ge", "gei", "gen", "geng", "gong", "gou", "gu", "gua", "guai", "guan", "guang", "gui", "gun", "guo",
-        "ha", "hai", "han", "hang", "hao", "he", "hei", "hen", "heng", "hong", "hou", "hu", "hua", "huai", "huan", "huang", "hui", "hun", "huo",
-        "ji", "jia", "jian", "jiang", "jiao", "jie", "jin", "jing", "jiong", "jiu", "ju", "juan", "jue", "jun",
-        "ka", "kai", "kan", "kang", "kao", "ke", "kei", "ken", "keng", "kong", "kou", "ku", "kua", "kuai", "kuan", "kuang", "kui", "kun", "kuo",
-        "la", "lai", "lan", "lang", "lao", "le", "lei", "leng", "li", "lia", "lian", "liang", "liao", "lie", "lin", "ling", "liu", "lo", "long", "lou", "lu", "luan", "lun", "luo", "lv", "lve",
-        "ma", "mai", "man", "mang", "mao", "me", "mei", "men", "meng", "mi", "mian", "miao", "mie", "min", "ming", "miu", "mo", "mou", "mu",
-        "na", "nai", "nan", "nang", "nao", "ne", "nei", "nen", "neng", "ni", "nian", "niang", "niao", "nie", "nin", "ning", "niu", "nong", "nou", "nu", "nuan", "nun", "nuo", "nv", "nve",
+        "ga", "gai", "gan", "gang", "gao", "ge", "gei", "gen", "geng", "gong", "gou", "gu", "gua",
+        "guai", "guan", "guang", "gui", "gun", "guo",
+        "ha", "hai", "han", "hang", "hao", "he", "hei", "hen", "heng", "hong", "hou", "hu", "hua",
+        "huai", "huan", "huang", "hui", "hun", "huo",
+        "ji", "jia", "jian", "jiang", "jiao", "jie", "jin", "jing", "jiong", "jiu", "ju", "juan",
+        "jue", "jun",
+        "ka", "kai", "kan", "kang", "kao", "ke", "kei", "ken", "keng", "kong", "kou", "ku", "kua",
+        "kuai", "kuan", "kuang", "kui", "kun", "kuo",
+        "la", "lai", "lan", "lang", "lao", "le", "lei", "leng", "li", "lia", "lian", "liang",
+        "liao", "lie", "lin", "ling", "liu", "lo", "long", "lou", "lu", "luan", "lun", "luo", "lv",
+        "lve",
+        "ma", "mai", "man", "mang", "mao", "me", "mei", "men", "meng", "mi", "mian", "miao", "mie",
+        "min", "ming", "miu", "mo", "mou", "mu",
+        "na", "nai", "nan", "nang", "nao", "ne", "nei", "nen", "neng", "ni", "nian", "niang",
+        "niao", "nie", "nin", "ning", "niu", "nong", "nou", "nu", "nuan", "nun", "nuo", "nv", "nve",
         "o", "ou",
-        "pa", "pai", "pan", "pang", "pao", "pei", "pen", "peng", "pi", "pian", "piao", "pie", "pin", "ping", "po", "pou", "pu",
-        "qi", "qia", "qian", "qiang", "qiao", "qie", "qin", "qing", "qiong", "qiu", "qu", "quan", "que", "qun",
-        "ran", "rang", "rao", "re", "ren", "reng", "ri", "rong", "rou", "ru", "rua", "ruan", "rui", "run", "ruo",
-        "sa", "sai", "san", "sang", "sao", "se", "sen", "seng", "sha", "shai", "shan", "shang", "shao", "she", "shei", "shen", "sheng", "shi", "shou", "shu", "shua", "shuai", "shuan", "shuang", "shui", "shun", "shuo", "si", "song", "sou", "su", "suan", "sui", "sun", "suo",
-        "ta", "tai", "tan", "tang", "tao", "te", "teng", "ti", "tian", "tiao", "tie", "ting", "tong", "tou", "tu", "tuan", "tui", "tun", "tuo",
+        "pa", "pai", "pan", "pang", "pao", "pei", "pen", "peng", "pi", "pian", "piao", "pie", "pin",
+        "ping", "po", "pou", "pu",
+        "qi", "qia", "qian", "qiang", "qiao", "qie", "qin", "qing", "qiong", "qiu", "qu", "quan",
+        "que", "qun",
+        "ran", "rang", "rao", "re", "ren", "reng", "ri", "rong", "rou", "ru", "rua", "ruan", "rui",
+        "run", "ruo",
+        "sa", "sai", "san", "sang", "sao", "se", "sen", "seng", "sha", "shai", "shan", "shang",
+        "shao", "she", "shei", "shen", "sheng", "shi", "shou", "shu", "shua", "shuai", "shuan",
+        "shuang", "shui", "shun", "shuo", "si", "song", "sou", "su", "suan", "sui", "sun", "suo",
+        "ta", "tai", "tan", "tang", "tao", "te", "teng", "ti", "tian", "tiao", "tie", "ting",
+        "tong", "tou", "tu", "tuan", "tui", "tun", "tuo",
         "wa", "wai", "wan", "wang", "wei", "wen", "weng", "wo", "wu",
-        "xi", "xia", "xian", "xiang", "xiao", "xie", "xin", "xing", "xiong", "xiu", "xu", "xuan", "xue", "xun",
-        "ya", "yan", "yang", "yao", "ye", "yi", "yin", "ying", "yo", "yong", "you", "yu", "yuan", "yue", "yun",
-        "za", "zai", "zan", "zang", "zao", "ze", "zei", "zen", "zeng", "zha", "zhai", "zhan", "zhang", "zhao", "zhe", "zhei", "zhen", "zheng", "zhi", "zhong", "zhou", "zhu", "zhua", "zhuai", "zhuan", "zhuang", "zhui", "zhun", "zhuo", "zi", "zong", "zou", "zu", "zuan", "zui", "zun", "zuo"
+        "xi", "xia", "xian", "xiang", "xiao", "xie", "xin", "xing", "xiong", "xiu", "xu", "xuan",
+        "xue", "xun",
+        "ya", "yan", "yang", "yao", "ye", "yi", "yin", "ying", "yo", "yong", "you", "yu", "yuan",
+        "yue", "yun",
+        "za", "zai", "zan", "zang", "zao", "ze", "zei", "zen", "zeng", "zha", "zhai", "zhan",
+        "zhang", "zhao", "zhe", "zhei", "zhen", "zheng", "zhi", "zhong", "zhou", "zhu", "zhua",
+        "zhuai", "zhuan", "zhuang", "zhui", "zhun", "zhuo", "zi", "zong", "zou", "zu", "zuan",
+        "zui", "zun", "zuo",
     ]
 }
 
@@ -206,10 +232,13 @@ private struct RimeDictionaryEntry: Sendable {
 
     init?(line: String) {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
-        if trimmed.isEmpty || trimmed.hasPrefix("#") || trimmed == "---" || trimmed == "..." { return nil }
+        if trimmed.isEmpty || trimmed.hasPrefix("#") || trimmed == "---" || trimmed == "..." {
+            return nil
+        }
         if trimmed.contains(":") && !trimmed.contains("\t") { return nil }
 
-        let fields = trimmed.split(separator: "\t", omittingEmptySubsequences: true).map(String.init)
+        let fields = trimmed.split(separator: "\t", omittingEmptySubsequences: true).map(
+            String.init)
         guard fields.count >= 2 else { return nil }
         let tokens = PinyinTokenizer.normalizePinyin(fields[1], keepsSpaces: true)
             .split(whereSeparator: { $0 == " " || $0 == "'" })
@@ -231,6 +260,7 @@ extension String {
             "軟": "软", "體": "体", "開": "开", "發": "发", "數": "数", "據": "据", "庫": "库", "雲": "云",
             "臺": "台", "後": "后", "裏": "里", "裡": "里", "麼": "么", "為": "为", "與": "与",
             "這": "这", "個": "个", "們": "们", "會": "会", "來": "来", "時": "时", "間": "间", "現": "现",
+            "魚": "鱼",
             "讓": "让", "對": "对", "應": "应", "問": "问", "題": "题", "無": "无", "線": "线", "測": "测",
             "試": "试", "設": "设", "計": "计", "產": "产", "業": "业", "機": "机", "車": "车", "書": "书",
             "長": "长", "門": "门", "風": "风", "馬": "马", "東": "东", "區": "区", "醫": "医", "愛": "爱",
@@ -240,7 +270,7 @@ extension String {
             "點": "点", "輸": "输", "獨": "独", "類": "类", "關": "关", "鍵": "键", "態": "态", "壓": "压",
             "縮": "缩", "檔": "档", "佈": "布", "優": "优", "險": "险", "損": "损", "貝": "贝", "葉": "叶",
             "灣": "湾", "廣": "广", "華": "华", "劃": "划", "實": "实", "驗": "验", "證": "证", "論": "论",
-            "斷": "断", "構": "构", "潔": "洁"
+            "斷": "断", "構": "构", "潔": "洁",
         ]
         return reduce(into: "") { result, character in
             result.append(table[character] ?? String(character))
@@ -309,7 +339,8 @@ struct RimeLexicon: Sendable {
             return RimeConsumption(tokenCount: tokens.count, tokens: tokens)
         }
 
-        if let commentTokens = tokenizer.readingTokens(from: comment ?? ""), !commentTokens.isEmpty {
+        if let commentTokens = tokenizer.readingTokens(from: comment ?? ""), !commentTokens.isEmpty
+        {
             for tokens in tokenizations where tokens.count >= commentTokens.count {
                 if Array(tokens.prefix(commentTokens.count)) == commentTokens {
                     return RimeConsumption(tokenCount: commentTokens.count, tokens: tokens)
@@ -322,9 +353,10 @@ struct RimeLexicon: Sendable {
         for tokens in tokenizations {
             for prefixCount in stride(from: tokens.count, through: 1, by: -1) {
                 let reading = Array(tokens.prefix(prefixCount)).joined(separator: " ")
-                let matchesSurface = entriesByReading[reading]?.contains(where: {
-                    $0.surface == normalizedSurface
-                }) == true
+                let matchesSurface =
+                    entriesByReading[reading]?.contains(where: {
+                        $0.surface == normalizedSurface
+                    }) == true
                 if matchesSurface, prefixCount > best.tokenCount {
                     best = RimeConsumption(tokenCount: prefixCount, tokens: tokens)
                     break
@@ -402,13 +434,17 @@ struct RimeLexicon: Sendable {
         }
 
         if lhs.entry.weight != rhs.entry.weight { return lhs.entry.weight > rhs.entry.weight }
-        if lhs.entry.surface.count != rhs.entry.surface.count { return lhs.entry.surface.count > rhs.entry.surface.count }
+        if lhs.entry.surface.count != rhs.entry.surface.count {
+            return lhs.entry.surface.count > rhs.entry.surface.count
+        }
         return lhs.entry.surface < rhs.entry.surface
     }
 
     private static func entrySort(_ lhs: Entry, _ rhs: Entry) -> Bool {
         if lhs.weight != rhs.weight { return lhs.weight > rhs.weight }
-        if lhs.readingTokens.count != rhs.readingTokens.count { return lhs.readingTokens.count > rhs.readingTokens.count }
+        if lhs.readingTokens.count != rhs.readingTokens.count {
+            return lhs.readingTokens.count > rhs.readingTokens.count
+        }
         if lhs.surface.count != rhs.surface.count { return lhs.surface.count > rhs.surface.count }
         return lhs.surface < rhs.surface
     }

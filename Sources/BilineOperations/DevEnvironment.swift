@@ -103,6 +103,12 @@ public struct BilineOperationPaths: Sendable, Equatable {
                 inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle),
             BilineAppPath.rimeUserDictionaryURL(
                 inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle),
+            BilineAppPath.rimeUserDictionaryURL(
+                inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle,
+                characterForm: "simplified"),
+            BilineAppPath.rimeUserDictionaryURL(
+                inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle,
+                characterForm: "traditional"),
         ]
     }
 }
@@ -124,6 +130,10 @@ public struct DevEnvironmentSnapshot: Sendable, Equatable {
     public let rimeUserDictionaryPath: String
     public let rimeUserDictionaryExists: Bool
     public let characterFormDefaultsRawValue: String
+    public let punctuationFormDefaultsRawValue: String
+    public let rimeSchemaID: String
+    public let rimeUserDictionaryName: String
+    public let rimeRuntimeResourceCount: Int
     public let recommendedRepairLevel: Int
 
     public var settingsInstalledAtStablePath: Bool {

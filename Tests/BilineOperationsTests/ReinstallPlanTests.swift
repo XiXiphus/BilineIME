@@ -59,9 +59,13 @@ final class ReinstallPlanTests: XCTestCase {
             currentInputSource: "com.apple.keylayout.ABC",
             credentialFilePath: "/tmp/alibaba-credentials.json",
             credentialFileComplete: true,
-            rimeUserDictionaryPath: "/tmp/biline_pinyin.userdb",
+            rimeUserDictionaryPath: "/tmp/biline_pinyin_simp.userdb",
             rimeUserDictionaryExists: true,
             characterFormDefaultsRawValue: "simplified",
+            punctuationFormDefaultsRawValue: "fullwidth",
+            rimeSchemaID: "biline_pinyin_simp",
+            rimeUserDictionaryName: "biline_pinyin_simp",
+            rimeRuntimeResourceCount: 9,
             recommendedRepairLevel: 3
         )
 

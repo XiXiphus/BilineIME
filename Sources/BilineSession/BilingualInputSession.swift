@@ -39,7 +39,7 @@ public struct BilingualCandidateItem: Sendable, Equatable, Identifiable {
     }
 
     public var englishText: String? {
-        guard case let .ready(text) = previewState else {
+        guard case .ready(let text) = previewState else {
             return nil
         }
         return text
@@ -157,6 +157,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
     public var canDeleteBackward: Bool { withStateLock { !rawInput.isEmpty } }
     public var hasCandidates: Bool { withStateLock { !currentSnapshot.items.isEmpty } }
+    public var punctuationForm: PunctuationForm { settingsStore.punctuationForm }
     public private(set) var compositionMode: CompositionMode = .candidateCompact
     public private(set) var hasEverExpandedInCurrentComposition = false
 
@@ -313,12 +314,14 @@ public final class BilingualInputSession: @unchecked Sendable {
             presentationMode = .expanded
             let targetRow = currentSelectedRow + 1
             if targetRow < currentRowCount {
-                let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
+                let targetColumn = min(
+                    currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
                 selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
                 return
             }
 
-            moveToAdjacentPage(direction: .next, preferredColumn: currentSelectedColumn, preferredRow: 0)
+            moveToAdjacentPage(
+                direction: .next, preferredColumn: currentSelectedColumn, preferredRow: 0)
         }
     }
 
@@ -348,7 +351,8 @@ public final class BilingualInputSession: @unchecked Sendable {
             }
 
             let targetRow = currentSelectedRow - 1
-            let targetColumn = min(currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
+            let targetColumn = min(
+                currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
             selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
         }
     }
@@ -401,7 +405,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     public func renderCommittedText(_ text: String) -> String {
-        PunctuationPolicy.renderCommittedText(text)
+        PunctuationPolicy.renderCommittedText(text, form: settingsStore.punctuationForm)
     }
 
     public func cancel() {
@@ -513,7 +517,8 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private var currentItem: BilingualCandidateItem? {
-        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < currentSnapshot.items.count else {
+        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < currentSnapshot.items.count
+        else {
             return nil
         }
         return currentSnapshot.items[currentSelectedFlatIndex]
@@ -806,7 +811,9 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private var currentSelectedCandidateID: String? {
-        guard currentSelectedFlatIndex >= 0, currentSelectedFlatIndex < engineSnapshot.candidates.count else {
+        guard currentSelectedFlatIndex >= 0,
+            currentSelectedFlatIndex < engineSnapshot.candidates.count
+        else {
             return nil
         }
         return engineSnapshot.candidates[currentSelectedFlatIndex].id
@@ -860,7 +867,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     }
 
     private var renderedRawInput: String {
-        PunctuationPolicy.renderPreedit(rawInput)
+        PunctuationPolicy.renderPreedit(rawInput, form: settingsStore.punctuationForm)
     }
 
     private func publishSnapshot() {

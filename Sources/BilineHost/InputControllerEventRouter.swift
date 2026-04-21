@@ -51,6 +51,7 @@ public struct InputControllerState: Sendable, Equatable {
     public let canDeleteBackward: Bool
     public let hasCandidates: Bool
     public let compactColumnCount: Int
+    public let punctuationForm: PunctuationForm
     public let pageIndex: Int
     public let selectedRow: Int
     public let isExpandedPresentation: Bool
@@ -62,6 +63,7 @@ public struct InputControllerState: Sendable, Equatable {
         canDeleteBackward: Bool,
         hasCandidates: Bool,
         compactColumnCount: Int,
+        punctuationForm: PunctuationForm = .fullwidth,
         pageIndex: Int = 0,
         selectedRow: Int = 0,
         isExpandedPresentation: Bool = false,
@@ -72,6 +74,7 @@ public struct InputControllerState: Sendable, Equatable {
         self.canDeleteBackward = canDeleteBackward
         self.hasCandidates = hasCandidates
         self.compactColumnCount = max(1, compactColumnCount)
+        self.punctuationForm = punctuationForm
         self.pageIndex = max(0, pageIndex)
         self.selectedRow = max(0, selectedRow)
         self.isExpandedPresentation = isExpandedPresentation
@@ -84,6 +87,7 @@ public enum InputControllerAction: Sendable, Equatable {
     case consume
     case append(String)
     case appendLiteral(String)
+    case insertText(String)
     case commitChineseAndInsert(String)
     case toggleLayer
     case deleteBackward
@@ -163,7 +167,8 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             }
             switch state.compositionMode {
             case .candidateExpanded:
-                return state.selectedRow == 0 ? .collapseToCompactAndSelectFirst : .browsePreviousRow
+                return state.selectedRow == 0
+                    ? .collapseToCompactAndSelectFirst : .browsePreviousRow
             case .candidateCompact:
                 return .browsePreviousRow
             case .rawBufferOnly:
@@ -191,13 +196,20 @@ public final class InputControllerEventRouter: @unchecked Sendable {
 
         if state.isComposing,
             state.hasCandidates,
-            let digitIndex = candidateColumnIndex(from: event, columnCount: state.compactColumnCount)
+            let digitIndex = candidateColumnIndex(
+                from: event, columnCount: state.compactColumnCount)
         {
             return .selectColumn(digitIndex)
         }
 
         if state.isComposing, let punctuation = terminatingPunctuationCommitText(from: event) {
             return .commitChineseAndInsert(punctuation)
+        }
+
+        if !state.isComposing,
+            let punctuation = standalonePunctuationText(from: event, state: state)
+        {
+            return .insertText(punctuation)
         }
 
         guard let characters = event.charactersIgnoringModifiers, !characters.isEmpty else {
@@ -261,6 +273,18 @@ public final class InputControllerEventRouter: @unchecked Sendable {
         return nil
     }
 
+    private func standalonePunctuationText(
+        from event: InputControllerEvent,
+        state: InputControllerState
+    ) -> String? {
+        guard let character = actualCharacter(for: event),
+            PunctuationPolicy.canHandle(character)
+        else {
+            return nil
+        }
+        return PunctuationPolicy.renderCommittedText(character, form: state.punctuationForm)
+    }
+
     private func rowBrowseAction(
         for event: InputControllerEvent,
         state: InputControllerState
@@ -272,7 +296,7 @@ public final class InputControllerEventRouter: @unchecked Sendable {
         }
 
         guard state.isComposing else {
-            return .passThrough
+            return nil
         }
 
         switch state.compositionMode {

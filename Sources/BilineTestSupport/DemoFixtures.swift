@@ -18,13 +18,15 @@ public enum DemoFixtures {
         expandedRowCount: Int = 5,
         delay: Duration = .zero,
         failures: Set<String> = [],
-        previewEnabled: Bool = true
+        previewEnabled: Bool = true,
+        punctuationForm: PunctuationForm = .fullwidth
     ) -> BilingualInputSession {
         BilingualInputSession(
             settingsStore: DemoSettingsStore(
                 previewEnabled: previewEnabled,
                 compactColumnCount: compactColumnCount,
-                expandedRowCount: expandedRowCount
+                expandedRowCount: expandedRowCount,
+                punctuationForm: punctuationForm
             ),
             engineFactory: makeEngineFactory(),
             previewCoordinator: makeCoordinator(delay: delay, failures: failures)
@@ -57,6 +59,7 @@ private struct DemoSettingsStore: SettingsStore {
     let expandedRowCount: Int
     let fuzzyPinyinEnabled: Bool = false
     let characterForm: CharacterForm = .simplified
+    let punctuationForm: PunctuationForm
 
     var pageSize: Int {
         compactColumnCount * expandedRowCount

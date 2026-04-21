@@ -1,3 +1,4 @@
+import BilineCore
 import BilinePreview
 import BilineSettings
 import Foundation
@@ -9,6 +10,7 @@ struct DefaultSettingsStore: SettingsStore {
     let expandedRowCount: Int
     let fuzzyPinyinEnabled: Bool
     let characterForm: CharacterForm
+    let punctuationForm: PunctuationForm
 
     var pageSize: Int {
         compactColumnCount * expandedRowCount
@@ -23,7 +25,8 @@ struct DefaultSettingsStore: SettingsStore {
             ?? 5,
         fuzzyPinyinEnabled: Bool = Self.boolDefault(forKey: BilineDefaultsKey.fuzzyPinyinEnabled)
             ?? false,
-        characterForm: CharacterForm = Self.characterFormDefault() ?? .simplified
+        characterForm: CharacterForm = Self.characterFormDefault() ?? .simplified,
+        punctuationForm: PunctuationForm = Self.punctuationFormDefault() ?? .fullwidth
     ) {
         self.targetLanguage = targetLanguage
         self.previewEnabled = previewEnabled
@@ -31,6 +34,7 @@ struct DefaultSettingsStore: SettingsStore {
         self.expandedRowCount = max(1, expandedRowCount)
         self.fuzzyPinyinEnabled = fuzzyPinyinEnabled
         self.characterForm = characterForm
+        self.punctuationForm = punctuationForm
     }
 
     private static func boolDefault(forKey key: String) -> Bool? {
@@ -48,5 +52,13 @@ struct DefaultSettingsStore: SettingsStore {
             return nil
         }
         return CharacterForm(rawValue: rawValue)
+    }
+
+    private static func punctuationFormDefault() -> PunctuationForm? {
+        guard let rawValue = UserDefaults.standard.string(forKey: BilineDefaultsKey.punctuationForm)
+        else {
+            return nil
+        }
+        return PunctuationForm(rawValue: rawValue)
     }
 }

@@ -17,9 +17,9 @@ public protocol TranslationProvider: Sendable {
     func translate(_ text: String, target: TargetLanguage) async throws -> String
 }
 
-public extension TranslationProvider {
-    var providerModelIdentifier: String { "default" }
-    var translationProfileIdentifier: String { "default" }
+extension TranslationProvider {
+    public var providerModelIdentifier: String { "default" }
+    public var translationProfileIdentifier: String { "default" }
 }
 
 public protocol BatchTranslationProvider: TranslationProvider {
@@ -33,6 +33,7 @@ public protocol SettingsStore: Sendable {
     var expandedRowCount: Int { get }
     var fuzzyPinyinEnabled: Bool { get }
     var characterForm: CharacterForm { get }
+    var punctuationForm: PunctuationForm { get }
     var pageSize: Int { get }
 }
 
@@ -293,7 +294,8 @@ public actor TranslationPreviewScheduler {
 
         guard let first = queued.first else { return }
 
-        let selected = queued
+        let selected =
+            queued
             .filter { $0.target == first.target }
             .prefix(configuration.maxBatchSize)
 
@@ -506,8 +508,8 @@ public actor TranslationPreviewScheduler {
     }
 }
 
-private extension Duration {
-    var secondsApproximation: TimeInterval {
+extension Duration {
+    fileprivate var secondsApproximation: TimeInterval {
         let components = components
         return TimeInterval(components.seconds)
             + TimeInterval(components.attoseconds) / 1_000_000_000_000_000_000
@@ -537,7 +539,8 @@ public actor PreviewCoordinator {
         provider: any TranslationProvider,
         cache: PreviewCache = PreviewCache(),
         debounce: Duration = .milliseconds(120),
-        schedulerConfiguration: TranslationPreviewScheduler.Configuration = TranslationPreviewScheduler.Configuration()
+        schedulerConfiguration: TranslationPreviewScheduler.Configuration =
+            TranslationPreviewScheduler.Configuration()
     ) {
         self.providerIdentifier = provider.providerIdentifier
         self.providerModelIdentifier = provider.providerModelIdentifier
@@ -675,7 +678,8 @@ public actor PreviewCoordinator {
     }
 
     public func cancel(sessionID: UUID) async {
-        let cancelledRequests = activeRequests
+        let cancelledRequests =
+            activeRequests
             .filter { $0.key.sessionID == sessionID }
             .map { (activePreviewID: $0.key, requestKey: $0.value.requestKey) }
         activeRequests = activeRequests.filter { $0.key.sessionID != sessionID }
@@ -716,8 +720,8 @@ public actor PreviewCoordinator {
     }
 }
 
-private extension ActivePreviewID {
-    var schedulerSubscriberID: TranslationPreviewSubscriberID {
+extension ActivePreviewID {
+    fileprivate var schedulerSubscriberID: TranslationPreviewSubscriberID {
         TranslationPreviewSubscriberID("\(sessionID.uuidString):\(requestID)")
     }
 }

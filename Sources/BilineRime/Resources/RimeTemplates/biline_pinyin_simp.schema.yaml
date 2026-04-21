@@ -1,0 +1,60 @@
+# Rime schema
+# encoding: utf-8
+
+schema:
+  schema_id: biline_pinyin_simp
+  name: Biline 简体拼音
+  version: "0.5"
+  author:
+    - BilineIME
+  description: |
+    BilineIME 简体拼音方案。Rime 只负责中文拼音候选、用户词典和词频学习；
+    标点、双层候选、英文预览、英文层提交由 Biline 运行时负责。
+
+engine:
+  processors:
+    - ascii_composer
+    - speller
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - abc_segmentor
+    - fallback_segmentor
+  translators:
+    - script_translator
+  filters:
+    - uniquifier
+
+speller:
+  alphabet: abcdefghijklmnopqrstuvwxyz
+  initials: abcdefghijklmnopqrstuvwxyz
+  delimiter: " '"
+  algebra:
+    __patch:
+      - pinyin:/abbreviation
+      - pinyin:/spelling_correction
+      - pinyin:/key_correction
+
+translator:
+  dictionary: biline_pinyin
+  user_dict: biline_pinyin_simp
+  enable_sentence: true
+  enable_completion: true
+  enable_user_dict: true
+  enable_encoder: true
+  encode_commit_history: true
+  preedit_format:
+    - xform/([nl])v/$1ü/
+    - xform/([nl])ue/$1üe/
+    - xform/([jqxy])v/$1u/
+
+ascii_composer:
+  good_old_caps_lock: true
+  switch_key:
+    Shift_L: noop
+    Shift_R: noop
+    Control_L: noop
+    Control_R: noop
+    Caps_Lock: clear
+    Eisu_toggle: clear

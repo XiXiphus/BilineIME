@@ -9,7 +9,6 @@ public struct RimeCandidateEngineFactory: CandidateEngineFactory, Sendable {
     private let settings: RimeSettings
     private let tokenizer: PinyinTokenizer
     private let lexicon: RimeLexicon
-    private let schemaID = "biline_pinyin"
 
     public init(
         fuzzyPinyinEnabled: Bool,
@@ -26,7 +25,9 @@ public struct RimeCandidateEngineFactory: CandidateEngineFactory, Sendable {
         self.lexicon = try runtime.makeLexicon(settings: settings)
     }
 
-    public static func appDefault(settingsStore: any SettingsStore) throws -> RimeCandidateEngineFactory {
+    public static func appDefault(settingsStore: any SettingsStore) throws
+        -> RimeCandidateEngineFactory
+    {
         try RimeCandidateEngineFactory(
             fuzzyPinyinEnabled: settingsStore.fuzzyPinyinEnabled,
             characterForm: settingsStore.characterForm
@@ -36,7 +37,7 @@ public struct RimeCandidateEngineFactory: CandidateEngineFactory, Sendable {
     public func makeSession(config: EngineConfig) -> any CandidateEngineSession {
         do {
             return try RimeCandidateEngineSession(
-                schemaID: schemaID,
+                schemaID: settings.schemaID,
                 settings: RimeSettings(
                     pageSize: config.pageSize,
                     fuzzyPinyinEnabled: settings.fuzzyPinyinEnabled,
@@ -88,7 +89,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
 
         if requiresSessionReset {
             do {
-                sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
+                sessionID = try runtime.resetSession(
+                    sessionID, schemaID: schemaID, settings: settings)
                 requiresSessionReset = false
             } catch {
                 self.rawInput = normalizedInput
@@ -99,7 +101,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
         if normalizedInput != self.rawInput {
             if !applyInputTransition(from: self.rawInput, to: normalizedInput) {
                 do {
-                    sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
+                    sessionID = try runtime.resetSession(
+                        sessionID, schemaID: schemaID, settings: settings)
                 } catch {
                     self.rawInput = normalizedInput
                     return rawBufferSnapshot(for: normalizedInput)
@@ -158,19 +161,26 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
         }
 
         var currentSnapshot = fetchSnapshot()
-        let selectedIndex = max(0, min(Int(currentSnapshot.highlightedIndex), max(Int(currentSnapshot.candidateCount) - 1, 0)))
-        let selectedSurface = currentSnapshot.candidates.map { pointer in
-            String(cString: pointer[selectedIndex].text)
-        } ?? rawInput
+        let selectedIndex = max(
+            0,
+            min(
+                Int(currentSnapshot.highlightedIndex),
+                max(Int(currentSnapshot.candidateCount) - 1, 0)))
+        let selectedSurface =
+            currentSnapshot.candidates.map { pointer in
+                String(cString: pointer[selectedIndex].text)
+            } ?? rawInput
         BRimeFreeSnapshot(&currentSnapshot)
 
         var result = BRimeCommitResult()
-        guard BRimeSelectCandidateOnCurrentPage(sessionID, numericCast(selectedIndex), &result) else {
+        guard BRimeSelectCandidateOnCurrentPage(sessionID, numericCast(selectedIndex), &result)
+        else {
             return CommitResult(committedText: rawInput, snapshot: .idle)
         }
         defer { BRimeFreeCommitResult(&result) }
 
-        let committedText = result.committedText.map { String(cString: $0) }
+        let committedText =
+            result.committedText.map { String(cString: $0) }
             .flatMap { $0.isEmpty ? nil : $0 }
             .map(renderedSurface)
             ?? renderedSurface(selectedSurface)
@@ -179,7 +189,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
         let selectedConsumesWholeInput =
             selectedConsumedCount > 0 && currentEngineSnapshot.remainingRawInput.isEmpty
         let couldNotProvePrefix = selectedConsumedCount == 0
-        let fallbackTailInput = selectedConsumedCount > 0 ? currentEngineSnapshot.remainingRawInput : ""
+        let fallbackTailInput =
+            selectedConsumedCount > 0 ? currentEngineSnapshot.remainingRawInput : ""
 
         let postCommitInput = result.postCommitSnapshot.input.map { String(cString: $0) } ?? ""
         let stalePostCommitInput = postCommitInput.isEmpty || postCommitInput == rawInput
@@ -191,7 +202,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
         if selectedConsumesWholeInput || (couldNotProvePrefix && stalePostCommitInput) {
             rawInput = ""
             do {
-                sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
+                sessionID = try runtime.resetSession(
+                    sessionID, schemaID: schemaID, settings: settings)
                 requiresSessionReset = false
             } catch {
                 requiresSessionReset = true
@@ -200,7 +212,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
         } else if shouldUseFallbackTail {
             rawInput = fallbackTailInput
             do {
-                sessionID = try runtime.resetSession(sessionID, schemaID: schemaID, settings: settings)
+                sessionID = try runtime.resetSession(
+                    sessionID, schemaID: schemaID, settings: settings)
                 requiresSessionReset = false
                 guard replayInput(fallbackTailInput) else {
                     snapshot = rawBufferSnapshot(for: fallbackTailInput)
@@ -255,7 +268,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
 
         let candidateCount = Int(snapshot.candidateCount)
         let selectedIndex = max(0, min(Int(snapshot.highlightedIndex), max(candidateCount - 1, 0)))
-        let preeditText = snapshot.preedit.map { String(cString: $0) }
+        let preeditText =
+            snapshot.preedit.map { String(cString: $0) }
             .flatMap { $0.isEmpty ? nil : $0 }
             ?? rawInput
 
@@ -290,13 +304,16 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
             return rawBufferSnapshot(for: rawInput)
         }
 
-        let selectedConsumption = selectedIndex < consumptions.count
+        let selectedConsumption =
+            selectedIndex < consumptions.count
             ? consumptions[selectedIndex]
             : RimeConsumption(tokenCount: 0, tokens: tokenizer.tokenize(rawInput) ?? [])
         let selectedConsumed = selectedConsumption.tokenCount
         let tokens = selectedConsumption.tokens
-        let activeRawInput = selectedConsumed > 0 ? Array(tokens.prefix(selectedConsumed)).joined() : ""
-        let remainingRawInput = selectedConsumed > 0 ? Array(tokens.dropFirst(selectedConsumed)).joined() : rawInput
+        let activeRawInput =
+            selectedConsumed > 0 ? Array(tokens.prefix(selectedConsumed)).joined() : ""
+        let remainingRawInput =
+            selectedConsumed > 0 ? Array(tokens.dropFirst(selectedConsumed)).joined() : rawInput
 
         return CompositionSnapshot(
             rawInput: rawInput,
@@ -356,7 +373,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
         processCharacters(input[...])
     }
 
-    private func processCharacters<S: Sequence>(_ characters: S) -> Bool where S.Element == Character {
+    private func processCharacters<S: Sequence>(_ characters: S) -> Bool
+    where S.Element == Character {
         for character in characters {
             guard let keycode = keycode(for: character) else {
                 return false
@@ -369,7 +387,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
     }
 
     private func keycode(for character: Character) -> Int32? {
-        guard let scalar = character.unicodeScalars.first, character.unicodeScalars.count == 1 else {
+        guard let scalar = character.unicodeScalars.first, character.unicodeScalars.count == 1
+        else {
             return nil
         }
         guard scalar.isASCII else {

@@ -107,7 +107,8 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.selectedRow, 1)
         XCTAssertEqual(session.snapshot.selectedColumn, 1)
         XCTAssertEqual(session.snapshot.selectedFlatIndex, 3)
-        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "市")
+        XCTAssertEqual(
+            session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "市")
     }
 
     func testMoveRowAdvancesToNextPageWhenReachingBottomRow() {
@@ -126,7 +127,8 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.selectedRow, 0)
         XCTAssertEqual(session.snapshot.selectedColumn, 1)
         XCTAssertEqual(session.snapshot.selectedFlatIndex, 1)
-        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "识")
+        XCTAssertEqual(
+            session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "识")
     }
 
     func testFirstRowHyphenCollapsesAndResetsToFirstColumn() {
@@ -149,7 +151,8 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.presentationMode, .compact)
         XCTAssertEqual(session.snapshot.selectedRow, 0)
         XCTAssertEqual(session.snapshot.selectedColumn, 0)
-        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "是")
+        XCTAssertEqual(
+            session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "是")
     }
 
     func testEqualAfterCollapseExpandsFromFirstColumnToNextRow() {
@@ -169,7 +172,8 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.presentationMode, .expanded)
         XCTAssertEqual(session.snapshot.selectedRow, 1)
         XCTAssertEqual(session.snapshot.selectedColumn, 0)
-        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "事")
+        XCTAssertEqual(
+            session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "事")
     }
 
     func testExpandAndAdvanceShowsSecondRowWhenPageHasMoreThanFiveCandidates() {
@@ -188,7 +192,8 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.compositionMode, .candidateExpanded)
         XCTAssertTrue(session.hasEverExpandedInCurrentComposition)
         XCTAssertEqual(session.snapshot.selectedRow, 1)
-        XCTAssertEqual(session.snapshot.items(inRow: 1).map(\.candidate.surface), ["识", "诗", "十", "史", "食"])
+        XCTAssertEqual(
+            session.snapshot.items(inRow: 1).map(\.candidate.surface), ["识", "诗", "十", "史", "食"])
     }
 
     func testTurnPagePreservesSelectedRowAndColumnWhenPossible() {
@@ -206,7 +211,8 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.pageIndex, 1)
         XCTAssertEqual(session.snapshot.selectedRow, 1)
         XCTAssertEqual(session.snapshot.selectedColumn, 1)
-        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "十")
+        XCTAssertEqual(
+            session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "十")
     }
 
     func testBrowsePreviousRowFromFirstRowOnLaterPageTurnsToPreviousPage() {
@@ -228,7 +234,8 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.presentationMode, .expanded)
         XCTAssertEqual(session.snapshot.selectedRow, 1)
         XCTAssertEqual(session.snapshot.selectedColumn, 0)
-        XCTAssertEqual(session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "事")
+        XCTAssertEqual(
+            session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "事")
     }
 
     func testAppendLiteralSwitchesToRawBufferOnlyComposition() {
@@ -339,6 +346,20 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.renderCommittedText(","), "，")
         XCTAssertEqual(session.renderCommittedText("()"), "（）")
         XCTAssertEqual(session.renderCommittedText("%+_"), "％＋＿")
+    }
+
+    func testHalfwidthPunctuationPolicyKeepsASCIIPunctuation() {
+        let session = DemoFixtures.makeBilingualSession(punctuationForm: .halfwidth)
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "%")
+        session.appendLiteral(text: "_")
+        session.appendLiteral(text: "+")
+
+        XCTAssertEqual(session.snapshot.displayRawInput, "shi%_+")
+        XCTAssertEqual(session.commitSelection(), "shi%_+")
+        XCTAssertEqual(session.renderCommittedText(","), ",")
+        XCTAssertEqual(session.renderCommittedText("()"), "()")
     }
 
     func testVisiblePreviewUpdatesToReadyWithoutExtraNavigation() async {
@@ -580,23 +601,23 @@ final class BilingualInputSessionTests: XCTestCase {
         let session = makeSessionWithEngine(
             snapshotsByInput: [
                 "nihao": CompositionSnapshot(
-                rawInput: "nihao",
-                markedText: "nihao",
-                candidates: [
-                    Candidate(
-                        id: "stub:nihao",
-                        surface: "你好",
-                        reading: "ni hao",
-                        score: 1,
-                        consumedTokenCount: 2
-                    )
-                ],
-                selectedIndex: 0,
-                pageIndex: 0,
-                isComposing: true,
-                activeRawInput: "nihao",
-                remainingRawInput: "",
-                consumedTokenCount: 2
+                    rawInput: "nihao",
+                    markedText: "nihao",
+                    candidates: [
+                        Candidate(
+                            id: "stub:nihao",
+                            surface: "你好",
+                            reading: "ni hao",
+                            score: 1,
+                            consumedTokenCount: 2
+                        )
+                    ],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "nihao",
+                    remainingRawInput: "",
+                    consumedTokenCount: 2
                 )
             ],
             commitResult: CommitResult(
@@ -721,23 +742,23 @@ final class BilingualInputSessionTests: XCTestCase {
         let session = makeSessionWithEngine(
             snapshotsByInput: [
                 "haopingguo": CompositionSnapshot(
-                rawInput: "haopingguo",
-                markedText: "haopingguo",
-                candidates: [
-                    Candidate(
-                        id: "stub:hao",
-                        surface: "好",
-                        reading: "hao",
-                        score: 1,
-                        consumedTokenCount: 1
-                    )
-                ],
-                selectedIndex: 0,
-                pageIndex: 0,
-                isComposing: true,
-                activeRawInput: "hao",
-                remainingRawInput: "pingguo",
-                consumedTokenCount: 1
+                    rawInput: "haopingguo",
+                    markedText: "haopingguo",
+                    candidates: [
+                        Candidate(
+                            id: "stub:hao",
+                            surface: "好",
+                            reading: "hao",
+                            score: 1,
+                            consumedTokenCount: 1
+                        )
+                    ],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "hao",
+                    remainingRawInput: "pingguo",
+                    consumedTokenCount: 1
                 ),
                 "pingguo": CompositionSnapshot(
                     rawInput: "pingguo",
@@ -790,6 +811,7 @@ private struct StubSettingsStore: SettingsStore {
     let expandedRowCount: Int = 5
     let fuzzyPinyinEnabled: Bool = false
     let characterForm: CharacterForm = .simplified
+    let punctuationForm: PunctuationForm = .fullwidth
 
     var pageSize: Int { compactColumnCount * expandedRowCount }
 }

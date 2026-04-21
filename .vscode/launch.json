@@ -1,0 +1,24 @@
+{
+    "configurations": [
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BilineIME}",
+            "name": "Debug bilinectl",
+            "target": "bilinectl",
+            "configuration": "debug",
+            "preLaunchTask": "swift: Build Debug bilinectl"
+        },
+        {
+            "type": "swift",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder:BilineIME}",
+            "name": "Release bilinectl",
+            "target": "bilinectl",
+            "configuration": "release",
+            "preLaunchTask": "swift: Build Release bilinectl"
+        }
+    ]
+}

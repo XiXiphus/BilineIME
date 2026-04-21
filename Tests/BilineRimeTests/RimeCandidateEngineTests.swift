@@ -96,8 +96,19 @@ final class RimeCandidateEngineTests: XCTestCase {
 
         let shuangyu = session.updateInput("shuangyu")
         XCTAssertEqual(shuangyu.candidates.first?.surface, "双语")
+        XCTAssertFalse(shuangyu.candidates.prefix(5).contains(where: { $0.surface == "雙魚" }))
 
         let jianti = session.updateInput("jiantizhongwen")
         XCTAssertEqual(jianti.candidates.first?.surface, "简体中文")
+    }
+
+    func testTraditionalModeUsesTraditionalSchemaOutput() throws {
+        let session = try makeSession(characterForm: .traditional)
+        _ = session.updateInput("shuangyu")
+
+        let result = session.commitSelected()
+
+        XCTAssertEqual(result.committedText, "雙語")
+        XCTAssertEqual(result.snapshot, .idle)
     }
 }

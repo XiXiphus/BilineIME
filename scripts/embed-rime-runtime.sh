@@ -25,7 +25,9 @@ APP_FRAMEWORKS="$APP_PATH/Contents/Frameworks"
 APP_RUNTIME="$APP_PATH/Contents/Resources/RimeRuntime"
 APP_RIME_DATA="$APP_RUNTIME/rime-data"
 
-mkdir -p "$APP_FRAMEWORKS" "$APP_RUNTIME" "$APP_RIME_DATA"
+mkdir -p "$APP_FRAMEWORKS" "$APP_RUNTIME"
+rm -rf "$APP_RIME_DATA"
+mkdir -p "$APP_RIME_DATA"
 
 copy_runtime_dependency() {
   local dependency_path="$1"
@@ -138,16 +140,28 @@ find "$APP_FRAMEWORKS" -maxdepth 1 -name '*.dylib' -print0 | while IFS= read -r 
   rewrite_framework_dependencies "$dylib"
 done
 
-if [[ -d "$RIME_SHARE" ]]; then
-  rm -rf "$APP_RUNTIME/share"
-  ditto "$RIME_SHARE" "$APP_RUNTIME/share"
+rm -rf "$APP_RUNTIME/share"
+OPENCC_SHARE=""
+if [[ -d "$RIME_SHARE/opencc" ]]; then
+  OPENCC_SHARE="$RIME_SHARE/opencc"
+elif command -v brew >/dev/null 2>&1; then
+  OPENCC_PREFIX="$(brew --prefix opencc 2>/dev/null || true)"
+  if [[ -n "$OPENCC_PREFIX" && -d "$OPENCC_PREFIX/share/opencc" ]]; then
+    OPENCC_SHARE="$OPENCC_PREFIX/share/opencc"
+  fi
+fi
+
+if [[ -n "$OPENCC_SHARE" ]]; then
+  mkdir -p "$APP_RUNTIME/share/opencc"
+  for file in s2t.json STCharacters.ocd2 STPhrases.ocd2; do
+    if [[ -f "$OPENCC_SHARE/$file" ]]; then
+      ditto "$OPENCC_SHARE/$file" "$APP_RUNTIME/share/opencc/$file"
+    fi
+  done
 fi
 
 for file in \
-  "$ROOT_DIR/Vendor/rime-prelude/default.yaml" \
-  "$ROOT_DIR/Vendor/rime-luna-pinyin/luna_pinyin.dict.yaml" \
   "$ROOT_DIR/Vendor/rime-luna-pinyin/pinyin.yaml" \
-  "$ROOT_DIR/Vendor/rime-essay/essay.txt" \
   "$ROOT_DIR/Vendor/rime-ice/rime_ice.dict.yaml"; do
   if [[ -f "$file" ]]; then
     ditto "$file" "$APP_RIME_DATA/$(basename "$file")"
@@ -156,10 +170,21 @@ done
 
 if [[ -d "$ROOT_DIR/Vendor/rime-ice/cn_dicts" ]]; then
   rm -rf "$APP_RIME_DATA/cn_dicts"
-  ditto "$ROOT_DIR/Vendor/rime-ice/cn_dicts" "$APP_RIME_DATA/cn_dicts"
+  mkdir -p "$APP_RIME_DATA/cn_dicts"
+  for file in 8105 base ext tencent others; do
+    if [[ -f "$ROOT_DIR/Vendor/rime-ice/cn_dicts/$file.dict.yaml" ]]; then
+      ditto "$ROOT_DIR/Vendor/rime-ice/cn_dicts/$file.dict.yaml" "$APP_RIME_DATA/cn_dicts/$file.dict.yaml"
+    fi
+  done
 fi
 
-for file in "$ROOT_DIR"/Sources/BilineRime/Resources/RimeTemplates/*.yaml; do
+for file in \
+  "$ROOT_DIR/Sources/BilineRime/Resources/RimeTemplates/default.yaml" \
+  "$ROOT_DIR/Sources/BilineRime/Resources/RimeTemplates/biline_pinyin_simp.schema.yaml" \
+  "$ROOT_DIR/Sources/BilineRime/Resources/RimeTemplates/biline_pinyin_trad.schema.yaml" \
+  "$ROOT_DIR/Sources/BilineRime/Resources/RimeTemplates/biline_pinyin.dict.yaml" \
+  "$ROOT_DIR/Sources/BilineRime/Resources/RimeTemplates/biline_phrases.dict.yaml" \
+  "$ROOT_DIR/Sources/BilineRime/Resources/RimeTemplates/biline_modern_phrases.dict.yaml"; do
   if [[ -f "$file" ]]; then
     ditto "$file" "$APP_RIME_DATA/$(basename "$file")"
   fi

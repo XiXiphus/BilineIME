@@ -1,4 +1,5 @@
 import AppKit
+import BilineCore
 import BilineOperations
 import BilinePreview
 import BilineSettings
@@ -41,6 +42,7 @@ final class BilineSettingsModel: ObservableObject {
     @Published var expandedRowCount = 5
     @Published var fuzzyPinyinEnabled = false
     @Published var characterForm: CharacterForm = .simplified
+    @Published var punctuationForm: PunctuationForm = .fullwidth
     @Published var previewEnabled = true
     @Published var imeInstalled = false
     @Published var imeRunning = false
@@ -54,6 +56,7 @@ final class BilineSettingsModel: ObservableObject {
     @Published var lifecycleRecommendation = "未知"
     @Published var lifecyclePlanText = ""
     @Published var characterFormDefaultsRawValue = ""
+    @Published var punctuationFormDefaultsRawValue = ""
     @Published var imeInstallPath = BilineAppPath.devInputMethodInstallURL.path
     @Published var credentialFileStatus = BilineCredentialFileStatus(
         fileURL: BilineAppPath.credentialFileURL(
@@ -72,7 +75,10 @@ final class BilineSettingsModel: ObservableObject {
     }
 
     var rimeUserDictionaryURL: URL {
-        BilineAppPath.rimeUserDictionaryURL(inputMethodBundleIdentifier: imeBundleID)
+        BilineAppPath.rimeUserDictionaryURL(
+            inputMethodBundleIdentifier: imeBundleID,
+            characterForm: characterForm.rawValue
+        )
     }
 
     var credentialFileURL: URL {
@@ -120,6 +126,19 @@ final class BilineSettingsModel: ObservableObject {
         characterFormDefaultsRawValue.isEmpty ? "未保存，默认简体" : characterFormDefaultsRawValue
     }
 
+    var punctuationFormTitle: String {
+        switch punctuationForm {
+        case .fullwidth:
+            return "全角"
+        case .halfwidth:
+            return "半角"
+        }
+    }
+
+    var punctuationFormDefaultsStatus: String {
+        punctuationFormDefaultsRawValue.isEmpty ? "未保存，默认全角" : punctuationFormDefaultsRawValue
+    }
+
     func refresh() {
         let lifecycleSnapshot = lifecycleDiagnostics.snapshot()
         loadDefaults()
@@ -135,6 +154,7 @@ final class BilineSettingsModel: ObservableObject {
         lifecycleRecommendation = lifecycleSnapshot.recommendedRepairText
         lifecyclePlanText = lifecyclePlanner.plan(level: .level1).rendered
         characterFormDefaultsRawValue = lifecycleSnapshot.characterFormDefaultsRawValue
+        punctuationFormDefaultsRawValue = lifecycleSnapshot.punctuationFormDefaultsRawValue
         imeInstallPath = lifecycleSnapshot.imeInstallPath
         imeInstalled = lifecycleSnapshot.imeInstalled
         imeRunning = lifecycleSnapshot.imeRunning
@@ -185,6 +205,7 @@ final class BilineSettingsModel: ObservableObject {
         defaultsStore.set(compactColumnCount, forKey: BilineDefaultsKey.compactColumnCount)
         defaultsStore.set(expandedRowCount, forKey: BilineDefaultsKey.expandedRowCount)
         defaultsStore.set(characterForm.rawValue, forKey: BilineDefaultsKey.characterForm)
+        defaultsStore.set(punctuationForm.rawValue, forKey: BilineDefaultsKey.punctuationForm)
         defaultsStore.synchronize()
         refresh()
     }
@@ -265,6 +286,10 @@ final class BilineSettingsModel: ObservableObject {
             CharacterForm(
                 rawValue: defaultsStore.string(forKey: BilineDefaultsKey.characterForm) ?? "")
             ?? .simplified
+        punctuationForm =
+            PunctuationForm(
+                rawValue: defaultsStore.string(forKey: BilineDefaultsKey.punctuationForm) ?? "")
+            ?? .fullwidth
         compactColumnCount = resolvedInteger(
             forKey: BilineDefaultsKey.compactColumnCount, fallback: 5)
         expandedRowCount = resolvedInteger(forKey: BilineDefaultsKey.expandedRowCount, fallback: 5)

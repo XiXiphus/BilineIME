@@ -29,6 +29,19 @@ struct RimeSettings: Sendable, Equatable {
     let pageSize: Int
     let fuzzyPinyinEnabled: Bool
     let characterForm: CharacterForm
+
+    var schemaID: String {
+        switch characterForm {
+        case .simplified:
+            return "biline_pinyin_simp"
+        case .traditional:
+            return "biline_pinyin_trad"
+        }
+    }
+
+    var userDictionaryName: String {
+        schemaID
+    }
 }
 
 private enum RimeDefaults {
@@ -70,19 +83,18 @@ final class RimeRuntime: @unchecked Sendable {
             throw RimeError.setupFailed(Self.lastError())
         }
 
-        let schemaPath = resolvedPaths.sharedDataDir
-            .appendingPathComponent("biline_pinyin.schema.yaml")
-            .path
-        guard BRimeDeploySchema(schemaPath) else {
-            throw RimeError.deployFailed(Self.lastError())
+        for schemaFileName in ["biline_pinyin_simp.schema.yaml", "biline_pinyin_trad.schema.yaml"] {
+            let schemaPath = resolvedPaths.sharedDataDir
+                .appendingPathComponent(schemaFileName)
+                .path
+            guard BRimeDeploySchema(schemaPath) else {
+                throw RimeError.deployFailed(Self.lastError())
+            }
         }
 
-        tokenizer = try PinyinTokenizer.fromDictionaryFile(
-            at: resolvedPaths.sharedDataDir.appendingPathComponent("luna_pinyin.dict.yaml")
-        )
+        tokenizer = PinyinTokenizer(syllables: [])
         lexicon = try RimeLexicon.fromDictionaryFiles(
             at: [
-                resolvedPaths.sharedDataDir.appendingPathComponent("luna_pinyin.dict.yaml"),
                 resolvedPaths.sharedDataDir.appendingPathComponent("rime_ice.dict.yaml"),
                 resolvedPaths.sharedDataDir.appendingPathComponent("cn_dicts/8105.dict.yaml"),
                 resolvedPaths.sharedDataDir.appendingPathComponent("cn_dicts/base.dict.yaml"),
@@ -128,7 +140,6 @@ final class RimeRuntime: @unchecked Sendable {
             ("ascii_mode", false),
             ("full_shape", false),
             ("ascii_punct", false),
-            ("zh_trad", settings.characterForm == .traditional),
         ]
 
         for (optionName, enabled) in requiredOptions {
@@ -141,7 +152,7 @@ final class RimeRuntime: @unchecked Sendable {
     func makeTokenizer(settings: RimeSettings) throws -> PinyinTokenizer {
         try prepare(settings: settings)
         guard let tokenizer else {
-            throw RimeError.missingResource("luna_pinyin.dict.yaml")
+            throw RimeError.missingResource("pinyin.yaml")
         }
         return tokenizer
     }
@@ -224,8 +235,23 @@ private struct RimePaths {
         try fileManager.createDirectory(at: userDataDir, withIntermediateDirectories: true)
         try fileManager.createDirectory(at: logDir, withIntermediateDirectories: true)
 
+        try removeObsoleteSharedData(using: fileManager)
         try copyBundledData()
         try writeCustomConfig(settings: settings)
+    }
+
+    private func removeObsoleteSharedData(using fileManager: FileManager) throws {
+        for relativePath in [
+            "luna_pinyin.dict.yaml",
+            "essay.txt",
+            "biline_pinyin.schema.yaml",
+            "cn_dicts/41448.dict.yaml",
+        ] {
+            let url = sharedDataDir.appendingPathComponent(relativePath)
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
+            }
+        }
     }
 
     private func copyBundledData() throws {
@@ -241,11 +267,7 @@ private struct RimePaths {
 
         let vendorFiles = [
             RimeDataFile(
-                relativePath: "luna_pinyin.dict.yaml",
-                repoRelativePath: "rime-luna-pinyin/luna_pinyin.dict.yaml"),
-            RimeDataFile(
                 relativePath: "pinyin.yaml", repoRelativePath: "rime-luna-pinyin/pinyin.yaml"),
-            RimeDataFile(relativePath: "essay.txt", repoRelativePath: "rime-essay/essay.txt"),
             RimeDataFile(
                 relativePath: "rime_ice.dict.yaml", repoRelativePath: "rime-ice/rime_ice.dict.yaml"),
             RimeDataFile(
@@ -282,7 +304,8 @@ private struct RimePaths {
 
         for (resourceName, ext) in [
             ("default", "yaml"),
-            ("biline_pinyin.schema", "yaml"),
+            ("biline_pinyin_simp.schema", "yaml"),
+            ("biline_pinyin_trad.schema", "yaml"),
             ("biline_pinyin.dict", "yaml"),
             ("biline_phrases.dict", "yaml"),
             ("biline_modern_phrases.dict", "yaml"),
@@ -332,8 +355,6 @@ private struct RimePaths {
             [
                 "patch:",
                 "  menu/page_size: \(max(1, settings.pageSize))",
-                "  switches/@0/reset: \(settings.characterForm == .traditional ? 1 : 0)",
-                "  zh_trad/option_name: zh_trad",
                 "  speller/algebra:",
                 "    __patch:",
                 "      - pinyin:/abbreviation",
@@ -342,7 +363,7 @@ private struct RimePaths {
             ] + fuzzyPatches
 
         let contents = lines.joined(separator: "\n") + "\n"
-        let url = userDataDir.appendingPathComponent("biline_pinyin.custom.yaml")
+        let url = userDataDir.appendingPathComponent("\(settings.schemaID).custom.yaml")
         try contents.write(to: url, atomically: true, encoding: .utf8)
     }
 

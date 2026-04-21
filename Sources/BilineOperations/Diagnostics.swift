@@ -41,11 +41,22 @@ public struct DevEnvironmentDiagnostics {
             !fileManager.fileExists(atPath: $0.path)
         }
         let hasHitoolbox = hitoolbox.contains("io.github.xixiphus.inputmethod.BilineIME")
-        let rimeUserDB = BilineAppPath.rimeUserDictionaryURL(
-            inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle)
         let characterFormRaw =
             BilineDefaultsStore(domain: BilineAppIdentifier.devInputMethodBundle)
             .string(forKey: BilineDefaultsKey.characterForm) ?? ""
+        let punctuationFormRaw =
+            BilineDefaultsStore(domain: BilineAppIdentifier.devInputMethodBundle)
+            .string(forKey: BilineDefaultsKey.punctuationForm) ?? ""
+        let resolvedCharacterForm = characterFormRaw.isEmpty ? "simplified" : characterFormRaw
+        let schemaID = BilineAppPath.rimeSchemaID(characterForm: resolvedCharacterForm)
+        let userDictionaryName = BilineAppPath.rimeUserDictionaryName(
+            characterForm: resolvedCharacterForm)
+        let activeRimeUserDB = BilineAppPath.rimeUserDictionaryURL(
+            inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle,
+            characterForm: resolvedCharacterForm
+        )
+        let runtimeResourceURL = paths.devInputMethodInstallURL
+            .appendingPathComponent("Contents/Resources/RimeRuntime/rime-data", isDirectory: true)
 
         return DevEnvironmentSnapshot(
             imeInstallPath: paths.devInputMethodInstallURL.path,
@@ -61,9 +72,13 @@ public struct DevEnvironmentDiagnostics {
             currentInputSource: currentSource,
             credentialFilePath: credentialStatus.fileURL.path,
             credentialFileComplete: credentialStatus.isComplete,
-            rimeUserDictionaryPath: rimeUserDB.path,
-            rimeUserDictionaryExists: fileManager.fileExists(atPath: rimeUserDB.path),
+            rimeUserDictionaryPath: activeRimeUserDB.path,
+            rimeUserDictionaryExists: fileManager.fileExists(atPath: activeRimeUserDB.path),
             characterFormDefaultsRawValue: characterFormRaw,
+            punctuationFormDefaultsRawValue: punctuationFormRaw,
+            rimeSchemaID: schemaID,
+            rimeUserDictionaryName: userDictionaryName,
+            rimeRuntimeResourceCount: resourceCount(at: runtimeResourceURL),
             recommendedRepairLevel: recommendedRepairLevel(
                 settingsPathCount: settingsPathCount,
                 imePathCount: imePathCount,
@@ -94,7 +109,13 @@ public struct DevEnvironmentDiagnostics {
             "credential_file_complete=\(snapshot.credentialFileComplete)",
             "rime_userdb=\(snapshot.rimeUserDictionaryPath)",
             "rime_userdb_exists=\(snapshot.rimeUserDictionaryExists)",
+            "character_form=\(snapshot.characterFormDefaultsRawValue.isEmpty ? "simplified" : snapshot.characterFormDefaultsRawValue)",
             "character_form_default=\(snapshot.characterFormDefaultsRawValue.isEmpty ? "<unset>" : snapshot.characterFormDefaultsRawValue)",
+            "punctuation_form=\(snapshot.punctuationFormDefaultsRawValue.isEmpty ? "fullwidth" : snapshot.punctuationFormDefaultsRawValue)",
+            "punctuation_form_default=\(snapshot.punctuationFormDefaultsRawValue.isEmpty ? "<unset>" : snapshot.punctuationFormDefaultsRawValue)",
+            "rime_schema_id=\(snapshot.rimeSchemaID)",
+            "rime_userdb_name=\(snapshot.rimeUserDictionaryName)",
+            "rime_runtime_resource_count=\(snapshot.rimeRuntimeResourceCount)",
             "recommended_repair=\(snapshot.recommendedRepairText)",
             "manual_host_gate=required",
         ].joined(separator: "\n")
@@ -112,6 +133,27 @@ public struct DevEnvironmentDiagnostics {
     private func isProcessRunning(_ processName: String) -> Bool {
         ((try? runner.run("/usr/bin/pgrep", ["-x", processName], allowFailure: true).status) ?? 1)
             == 0
+    }
+
+    private func resourceCount(at url: URL) -> Int {
+        guard
+            let enumerator = fileManager.enumerator(
+                at: url,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )
+        else {
+            return 0
+        }
+
+        var count = 0
+        for case let fileURL as URL in enumerator {
+            let values = try? fileURL.resourceValues(forKeys: [.isRegularFileKey])
+            if values?.isRegularFile == true {
+                count += 1
+            }
+        }
+        return count
     }
 
     private func recommendedRepairLevel(

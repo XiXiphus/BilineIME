@@ -1,7 +1,8 @@
 config_version: "0.2"
 
 schema_list:
-  - schema: biline_pinyin
+  - schema: biline_pinyin_simp
+  - schema: biline_pinyin_trad
 
 menu:
   page_size: 25

@@ -244,7 +244,7 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
-    func testEqualPhysicalKeyStillPassesThroughWhenNotComposing() {
+    func testEqualPhysicalKeyUsesBilinePunctuationWhenNotComposing() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
             isComposing: false,
@@ -263,7 +263,7 @@ final class InputControllerEventRouterTests: XCTestCase {
                 ),
                 state: state
             ),
-            .passThrough
+            .insertText("＝")
         )
     }
 
@@ -574,7 +574,67 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
-    func testHyphenPassesThroughWhenNotComposing() {
+    func testFullwidthPunctuationIsInsertedWhenNotComposing() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5,
+            punctuationForm: .fullwidth
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 43,
+                    characters: ",",
+                    charactersIgnoringModifiers: ","
+                ),
+                state: state
+            ),
+            .insertText("，")
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 29,
+                    characters: ")",
+                    charactersIgnoringModifiers: "0"
+                ),
+                state: state
+            ),
+            .insertText("）")
+        )
+    }
+
+    func testHalfwidthPunctuationIsInsertedWhenNotComposing() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5,
+            punctuationForm: .halfwidth
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 43,
+                    characters: ",",
+                    charactersIgnoringModifiers: ","
+                ),
+                state: state
+            ),
+            .insertText(",")
+        )
+    }
+
+    func testHyphenUsesBilinePunctuationWhenNotComposing() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
             isComposing: false,
@@ -593,7 +653,7 @@ final class InputControllerEventRouterTests: XCTestCase {
                 ),
                 state: state
             ),
-            .passThrough
+            .insertText("－")
         )
     }
     func testAsciiLettersNormalizeToLowercasePinyinInput() {

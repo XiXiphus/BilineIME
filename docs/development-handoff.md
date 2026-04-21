@@ -117,7 +117,8 @@ are easy to leak from a public project workflow.
 
 ```bash
 make build-settings
-open "$HOME/Library/Caches/BilineIME/DerivedData/Build/Products/Debug/BilineSettingsDev.app"
+make install-settings-dev
+open "$HOME/Applications/BilineSettingsDev.app"
 ```
 
 The settings app writes key material to:
@@ -139,6 +140,16 @@ The CLI helper writes the same local credential file for development:
 ```bash
 make configure-aliyun-credentials
 ```
+
+Do not launch `BilineSettingsDev.app` from DerivedData. A valid dev install has:
+
+```text
+~/Library/Input Methods/BilineIMEDev.app
+~/Applications/BilineSettingsDev.app
+```
+
+Use `make diagnose-dev-apps` when app registration, current input source, or
+credential status is unclear.
 
 Check credential presence without printing secrets:
 

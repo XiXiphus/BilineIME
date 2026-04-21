@@ -1,7 +1,10 @@
 #!/bin/bash
 set -euo pipefail
 
-DOMAIN="${BILINE_DEFAULTS_DOMAIN:-io.github.xixiphus.inputmethod.BilineIME.dev}"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+source "$ROOT_DIR/scripts/ime-paths.sh"
+
+DOMAIN="${BILINE_DEFAULTS_DOMAIN:-$DEV_BUNDLE_ID}"
 DEFAULT_REGION="cn-hangzhou"
 DEFAULT_ENDPOINT="https://mt.cn-hangzhou.aliyuncs.com"
 CREDENTIAL_FILE="${BILINE_CREDENTIAL_FILE:-$HOME/Library/Containers/$DOMAIN/Data/Library/Application Support/BilineIME/alibaba-credentials.json}"

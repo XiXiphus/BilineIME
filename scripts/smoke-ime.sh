@@ -396,23 +396,36 @@ expect_host_text_stable() {
   done
 }
 
-expect_host_text_ascii() {
+expect_host_text_translated() {
+  local raw_input="$1"
   local attempts="${1:-50}"
   local actual=""
   local index
 
+  if [[ "$raw_input" =~ ^[0-9]+$ ]]; then
+    attempts="$raw_input"
+    raw_input=""
+  else
+    attempts="${2:-50}"
+  fi
+
   for ((index = 0; index < attempts; index++)); do
     actual="$(read_host_text)"
-    if [[ -n "$actual" && "$actual" =~ [A-Za-z] ]]; then
+    local trimmed_actual="${actual//$'\n'/}"
+    if [[ -n "$trimmed_actual" && "$trimmed_actual" =~ [A-Za-z] && "$trimmed_actual" != "$raw_input" ]]; then
       return 0
     fi
     sleep 0.1
   done
 
   LAST_FAILURE_KIND="translation-preview-not-ready"
-  LAST_FAILURE_DETAIL="expected_non_empty_ascii_host actual=${actual:-<empty>}"
-  echo "expected non-empty ASCII host text, got [${actual:-<empty>}]" >&2
+  LAST_FAILURE_DETAIL="expected_translated_host raw_input=${raw_input:-<none>} actual=${actual:-<empty>}"
+  echo "expected translated host text for [${raw_input:-<none>}], got [${actual:-<empty>}]" >&2
   return 1
+}
+
+expect_host_text_ascii() {
+  expect_host_text_translated "" "${1:-50}"
 }
 
 write_prepare_result() {
@@ -695,7 +708,7 @@ probe_phrase_hao_ping_guo_english() {
   sleep 1.2
   expect_field activeLayer english || return 1
   smoke_key space
-  expect_host_text 'good apple' || return 1
+  expect_host_text 'Good apple' || return 1
   expect_field isComposing false || return 1
 }
 
@@ -712,7 +725,7 @@ probe_phrase_ni_hao_english() {
   sleep 1.2
   expect_field activeLayer english || return 1
   smoke_key space
-  expect_host_text 'hello' || return 1
+  expect_host_text 'Hello' || return 1
   expect_field isComposing false || return 1
 }
 
@@ -809,7 +822,7 @@ probe_aliyun_preview_nihao() {
   expect_field activeLayer english || return 1
   sleep 1.6
   smoke_key space
-  expect_host_text_ascii 50 || return 1
+  expect_host_text_translated nihao 50 || return 1
 }
 
 probe_aliyun_preview_haopingguo() {
@@ -818,7 +831,7 @@ probe_aliyun_preview_haopingguo() {
   expect_field activeLayer english || return 1
   sleep 1.6
   smoke_key space
-  expect_host_text_ascii 50 || return 1
+  expect_host_text_translated haopingguo 50 || return 1
 }
 
 probe_candidate_list_nihao() {

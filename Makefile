@@ -5,7 +5,7 @@ SETTINGS_SCHEME := BilineSettingsDev
 DERIVED_DATA := $(HOME)/Library/Caches/BilineIME/DerivedData
 CONFIGURATION ?= Debug
 
-.PHONY: bootstrap project test build-ime build-ime-release build-settings install-ime uninstall-ime reset-ime repair-ime package-release package-internal diagnose-ime diagnose-ime-dev diagnose-ime-release configure-aliyun-credentials aliyun-credentials-status smoke-ime smoke-ime-aliyun smoke-ime-release verify-ime format verify
+.PHONY: bootstrap project test build-ime build-ime-release build-settings install-settings-dev install-ime uninstall-ime reset-ime reset-dev-apps repair-ime package-release package-internal diagnose-ime diagnose-ime-dev diagnose-ime-release diagnose-dev-apps configure-aliyun-credentials aliyun-credentials-status smoke-ime smoke-ime-aliyun smoke-ime-release verify-ime format verify
 
 bootstrap:
 	brew install xcodegen swift-format cmake boost
@@ -26,6 +26,9 @@ build-ime-release: project
 build-settings: project
 	xcodebuild -project $(PROJECT_NAME).xcodeproj -scheme $(SETTINGS_SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) build
 
+install-settings-dev:
+	./scripts/install-settings-dev.sh
+
 install-ime:
 	./scripts/install-ime-dev.sh
 
@@ -35,6 +38,9 @@ uninstall-ime:
 reset-ime:
 	./scripts/uninstall-ime.sh
 	./scripts/install-ime-dev.sh
+
+reset-dev-apps:
+	./scripts/reset-dev-apps.sh
 
 repair-ime:
 	./scripts/repair-ime.sh $(REPAIR_LEVEL)
@@ -52,6 +58,9 @@ diagnose-ime-dev:
 
 diagnose-ime-release:
 	./scripts/diagnose-ime.sh release
+
+diagnose-dev-apps:
+	./scripts/diagnose-dev-apps.sh
 
 configure-aliyun-credentials:
 	./scripts/configure-aliyun-credentials.sh configure

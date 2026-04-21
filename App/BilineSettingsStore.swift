@@ -1,4 +1,5 @@
 import BilinePreview
+import BilineSettings
 import Foundation
 
 struct DefaultSettingsStore: SettingsStore {
@@ -15,10 +16,10 @@ struct DefaultSettingsStore: SettingsStore {
 
     init(
         targetLanguage: TargetLanguage = .english,
-        previewEnabled: Bool = Self.boolDefault(forKey: "BilinePreviewEnabled") ?? true,
-        compactColumnCount: Int = Self.integerDefault(forKey: "BilineCompactColumnCount") ?? 5,
-        expandedRowCount: Int = Self.integerDefault(forKey: "BilineExpandedRowCount") ?? 5,
-        fuzzyPinyinEnabled: Bool = Self.boolDefault(forKey: "BilineFuzzyPinyinEnabled") ?? false,
+        previewEnabled: Bool = Self.boolDefault(forKey: BilineDefaultsKey.previewEnabled) ?? true,
+        compactColumnCount: Int = Self.integerDefault(forKey: BilineDefaultsKey.compactColumnCount) ?? 5,
+        expandedRowCount: Int = Self.integerDefault(forKey: BilineDefaultsKey.expandedRowCount) ?? 5,
+        fuzzyPinyinEnabled: Bool = Self.boolDefault(forKey: BilineDefaultsKey.fuzzyPinyinEnabled) ?? false,
         characterForm: CharacterForm = .simplified
     ) {
         self.targetLanguage = targetLanguage

@@ -1,5 +1,6 @@
 import AppKit
 import BilinePreview
+import BilineSettings
 import Carbon
 import Combine
 import Foundation
@@ -20,14 +21,15 @@ enum TranslationProviderChoice: String, CaseIterable, Identifiable {
 
 @MainActor
 final class BilineSettingsModel: ObservableObject {
-    static let devInputSourceID = "io.github.xixiphus.inputmethod.BilineIME.dev.pinyin"
+    static let devInputSourceID = BilineAppIdentifier.devInputSource
 
-    private let defaultsDomain = "io.github.xixiphus.inputmethod.BilineIME.dev"
-    private let imeBundleID = "io.github.xixiphus.inputmethod.BilineIME.dev"
-    private var credentialFileStore: AlibabaCredentialFileStore {
-        AlibabaCredentialFileStore(
-            fileURL: AlibabaCredentialFileStore.defaultURL(inputMethodBundleIdentifier: imeBundleID)
-        )
+    private let defaultsDomain = BilineAppIdentifier.devInputMethodBundle
+    private let imeBundleID = BilineAppIdentifier.devInputMethodBundle
+    private var defaultsStore: BilineDefaultsStore {
+        BilineDefaultsStore(domain: defaultsDomain)
+    }
+    private var credentialFileStore: BilineCredentialFileStore {
+        BilineCredentialFileStore(inputMethodBundleIdentifier: imeBundleID)
     }
 
     @Published var provider: TranslationProviderChoice = .off
@@ -40,15 +42,22 @@ final class BilineSettingsModel: ObservableObject {
     @Published var imeInstalled = false
     @Published var imeRunning = false
     @Published var currentInputSource = ""
-    @Published var credentialFileStatus = AlibabaCredentialFileStatus(accessKeyIdLength: nil, accessKeySecretLength: nil)
+    @Published var settingsAppPath = ""
+    @Published var settingsRegisteredPaths: [String] = []
+    @Published var imeInstallPath = BilineAppPath.devInputMethodInstallURL.path
+    @Published var credentialFileStatus = BilineCredentialFileStatus(
+        fileURL: BilineAppPath.credentialFileURL(inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle),
+        accessKeyIdLength: nil,
+        accessKeySecretLength: nil,
+        loadError: .missing
+    )
     @Published var credentialSaveStatus = ""
     @Published var connectionTestStatus = ""
     @Published var connectionTestSucceeded = false
     @Published var isTestingConnection = false
 
     var rimeUserDirectory: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Containers/\(imeBundleID)/Data/Library/Application Support/Rime", isDirectory: true)
+        BilineAppPath.rimeUserDirectory(inputMethodBundleIdentifier: imeBundleID)
     }
 
     var credentialFileURL: URL {
@@ -74,6 +83,9 @@ final class BilineSettingsModel: ObservableObject {
             if credentialFileStatus.isComplete {
                 return "已保存到本机输入法容器"
             }
+            if let error = credentialFileStatus.loadError, error != .missing {
+                return "凭据文件不可读"
+            }
             return "需要保存 AccessKey"
         } else {
             return "英文预览不会调用云翻译"
@@ -83,11 +95,13 @@ final class BilineSettingsModel: ObservableObject {
     func refresh() {
         loadDefaults()
         credentialFileStatus = credentialFileStore.status()
-        imeInstalled = FileManager.default.fileExists(
-            atPath: FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Input Methods/BilineIMEDev.app", isDirectory: true)
-                .path
-        )
+        settingsAppPath = Bundle.main.bundleURL.path
+        settingsRegisteredPaths = NSWorkspace.shared
+            .urlsForApplications(withBundleIdentifier: BilineAppIdentifier.devSettingsBundle)
+            .map(\.path)
+            .sorted()
+        imeInstallPath = BilineAppPath.devInputMethodInstallURL.path
+        imeInstalled = FileManager.default.fileExists(atPath: imeInstallPath)
         imeRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: imeBundleID).isEmpty
         currentInputSource = currentKeyboardInputSourceID()
     }
@@ -101,7 +115,7 @@ final class BilineSettingsModel: ObservableObject {
         if !trimmedAccessKeyId.isEmpty && !trimmedAccessKeySecret.isEmpty {
             do {
                 try credentialFileStore.save(
-                    AlibabaCredentialFileRecord(
+                    BilineAlibabaCredentialRecord(
                         accessKeyId: trimmedAccessKeyId,
                         accessKeySecret: trimmedAccessKeySecret,
                         regionId: region.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -118,19 +132,19 @@ final class BilineSettingsModel: ObservableObject {
             credentialSaveStatus = "已保存设置"
         }
 
-        setDefault(provider.rawValue, forKey: "BilineTranslationProvider")
-        setDefault(region.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "BilineAlibabaRegionId")
-        setDefault(endpoint.trimmingCharacters(in: .whitespacesAndNewlines), forKey: "BilineAlibabaEndpoint")
-        synchronizeDefaults()
+        defaultsStore.set(provider.rawValue, forKey: BilineDefaultsKey.translationProvider)
+        defaultsStore.set(region.trimmingCharacters(in: .whitespacesAndNewlines), forKey: BilineDefaultsKey.alibabaRegionId)
+        defaultsStore.set(endpoint.trimmingCharacters(in: .whitespacesAndNewlines), forKey: BilineDefaultsKey.alibabaEndpoint)
+        defaultsStore.synchronize()
         refresh()
     }
 
     func saveInputSettings() {
-        setDefault(fuzzyPinyinEnabled, forKey: "BilineFuzzyPinyinEnabled")
-        setDefault(previewEnabled, forKey: "BilinePreviewEnabled")
-        setDefault(compactColumnCount, forKey: "BilineCompactColumnCount")
-        setDefault(expandedRowCount, forKey: "BilineExpandedRowCount")
-        synchronizeDefaults()
+        defaultsStore.set(fuzzyPinyinEnabled, forKey: BilineDefaultsKey.fuzzyPinyinEnabled)
+        defaultsStore.set(previewEnabled, forKey: BilineDefaultsKey.previewEnabled)
+        defaultsStore.set(compactColumnCount, forKey: BilineDefaultsKey.compactColumnCount)
+        defaultsStore.set(expandedRowCount, forKey: BilineDefaultsKey.expandedRowCount)
+        defaultsStore.synchronize()
         refresh()
     }
 
@@ -143,16 +157,16 @@ final class BilineSettingsModel: ObservableObject {
         Task {
             defer { Task { @MainActor in self.isTestingConnection = false } }
             do {
-                guard let credentials = credentialFileStore.load()?.credentials else {
-                    await setConnectionResult("需要保存 AccessKey", success: false)
-                    return
-                }
+                let record = try credentialFileStore.load()
                 guard let endpointURL = URL(string: endpoint) else {
                     await setConnectionResult("Endpoint 无效", success: false)
                     return
                 }
                 let provider = AlibabaMachineTranslationProvider(
-                    credentials: credentials,
+                    credentials: AlibabaMachineTranslationCredentials(
+                        accessKeyId: record.accessKeyId,
+                        accessKeySecret: record.accessKeySecret
+                    ),
                     configuration: AlibabaMachineTranslationConfiguration(
                         endpoint: endpointURL,
                         regionId: region
@@ -165,6 +179,14 @@ final class BilineSettingsModel: ObservableObject {
                 await setConnectionResult("鉴权失败：\(code)", success: false)
             } catch AlibabaMachineTranslationError.throttled(let code, _) {
                 await setConnectionResult("请求受限：\(code)", success: false)
+            } catch BilineCredentialFileLoadError.missing {
+                await setConnectionResult("需要保存 AccessKey", success: false)
+            } catch BilineCredentialFileLoadError.unreadable,
+                BilineCredentialFileLoadError.decodingFailed
+            {
+                await setConnectionResult("凭据文件不可读", success: false)
+            } catch let error as URLError {
+                await setConnectionResult("网络失败：\(error.code.rawValue)", success: false)
             } catch {
                 await setConnectionResult("请求失败", success: false)
             }
@@ -185,50 +207,19 @@ final class BilineSettingsModel: ObservableObject {
     }
 
     private func loadDefaults() {
-        let providerRaw = stringDefault(forKey: "BilineTranslationProvider") ?? TranslationProviderChoice.off.rawValue
+        let providerRaw = defaultsStore.string(forKey: BilineDefaultsKey.translationProvider) ?? TranslationProviderChoice.off.rawValue
         provider = TranslationProviderChoice(rawValue: providerRaw) ?? .off
-        region = stringDefault(forKey: "BilineAlibabaRegionId") ?? "cn-hangzhou"
-        endpoint = stringDefault(forKey: "BilineAlibabaEndpoint") ?? "https://mt.cn-hangzhou.aliyuncs.com"
-        fuzzyPinyinEnabled = boolDefault(forKey: "BilineFuzzyPinyinEnabled") ?? false
-        compactColumnCount = resolvedInteger(forKey: "BilineCompactColumnCount", fallback: 5)
-        expandedRowCount = resolvedInteger(forKey: "BilineExpandedRowCount", fallback: 5)
-        previewEnabled = boolDefault(forKey: "BilinePreviewEnabled") ?? true
+        region = defaultsStore.string(forKey: BilineDefaultsKey.alibabaRegionId) ?? "cn-hangzhou"
+        endpoint = defaultsStore.string(forKey: BilineDefaultsKey.alibabaEndpoint) ?? "https://mt.cn-hangzhou.aliyuncs.com"
+        fuzzyPinyinEnabled = defaultsStore.bool(forKey: BilineDefaultsKey.fuzzyPinyinEnabled) ?? false
+        compactColumnCount = resolvedInteger(forKey: BilineDefaultsKey.compactColumnCount, fallback: 5)
+        expandedRowCount = resolvedInteger(forKey: BilineDefaultsKey.expandedRowCount, fallback: 5)
+        previewEnabled = defaultsStore.bool(forKey: BilineDefaultsKey.previewEnabled) ?? true
     }
 
     private func resolvedInteger(forKey key: String, fallback: Int) -> Int {
-        let value = integerDefault(forKey: key) ?? 0
+        let value = defaultsStore.integer(forKey: key) ?? 0
         return value > 0 ? value : fallback
-    }
-
-    private func stringDefault(forKey key: String) -> String? {
-        CFPreferencesCopyAppValue(key as CFString, defaultsDomain as CFString) as? String
-    }
-
-    private func boolDefault(forKey key: String) -> Bool? {
-        CFPreferencesCopyAppValue(key as CFString, defaultsDomain as CFString) as? Bool
-    }
-
-    private func integerDefault(forKey key: String) -> Int? {
-        if let number = CFPreferencesCopyAppValue(key as CFString, defaultsDomain as CFString) as? NSNumber {
-            return number.intValue
-        }
-        return nil
-    }
-
-    private func setDefault(_ value: String, forKey key: String) {
-        CFPreferencesSetAppValue(key as CFString, value as CFString, defaultsDomain as CFString)
-    }
-
-    private func setDefault(_ value: Bool, forKey key: String) {
-        CFPreferencesSetAppValue(key as CFString, value as CFBoolean, defaultsDomain as CFString)
-    }
-
-    private func setDefault(_ value: Int, forKey key: String) {
-        CFPreferencesSetAppValue(key as CFString, NSNumber(value: value), defaultsDomain as CFString)
-    }
-
-    private func synchronizeDefaults() {
-        CFPreferencesAppSynchronize(defaultsDomain as CFString)
     }
 
     private func setConnectionResult(_ message: String, success: Bool) async {

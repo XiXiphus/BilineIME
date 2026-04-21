@@ -160,11 +160,20 @@ struct StatusView: View {
                 SettingsRow(title: "输入法安装") {
                     StatusBadge(text: model.imeInstalled ? "已安装" : "未安装", isPositive: model.imeInstalled)
                 }
+                SettingsRow(title: "输入法路径", subtitle: model.imeInstallPath) {
+                    StatusBadge(text: model.imeInstalled ? "存在" : "缺失", isPositive: model.imeInstalled)
+                }
                 SettingsRow(title: "当前输入源", subtitle: model.currentInputSource) {
                     StatusBadge(text: model.currentInputSource == BilineSettingsModel.devInputSourceID ? "BilineIME Dev" : "未选择", isPositive: model.currentInputSource == BilineSettingsModel.devInputSourceID)
                 }
                 SettingsRow(title: "输入法进程") {
                     StatusBadge(text: model.imeRunning ? "运行中" : "未运行", isPositive: model.imeRunning)
+                }
+                SettingsRow(title: "设置 App 路径", subtitle: model.settingsAppPath) {
+                    StatusBadge(text: model.settingsAppPath.contains("/Applications/") ? "稳定路径" : "临时路径", isPositive: model.settingsAppPath.contains("/Applications/"))
+                }
+                SettingsRow(title: "LaunchServices 注册", subtitle: model.settingsRegisteredPaths.joined(separator: "\n")) {
+                    StatusBadge(text: model.settingsRegisteredPaths.count == 1 ? "单一路径" : "\(model.settingsRegisteredPaths.count) 个路径", isPositive: model.settingsRegisteredPaths.count == 1)
                 }
                 SettingsRow(title: "翻译服务", subtitle: model.translationStatusText) {
                     StatusBadge(text: model.provider == .aliyun ? "阿里云" : "关闭", isPositive: model.provider == .aliyun)

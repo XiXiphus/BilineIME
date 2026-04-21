@@ -35,6 +35,8 @@ targetTemplates:
       - package: BilineModules
         product: BilineRime
       - package: BilineModules
+        product: BilineSettings
+      - package: BilineModules
         product: BilineSession
       - package: BilineModules
         product: BilineMocks
@@ -71,6 +73,8 @@ targetTemplates:
     dependencies:
       - package: BilineModules
         product: BilinePreview
+      - package: BilineModules
+        product: BilineSettings
     info:
       path: Companion/Support/Info.plist
       properties:

@@ -1,21 +1,16 @@
+import BilineSettings
 import BilinePreview
 import Foundation
 import OSLog
 
 enum TranslationProviderFactory {
-    private enum DefaultsKey {
-        static let provider = "BilineTranslationProvider"
-        static let regionId = "BilineAlibabaRegionId"
-        static let endpoint = "BilineAlibabaEndpoint"
-    }
-
     static func configuredProvider() -> (any TranslationProvider)? {
         guard selectedProvider == "aliyun" else { return nil }
         return FileBackedAlibabaTranslationProvider()
     }
 
     static var selectedProvider: String? {
-        UserDefaults.standard.string(forKey: DefaultsKey.provider)?
+        defaultsStore.string(forKey: BilineDefaultsKey.translationProvider)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
     }
@@ -33,22 +28,24 @@ enum TranslationProviderFactory {
 
     fileprivate static func makeAlibabaProvider() -> AlibabaMachineTranslationProvider? {
         let localRecord = AlibabaCredentialResolver.localCredentialRecord()
-        guard let credentials = localRecord?.credentials else {
+        guard let localRecord else {
             return nil
         }
 
-        let defaults = UserDefaults.standard
-        let regionId = normalized(defaults.string(forKey: DefaultsKey.regionId))
-            ?? normalized(localRecord?.regionId)
+        let regionId = normalized(defaultsStore.string(forKey: BilineDefaultsKey.alibabaRegionId))
+            ?? normalized(localRecord.regionId)
             ?? "cn-hangzhou"
-        let endpointString = normalized(defaults.string(forKey: DefaultsKey.endpoint))
-            ?? normalized(localRecord?.endpoint)
+        let endpointString = normalized(defaultsStore.string(forKey: BilineDefaultsKey.alibabaEndpoint))
+            ?? normalized(localRecord.endpoint)
         let endpoint = endpointString
             .flatMap(URL.init(string:))
             ?? URL(string: "https://mt.cn-hangzhou.aliyuncs.com")!
 
         return AlibabaMachineTranslationProvider(
-            credentials: credentials,
+            credentials: AlibabaMachineTranslationCredentials(
+                accessKeyId: localRecord.accessKeyId,
+                accessKeySecret: localRecord.accessKeySecret
+            ),
             configuration: AlibabaMachineTranslationConfiguration(
                 endpoint: endpoint,
                 regionId: regionId
@@ -60,6 +57,12 @@ enum TranslationProviderFactory {
         guard let value else { return nil }
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static var defaultsStore: BilineDefaultsStore {
+        BilineDefaultsStore(
+            domain: Bundle.main.bundleIdentifier ?? BilineAppIdentifier.devInputMethodBundle
+        )
     }
 }
 
@@ -82,7 +85,7 @@ struct FileBackedAlibabaTranslationProvider: BatchTranslationProvider {
 
     func translateBatch(_ texts: [String], target: TargetLanguage) async throws -> [String: String] {
         guard let provider = TranslationProviderFactory.makeAlibabaProvider() else {
-            logger.error("Alibaba provider unavailable: credential file could not be loaded for bundle=\(Bundle.main.bundleIdentifier ?? "<missing>", privacy: .public)")
+            logger.error("Alibaba provider unavailable: credential file could not be loaded for bundle=\(Bundle.main.bundleIdentifier ?? "<missing>", privacy: .public) path=\(BilineAppPath.inputMethodRuntimeCredentialFileURL().path, privacy: .public)")
             throw UnavailableTranslationProviderError.notConfigured
         }
         do {
@@ -97,10 +100,10 @@ struct FileBackedAlibabaTranslationProvider: BatchTranslationProvider {
 }
 
 enum AlibabaCredentialResolver {
-    static func localCredentialRecord() -> AlibabaCredentialFileRecord? {
-        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
-        let fileURL = AlibabaCredentialFileStore.defaultURL(inputMethodBundleIdentifier: bundleIdentifier)
-        return AlibabaCredentialFileStore(fileURL: fileURL).load()
+    static func localCredentialRecord() -> BilineAlibabaCredentialRecord? {
+        BilineCredentialFileStore(
+            fileURL: BilineAppPath.inputMethodRuntimeCredentialFileURL()
+        ).loadIfAvailable()
     }
 }
 

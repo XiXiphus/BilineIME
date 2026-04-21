@@ -71,7 +71,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
     }
 
     func moveSelection(_ direction: SelectionDirection) -> CompositionSnapshot {
-        let current = fetchSnapshot()
+        var current = fetchSnapshot()
+        defer { BRimeFreeSnapshot(&current) }
         guard current.candidateCount > 0 else {
             return makeSnapshot(rawInput: rawInput)
         }
@@ -89,7 +90,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
             return makeSnapshot(rawInput: rawInput)
         }
 
-        let newPage = fetchSnapshot()
+        var newPage = fetchSnapshot()
+        defer { BRimeFreeSnapshot(&newPage) }
         guard newPage.candidateCount > 0 else {
             return makeSnapshot(rawInput: rawInput)
         }

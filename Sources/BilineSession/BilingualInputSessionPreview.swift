@@ -105,12 +105,7 @@ extension BilingualInputSession {
                 previewTasks.removeValue(forKey: candidateID)
             }
 
-            if candidate.id == currentSelectedCandidateID {
-                publishSnapshot()
-            } else {
-                currentSnapshot = makeSnapshot()
-                onSnapshotUpdate?(currentSnapshot)
-            }
+            publishSnapshot()
         }
     }
 

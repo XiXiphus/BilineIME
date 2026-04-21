@@ -8,7 +8,21 @@ extension BilingualInputSession {
 
     func withStateLock<T>(_ body: () throws -> T) rethrows -> T {
         stateLock.lock()
-        defer { stateLock.unlock() }
+        lockDepth += 1
+        defer {
+            lockDepth -= 1
+            let snapshotToFire: BilingualCompositionSnapshot?
+            if lockDepth == 0, hasPendingNotification {
+                hasPendingNotification = false
+                snapshotToFire = currentSnapshot
+            } else {
+                snapshotToFire = nil
+            }
+            stateLock.unlock()
+            if let snapshotToFire {
+                onSnapshotUpdate?(snapshotToFire)
+            }
+        }
         return try body()
     }
 

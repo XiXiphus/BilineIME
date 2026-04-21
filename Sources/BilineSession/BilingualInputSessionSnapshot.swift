@@ -90,7 +90,7 @@ extension BilingualInputSession {
 
     func publishSnapshot() {
         currentSnapshot = makeSnapshot()
-        onSnapshotUpdate?(currentSnapshot)
+        hasPendingNotification = true
     }
 
     func rowCount(for candidates: [Candidate]) -> Int {

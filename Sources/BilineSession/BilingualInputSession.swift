@@ -29,6 +29,9 @@ public final class BilingualInputSession: @unchecked Sendable {
     var previewTasks: [String: Task<Void, Never>] = [:]
     let sessionID = UUID()
 
+    var lockDepth = 0
+    var hasPendingNotification = false
+
     public init(
         settingsStore: any SettingsStore,
         engineFactory: any CandidateEngineFactory,

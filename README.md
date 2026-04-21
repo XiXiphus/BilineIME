@@ -1,18 +1,56 @@
-# BilineIME
+<div align="center">
+  <br />
+  <img width="112" alt="BilineIME logo" src="https://github.com/user-attachments/assets/93da38f4-0a86-4ba3-8c33-29ad3645cc1b" />
+  <h1>BilineIME</h1>
+  <p>
+    <strong>A macOS Chinese input method for bilingual drafting.</strong>
+  </p>
+  <p>
+    Type Chinese. Preview English. Commit the layer you mean.
+  </p>
+  <p>
+    <a href="#development"><img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111111?style=for-the-badge&logo=apple&logoColor=white" /></a>
+    <a href="#architecture"><img alt="InputMethodKit" src="https://img.shields.io/badge/InputMethodKit-native-1f6feb?style=for-the-badge" /></a>
+    <a href="#current-capabilities"><img alt="Rime powered" src="https://img.shields.io/badge/Rime-powered-0f766e?style=for-the-badge" /></a>
+    <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-2f2f2f?style=for-the-badge" /></a>
+  </p>
+</div>
 
-![BilineIME logo](https://github.com/user-attachments/assets/93da38f4-0a86-4ba3-8c33-29ad3645cc1b)
+<table>
+  <tr>
+    <td align="center" width="33%">
+      <strong>Chinese first</strong><br />
+      Rime-backed candidates stay the source of truth.
+    </td>
+    <td align="center" width="33%">
+      <strong>Live preview</strong><br />
+      English suggestions update asynchronously while typing stays responsive.
+    </td>
+    <td align="center" width="33%">
+      <strong>Layer commit</strong><br />
+      Switch between Chinese and English output without leaving composition.
+    </td>
+  </tr>
+</table>
 
-**A macOS Chinese input method for bilingual drafting.**
+<p align="center">
+  <strong>Pre-release:</strong> BilineIME is under active stabilization. Core
+  behavior and deployment come before feature expansion.
+</p>
 
-Type Chinese. Preview English. Commit the layer you mean.
+<br />
 
-Experimental · macOS · InputMethodKit · GPL-3.0
-
-⚠️ **Note:** BilineIME is currently under active, intensive development. We are focusing on core stabilization and deployment pipelines before expanding features.
-
----
-
-![BilineIME running in TextEdit](docs/assets/readme-mode1-textedit.png)
+<table>
+  <tr>
+    <td align="center">
+      <a href="docs/assets/readme-mode1-textedit.png">
+        <img width="960" alt="BilineIME custom bilingual candidate panel running in TextEdit" src="docs/assets/readme-mode1-textedit.png" />
+      </a>
+      <br />
+      <sub>Real TextEdit smoke screenshot: Chinese candidates above English preview rows.</sub>
+    </td>
+  </tr>
+</table>
 
 ## What It Does
 

@@ -25,6 +25,32 @@ final class BilineSettingsModel: ObservableObject {
     @Published var characterForm: CharacterForm = .simplified
     @Published var punctuationForm: PunctuationForm = .fullwidth
     @Published var previewEnabled = true
+
+    // Phase 0: key bindings + appearance.
+    @Published var keyBindings: KeyBindingPolicy = .default
+    @Published var panelThemeMode: PanelThemeMode = .system
+    @Published var panelFontScale: Double = 1.0
+    @Published var keyBindingsSaveStatus = ""
+    @Published var appearanceSaveStatus = ""
+
+    // Phase 2: composing helpers.
+    @Published var autoPairBrackets = false
+    @Published var slashAsChineseEnumeration = false
+    @Published var autoSpaceBetweenChineseAndAscii = false
+    @Published var normalizeNumericColon = false
+    @Published var composingHelpersSaveStatus = ""
+
+    // Phase 3: per-context.
+    @Published var offlineMode = false
+    @Published var englishDefaultBundleIDs: [String] = []
+    @Published var perAppSaveStatus = ""
+
+    // Phase 4: engine-side toggles. Persisted now; behavior change is a
+    // separate milestone (Rime schema work for smart spelling, emoji
+    // lexicon for the candidate source).
+    @Published var smartSpellingEnabled = false
+    @Published var emojiCandidatesEnabled = false
+    @Published var engineExtrasSaveStatus = ""
     @Published var imeInstalled = false
     @Published var imeRunning = false
     @Published var rimeUserDictionaryExists = false

@@ -31,12 +31,13 @@ final class BilineInputController: IMKInputController {
         let timestamp: TimeInterval
     }
 
+    private let settingsStore: LiveSettingsStore
     private let inputSession: BilingualInputSession
     private let characterForm: CharacterForm
     private let punctuationForm: PunctuationForm
     private let candidatePanel: BilineCandidatePanelController
     private let textInputBridge = BilineTextInputBridge()
-    private let eventRouter = InputControllerEventRouter()
+    private let eventRouter: InputControllerEventRouter
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
         category: "input-controller"
@@ -56,9 +57,11 @@ final class BilineInputController: IMKInputController {
     private var didLogFirstComposingSnapshot = false
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
-        let settingsStore = DefaultSettingsStore()
+        let settingsStore = AppSettingsStore.make()
+        self.settingsStore = settingsStore
         self.characterForm = settingsStore.characterForm
         self.punctuationForm = settingsStore.punctuationForm
+        self.eventRouter = InputControllerEventRouter(keyBindings: settingsStore.keyBindings)
         #if DEBUG
             let smokePreviewDelay = SmokeDefaults.milliseconds(
                 forKey: SmokeDefaults.previewDelayMs,
@@ -134,6 +137,51 @@ final class BilineInputController: IMKInputController {
                 return
             }
             self.render(client: client, snapshot: snapshot)
+        }
+
+        // Push the initial snapshot into the panel and subscribe for live
+        // updates so theme/font/keybindings the user changes in the Settings
+        // app take effect without restarting the IME. We capture the
+        // dependencies by reference (router/panel are both Sendable) so the
+        // closure does not need to retain the controller itself.
+        applyLiveSettings(settingsStore.snapshot)
+        settingsStore.onChange = { [eventRouter, candidatePanel, inputSession] snapshot in
+            eventRouter.keyBindings = snapshot.keyBindings
+            candidatePanel.applyTheme(
+                PanelTheme(mode: snapshot.panelThemeMode, fontScale: snapshot.panelFontScale)
+            )
+            inputSession.postCommitPipeline = PostCommitPipelineBuilder.build(from: snapshot)
+            if let bundleID = inputSession.hostBundleID,
+                snapshot.englishDefaultBundleIDs.contains(bundleID)
+            {
+                inputSession.preferredDefaultLayer = .english
+            } else {
+                inputSession.preferredDefaultLayer = .chinese
+            }
+        }
+    }
+
+    /// Forwards a settings snapshot into the components that need it. Engine-
+    /// affecting fields (`pageSize`, `compactColumnCount`, `expandedRowCount`,
+    /// `fuzzyPinyinEnabled`) are deliberately NOT pushed here: changing them
+    /// mid-composition would invalidate the live engine session, so they take
+    /// effect on the next IME launch (or, in a future milestone, on the next
+    /// idle composition boundary).
+    private func applyLiveSettings(_ snapshot: SettingsSnapshot) {
+        eventRouter.keyBindings = snapshot.keyBindings
+        candidatePanel.applyTheme(
+            PanelTheme(mode: snapshot.panelThemeMode, fontScale: snapshot.panelFontScale)
+        )
+        inputSession.postCommitPipeline = PostCommitPipelineBuilder.build(from: snapshot)
+        // Refresh the per-host preferred layer for the currently-focused
+        // client so toggling the override list in Settings takes effect
+        // without requiring a client refocus.
+        if let bundleID = inputSession.hostBundleID,
+            snapshot.englishDefaultBundleIDs.contains(bundleID)
+        {
+            inputSession.preferredDefaultLayer = .english
+        } else {
+            inputSession.preferredDefaultLayer = .chinese
         }
     }
 
@@ -241,6 +289,15 @@ final class BilineInputController: IMKInputController {
         return handled
     }
 
+    override func activateServer(_ sender: Any!) {
+        super.activateServer(sender)
+        // Pick up any settings the user changed in the Settings app while the
+        // IME was in another client. The refresh is cheap (one CFPreferences
+        // synchronize plus a struct comparison) and stays off the keystroke
+        // hot path.
+        settingsStore.refresh()
+    }
+
     override func deactivateServer(_ sender: Any!) {
         textInputBridge.hide(candidatePanel: candidatePanel)
         if let client = activeClient as? IMKTextInput {
@@ -264,6 +321,7 @@ final class BilineInputController: IMKInputController {
             textInputBridge.clearAnchorCache()
             textInputBridge.hide(candidatePanel: candidatePanel)
         }
+        settingsStore.refresh()
     }
 
     private func commitSelection(using client: IMKTextInput) -> Bool {
@@ -487,6 +545,26 @@ final class BilineInputController: IMKInputController {
         eventRouter.reset()
         lastHandledKeySignature = nil
         didLogFirstComposingSnapshot = false
+
+        // Capture the new host so the post-commit pipeline can read its
+        // bundle ID without each transform reaching back through IMK on
+        // every commit. `bundleIdentifier()` is only on `IMKTextInput`,
+        // hence the conditional cast.
+        let bundleID = (clientObject as? IMKTextInput)?.bundleIdentifier()
+        inputSession.hostBundleID = bundleID
+
+        // Phase 3: per-app default English layer. We resolve the preferred
+        // layer once on switch instead of querying settings on every
+        // resetCompositionState, so the session's hot path stays
+        // settings-store-free.
+        let snapshot = settingsStore.snapshot
+        if let bundleID,
+            snapshot.englishDefaultBundleIDs.contains(bundleID)
+        {
+            inputSession.preferredDefaultLayer = .english
+        } else {
+            inputSession.preferredDefaultLayer = .chinese
+        }
     }
 
     #if DEBUG

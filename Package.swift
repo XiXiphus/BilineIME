@@ -51,7 +51,8 @@ let package = Package(
             dependencies: ["BilineCore", "BilinePreview"]
         ),
         .target(
-            name: "BilineSettings"
+            name: "BilineSettings",
+            dependencies: ["BilineCore", "BilinePreview"]
         ),
         .target(
             name: "BilineOperations",
@@ -82,7 +83,7 @@ let package = Package(
         ),
         .testTarget(
             name: "BilineHostTests",
-            dependencies: ["BilineHost"]
+            dependencies: ["BilineHost", "BilineCore"]
         ),
         .testTarget(
             name: "BilinePreviewTests",
@@ -94,7 +95,7 @@ let package = Package(
         ),
         .testTarget(
             name: "BilineSettingsTests",
-            dependencies: ["BilineSettings"]
+            dependencies: ["BilineSettings", "BilineCore"]
         ),
         .testTarget(
             name: "BilineOperationsTests",

@@ -1,15 +1,16 @@
 import BilineCore
+import Foundation
 
 extension BilingualInputSession {
     public func commitSelection() -> String? {
         withStateLock {
-            commitSelection(for: activeLayer)
+            commitSelection(for: activeLayer).map { applyPostCommitPipeline(to: $0) }
         }
     }
 
     public func commitChineseSelection() -> String? {
         withStateLock {
-            commitSelection(for: .chinese)
+            commitSelection(for: .chinese).map { applyPostCommitPipeline(to: $0) }
         }
     }
 
@@ -23,12 +24,40 @@ extension BilingualInputSession {
             }
             advanceCompositionRevision()
             resetCompositionState()
-            return committedText
+            return applyPostCommitPipeline(to: committedText)
         }
     }
 
     public func renderCommittedText(_ text: String) -> String {
-        PunctuationPolicy.renderCommittedText(text, form: settingsStore.punctuationForm)
+        let rendered = PunctuationPolicy.renderCommittedText(text, form: settingsStore.punctuationForm)
+        return applyPostCommitPipeline(to: rendered)
+    }
+
+    /// Runs the configured `PostCommitPipeline` against `text` and updates
+    /// the session's "last commit" memory so the next call sees this commit
+    /// in its `PostCommitContext`. Empty pipeline short-circuits to keep the
+    /// hot path free of allocations when no transforms are configured.
+    func applyPostCommitPipeline(to text: String) -> String {
+        let context = PostCommitContext(
+            lastCommittedText: lastCommitTextForPipeline,
+            lastCommitTimestamp: lastCommitTimestampForPipeline,
+            hostBundleID: hostBundleID,
+            punctuationForm: settingsStore.punctuationForm,
+            commitHistory: commitHistoryForPipeline
+        )
+        let result = postCommitPipeline.isEmpty
+            ? text
+            : postCommitPipeline.apply(text, context: context)
+        if !result.isEmpty {
+            lastCommitTextForPipeline = result
+            lastCommitTimestampForPipeline = Date()
+            commitHistoryForPipeline.append(result)
+            let limit = PostCommitContext.commitHistoryLimit
+            if commitHistoryForPipeline.count > limit {
+                commitHistoryForPipeline.removeFirst(commitHistoryForPipeline.count - limit)
+            }
+        }
+        return result
     }
 
     private func commitSelection(for layer: ActiveLayer) -> String? {

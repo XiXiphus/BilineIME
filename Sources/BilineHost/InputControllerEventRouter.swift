@@ -2,7 +2,14 @@ import BilineCore
 import Foundation
 
 public final class InputControllerEventRouter: @unchecked Sendable {
-    public init() {}
+    /// Mutable so the controller can hot-swap the policy when settings
+    /// change without rebuilding the router. Default keeps existing behavior
+    /// for tests and for IMEs that have not configured anything yet.
+    public var keyBindings: KeyBindingPolicy
+
+    public init(keyBindings: KeyBindingPolicy = .default) {
+        self.keyBindings = keyBindings
+    }
 
     public func reset() {}
 
@@ -16,6 +23,10 @@ public final class InputControllerEventRouter: @unchecked Sendable {
 
         if event.modifierFlags.contains(.command) {
             return .passThrough
+        }
+
+        if let candidateAction = candidateChordSelection(for: event, state: state) {
+            return candidateAction
         }
 
         if let rowAction = rowBrowseAction(for: event, state: state) {

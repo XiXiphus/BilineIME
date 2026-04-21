@@ -3,7 +3,11 @@ import SwiftUI
 private enum SettingsSection: String, CaseIterable, Identifiable {
     case status
     case translation
-    case input
+    case inputEngine
+    case keyBindings
+    case appearance
+    case composingHelpers
+    case perApp
 
     var id: String { rawValue }
 
@@ -11,7 +15,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .status: "状态"
         case .translation: "翻译"
-        case .input: "输入"
+        case .inputEngine: "输入引擎"
+        case .keyBindings: "按键"
+        case .appearance: "外观"
+        case .composingHelpers: "输入辅助"
+        case .perApp: "应用与单机模式"
         }
     }
 
@@ -19,7 +27,11 @@ private enum SettingsSection: String, CaseIterable, Identifiable {
         switch self {
         case .status: "checkmark.circle"
         case .translation: "globe"
-        case .input: "keyboard"
+        case .inputEngine: "keyboard"
+        case .keyBindings: "command"
+        case .appearance: "paintpalette"
+        case .composingHelpers: "wand.and.stars"
+        case .perApp: "macwindow"
         }
     }
 }
@@ -52,8 +64,16 @@ struct SettingsRootView: View {
             StatusView(model: model)
         case .translation:
             TranslationSettingsView(model: model)
-        case .input:
-            InputSettingsView(model: model)
+        case .inputEngine:
+            InputEngineSettingsView(model: model)
+        case .keyBindings:
+            KeyBindingSettingsView(model: model)
+        case .appearance:
+            AppearanceSettingsView(model: model)
+        case .composingHelpers:
+            ComposingHelpersSettingsView(model: model)
+        case .perApp:
+            PerAppSettingsView(model: model)
         }
     }
 }

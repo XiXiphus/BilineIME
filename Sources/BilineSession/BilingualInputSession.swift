@@ -16,10 +16,33 @@ public final class BilingualInputSession: @unchecked Sendable {
     public internal(set) var hasEverExpandedInCurrentComposition = false
     public internal(set) var hasExplicitCandidateSelection = false
 
+    /// Bundle identifier of the host app that owns the active client. Set
+    /// by the controller on client switch; consumed by the post-commit
+    /// pipeline so transforms can branch on host (e.g., per-app overrides).
+    public var hostBundleID: String?
+    /// Pipeline applied to every committed text just before it leaves the
+    /// session. Defaults to empty so behavior is unchanged for callers that
+    /// do not opt in.
+    public var postCommitPipeline: PostCommitPipeline = .empty
+    /// Layer the session falls back to whenever composition resets (cancel,
+    /// commit, deactivate). The controller flips this to `.english` when
+    /// the focused host app is in the per-app overrides list, so subsequent
+    /// compositions in that host start in English.
+    public var preferredDefaultLayer: ActiveLayer = .chinese
+
     let stateLock = NSRecursiveLock()
     let settingsStore: any SettingsStore
     let previewCoordinator: PreviewCoordinator
     var engineSession: any CandidateEngineSession
+
+    /// Most recent (text, timestamp) the pipeline saw. Transforms key off
+    /// this to detect "did the previous commit just happen and need a
+    /// follow-up space?" without reaching back into the session.
+    var lastCommitTextForPipeline: String?
+    var lastCommitTimestampForPipeline: Date?
+    /// Bounded chronological history for multi-step pattern detection. See
+    /// `PostCommitContext.commitHistoryLimit`.
+    var commitHistoryForPipeline: [String] = []
 
     var currentSnapshot: BilingualCompositionSnapshot = .idle
     var engineSnapshot: CompositionSnapshot = .idle

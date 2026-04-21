@@ -11,6 +11,8 @@ final class BilineCandidatePanelView: NSView {
         }
     }
 
+    private(set) var theme: PanelTheme = PanelTheme()
+
     override var isFlipped: Bool { true }
 
     let contentInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
@@ -21,10 +23,31 @@ final class BilineCandidatePanelView: NSView {
     let segmentPadding = NSEdgeInsets(top: 5, left: 6, bottom: 5, right: 6)
     let minimumColumnWidth: CGFloat = 28
     let segmentBreathingRoom: CGFloat = 2
-    let chineseFont = NSFont.systemFont(ofSize: 16, weight: .semibold)
-    let englishFont = NSFont.systemFont(ofSize: 13, weight: .regular)
+    private let baseChineseFontSize: CGFloat = 16
+    private let baseEnglishFontSize: CGFloat = 13
+    var chineseFont: NSFont {
+        NSFont.systemFont(ofSize: baseChineseFontSize * theme.clampedFontScale, weight: .semibold)
+    }
+    var englishFont: NSFont {
+        NSFont.systemFont(ofSize: baseEnglishFontSize * theme.clampedFontScale, weight: .regular)
+    }
     let fallbackFontResolver = SystemFallbackFontResolver()
     private var lineSizeCache: [CandidatePanelLineSizeKey: NSSize] = [:]
+
+    func applyTheme(_ theme: PanelTheme) {
+        guard self.theme != theme else { return }
+        let fontScaleChanged = self.theme.clampedFontScale != theme.clampedFontScale
+        self.theme = theme
+        if fontScaleChanged {
+            lineSizeCache.removeAll()
+        }
+        if let appearance = theme.appearance() {
+            self.appearance = appearance
+        } else {
+            self.appearance = nil
+        }
+        needsDisplay = true
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         drawSnapshot()

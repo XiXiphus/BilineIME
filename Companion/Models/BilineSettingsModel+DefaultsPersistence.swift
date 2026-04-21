@@ -38,6 +38,36 @@ extension BilineSettingsModel {
             forKey: BilineDefaultsKey.compactColumnCount, fallback: 5)
         expandedRowCount = resolvedInteger(forKey: BilineDefaultsKey.expandedRowCount, fallback: 5)
         previewEnabled = defaultsStore.bool(forKey: BilineDefaultsKey.previewEnabled) ?? true
+        keyBindings = KeyBindingDefaults.load(from: defaultsStore)
+        if let raw = defaultsStore.string(forKey: BilineDefaultsKey.panelThemeMode),
+            let mode = PanelThemeMode(rawValue: raw)
+        {
+            panelThemeMode = mode
+        } else {
+            panelThemeMode = .system
+        }
+        if let scale = defaultsStore.double(forKey: BilineDefaultsKey.panelFontScale), scale > 0 {
+            panelFontScale = scale
+        } else {
+            panelFontScale = 1.0
+        }
+        autoPairBrackets =
+            defaultsStore.bool(forKey: BilineDefaultsKey.autoPairBrackets) ?? false
+        slashAsChineseEnumeration =
+            defaultsStore.bool(forKey: BilineDefaultsKey.slashAsChineseEnumeration) ?? false
+        autoSpaceBetweenChineseAndAscii =
+            defaultsStore.bool(forKey: BilineDefaultsKey.autoSpaceBetweenChineseAndAscii) ?? false
+        normalizeNumericColon =
+            defaultsStore.bool(forKey: BilineDefaultsKey.normalizeNumericColon) ?? false
+        offlineMode = defaultsStore.bool(forKey: BilineDefaultsKey.offlineMode) ?? false
+        englishDefaultBundleIDs =
+            defaultsStore.stringArray(forKey: BilineDefaultsKey.englishDefaultBundleIDs)
+            .map { $0.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty } }
+            ?? []
+        smartSpellingEnabled =
+            defaultsStore.bool(forKey: BilineDefaultsKey.smartSpellingEnabled) ?? false
+        emojiCandidatesEnabled =
+            defaultsStore.bool(forKey: BilineDefaultsKey.emojiCandidatesEnabled) ?? false
     }
 
     func saveTranslationDefaults() {

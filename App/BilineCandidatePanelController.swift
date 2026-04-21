@@ -64,4 +64,28 @@ final class BilineCandidatePanelController: @unchecked Sendable {
         lastFrame = .zero
         lastWindowLevelRawValue = nil
     }
+
+    /// Applies a new theme to the contained view. Layout-affecting changes
+    /// (font scale) invalidate the panel's intrinsic size cache; visual-only
+    /// changes (mode) just trigger a redraw. Safe to call from any thread;
+    /// hops to main internally.
+    ///
+    /// When the panel is currently visible we also resize and re-show it so
+    /// font-scale changes take effect immediately without waiting for the
+    /// next keystroke. The anchor stays where it last was (we deliberately
+    /// don't requery the host) because the host may not have a marked-text
+    /// anchor available at this moment.
+    nonisolated func applyTheme(_ theme: PanelTheme) {
+        MainThreadExecutor.sync {
+            self.contentView.applyTheme(theme)
+            guard self.isVisible else { return }
+            let newSize = self.contentView.preferredSize
+            let origin = self.lastFrame.origin
+            let newFrame = NSRect(origin: origin, size: newSize)
+            if newFrame != self.lastFrame {
+                self.panel.setFrame(newFrame, display: true)
+                self.lastFrame = newFrame
+            }
+        }
+    }
 }

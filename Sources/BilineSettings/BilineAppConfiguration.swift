@@ -15,6 +15,47 @@ public enum BilineDefaultsKey {
     public static let fuzzyPinyinEnabled = "BilineFuzzyPinyinEnabled"
     public static let characterForm = "BilineCharacterForm"
     public static let punctuationForm = "BilinePunctuationForm"
+    /// Stored as a JSON blob (Data) — see `KeyBindingPolicy.encode()`.
+    public static let keyBindingPolicy = "BilineKeyBindingPolicy"
+    /// Panel theme mode (see `PanelTheme.Mode.rawValue`).
+    public static let panelThemeMode = "BilinePanelThemeMode"
+    /// Panel font scale multiplier, stored as Double.
+    public static let panelFontScale = "BilinePanelFontScale"
+
+    // Phase 2 composing helpers.
+    /// When enabled, committing an opening bracket also commits the matching
+    /// closing bracket. Caret stays after both because IMK does not let the
+    /// IME push the cursor backwards through the host text storage.
+    public static let autoPairBrackets = "BilineAutoPairBrackets"
+    /// When enabled, `/` is rewritten to `、` (ideographic enumeration mark)
+    /// in Chinese punctuation mode.
+    public static let slashAsChineseEnumeration = "BilineSlashAsChineseEnumeration"
+    /// When enabled, an ASCII letter or digit committed right after a
+    /// Chinese character (and vice versa) is prefixed with a thin space.
+    public static let autoSpaceBetweenChineseAndAscii = "BilineAutoSpaceBetweenChineseAndAscii"
+    /// When enabled, a colon committed inside a `digit colon space digit`
+    /// sequence collapses the spaces (e.g. `12: 00` -> `12:00`).
+    public static let normalizeNumericColon = "BilineNormalizeNumericColon"
+
+    // Phase 3 per-context.
+    /// When enabled, all network-backed preview/translation calls are
+    /// suppressed regardless of `previewEnabled`. Settings UI exposes this
+    /// as 单机模式.
+    public static let offlineMode = "BilineOfflineMode"
+    /// Stored as `[String]` (CFArray of CFString). Bundle identifiers in
+    /// this list start each new composition in the English layer instead of
+    /// Chinese.
+    public static let englishDefaultBundleIDs = "BilineEnglishDefaultBundleIDs"
+
+    // Phase 4 (engine-side, behavior in follow-up milestones).
+    /// Toggle for Rime's `spelling_corrector` filter. The Swift IME stores
+    /// the user's preference here; activating the actual filter is a Rime
+    /// schema-side change tracked as a separate milestone.
+    public static let smartSpellingEnabled = "BilineSmartSpellingEnabled"
+    /// Toggle for emoji candidate injection. Stored ahead of the engine
+    /// integration so the Settings UI can land first; the actual candidate
+    /// merge is Phase 4 engine work.
+    public static let emojiCandidatesEnabled = "BilineEmojiCandidatesEnabled"
 }
 
 public enum BilineAppIdentifier {
@@ -139,6 +180,22 @@ public struct BilineDefaultsStore: Sendable {
         return nil
     }
 
+    public func double(forKey key: String) -> Double? {
+        if let number = CFPreferencesCopyAppValue(key as CFString, domain as CFString) as? NSNumber
+        {
+            return number.doubleValue
+        }
+        return nil
+    }
+
+    public func data(forKey key: String) -> Data? {
+        CFPreferencesCopyAppValue(key as CFString, domain as CFString) as? Data
+    }
+
+    public func stringArray(forKey key: String) -> [String]? {
+        CFPreferencesCopyAppValue(key as CFString, domain as CFString) as? [String]
+    }
+
     public func set(_ value: String, forKey key: String) {
         CFPreferencesSetAppValue(key as CFString, value as CFString, domain as CFString)
     }
@@ -149,6 +206,18 @@ public struct BilineDefaultsStore: Sendable {
 
     public func set(_ value: Int, forKey key: String) {
         CFPreferencesSetAppValue(key as CFString, NSNumber(value: value), domain as CFString)
+    }
+
+    public func set(_ value: Double, forKey key: String) {
+        CFPreferencesSetAppValue(key as CFString, NSNumber(value: value), domain as CFString)
+    }
+
+    public func set(_ value: Data, forKey key: String) {
+        CFPreferencesSetAppValue(key as CFString, value as CFData, domain as CFString)
+    }
+
+    public func set(_ value: [String], forKey key: String) {
+        CFPreferencesSetAppValue(key as CFString, value as CFArray, domain as CFString)
     }
 
     public func removeValue(forKey key: String) {

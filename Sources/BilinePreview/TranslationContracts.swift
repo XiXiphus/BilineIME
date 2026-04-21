@@ -30,4 +30,11 @@ public protocol SettingsStore: Sendable {
     var characterForm: CharacterForm { get }
     var punctuationForm: PunctuationForm { get }
     var pageSize: Int { get }
+    var keyBindings: KeyBindingPolicy { get }
+}
+
+extension SettingsStore {
+    /// Default policy keeps existing behavior for stores that have not
+    /// adopted user-configurable bindings yet (test stubs, demo fixtures).
+    public var keyBindings: KeyBindingPolicy { .default }
 }

@@ -68,7 +68,10 @@ extension BilingualInputSession {
     func resetCompositionState() {
         rawInput = ""
         engineSnapshot = engineSession.reset()
-        activeLayer = .chinese
+        // Honor the per-host preferred layer when starting a fresh
+        // composition. The controller updates `preferredDefaultLayer`
+        // whenever the active client (and therefore the host app) changes.
+        activeLayer = preferredDefaultLayer
         compositionMode = .candidateCompact
         hasEverExpandedInCurrentComposition = false
         hasExplicitCandidateSelection = false

@@ -1,3 +1,4 @@
+import BilineCore
 import BilineHost
 import XCTest
 
@@ -776,4 +777,92 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
+    // MARK: - KeyBindingPolicy integration
+
+    func testCustomCandidate2BindingFiresSelectColumn1WhileComposing() {
+        let policy = KeyBindingPolicy(bindings: [
+            .candidate2: [KeyChord(character: ";")],
+        ])
+        let router = InputControllerEventRouter(keyBindings: policy)
+        let composing = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 41,
+                    characters: ";",
+                    charactersIgnoringModifiers: ";"
+                ),
+                state: composing
+            ),
+            .selectColumn(1)
+        )
+    }
+
+    func testCustomCandidate3BindingFallsThroughWhenNotComposing() {
+        // Outside composition the same chord must NOT be eaten by the router;
+        // it should fall through to the standalone-punctuation handler so the
+        // host receives the literal character.
+        let policy = KeyBindingPolicy(bindings: [
+            .candidate3: [KeyChord(character: "'")],
+        ])
+        let router = InputControllerEventRouter(keyBindings: policy)
+        let idle = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        let action = router.route(
+            event: InputControllerEvent(
+                type: .keyDown,
+                keyCode: 39,
+                characters: "'",
+                charactersIgnoringModifiers: "'"
+            ),
+            state: idle
+        )
+
+        if case .selectColumn = action {
+            XCTFail("Candidate-selection chord must not fire while idle")
+        }
+    }
+
+    func testCustomNextRowBindingTriggersExpansion() {
+        // Remap nextRowOrPage to "." (period) instead of "=" and verify the
+        // router uses the new binding for compact-mode expansion. Existing
+        // bindings (=, ]) remain in defaults but the router should also
+        // accept the user override.
+        let policy = KeyBindingPolicy(bindings: [
+            .nextRowOrPage: [KeyChord(character: ".", keyCode: 47)],
+        ])
+        let router = InputControllerEventRouter(keyBindings: policy)
+        let compact = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 47,
+                    characters: ".",
+                    charactersIgnoringModifiers: "."
+                ),
+                state: compact
+            ),
+            .expandAndAdvanceRow
+        )
+    }
 }

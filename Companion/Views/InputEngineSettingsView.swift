@@ -1,11 +1,14 @@
 import BilineCore
 import SwiftUI
 
-struct InputSettingsView: View {
+/// Engine-side input settings: character form, punctuation form, fuzzy
+/// pinyin, and candidate matrix dimensions. These map directly onto
+/// settings the Rime engine and `BilingualInputSession` consume.
+struct InputEngineSettingsView: View {
     @ObservedObject var model: BilineSettingsModel
 
     var body: some View {
-        SettingsPage(title: "输入") {
+        SettingsPage(title: "输入引擎") {
             SettingsCard {
                 SettingsRow(title: "字形输出") {
                     Picker("", selection: $model.characterForm) {
@@ -45,6 +48,39 @@ struct InputSettingsView: View {
                     Button("保存输入设置") { model.saveInputSettings() }
                     if !model.inputSaveStatus.isEmpty {
                         Text(model.inputSaveStatus)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(20)
+            }
+
+            SettingsCard {
+                Text("引擎扩展（开发中）")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 14)
+                    .padding(.bottom, 4)
+
+                SettingsRow(
+                    title: "智能拼写纠错",
+                    subtitle: "切换 Rime spelling_corrector，需要后续 schema 切换才会真正生效"
+                ) {
+                    Toggle("", isOn: $model.smartSpellingEnabled).labelsHidden()
+                }
+                SettingsRow(
+                    title: "表情候选词",
+                    subtitle: "在候选词中混入常用表情/颜文字，候选源对接为后续里程碑"
+                ) {
+                    Toggle("", isOn: $model.emojiCandidatesEnabled).labelsHidden()
+                }
+
+                HStack {
+                    Button("保存") { model.saveEngineExtras() }
+                    Button("恢复默认") { model.resetEngineExtrasToDefault() }
+                    if !model.engineExtrasSaveStatus.isEmpty {
+                        Text(model.engineExtrasSaveStatus)
                             .foregroundStyle(.secondary)
                     }
                     Spacer()

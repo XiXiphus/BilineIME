@@ -157,7 +157,7 @@ final class BilineInputController: IMKInputController {
 
         let clientObject = client as AnyObject
         if activeClient !== clientObject {
-            textInputBridge.clearAnchorCache()
+            switchActiveClient(to: clientObject)
             activeClient = clientObject
         }
 
@@ -200,7 +200,7 @@ final class BilineInputController: IMKInputController {
 
         let clientObject = client as AnyObject
         if activeClient !== clientObject {
-            textInputBridge.clearAnchorCache()
+            switchActiveClient(to: clientObject)
             activeClient = clientObject
         }
 
@@ -242,12 +242,12 @@ final class BilineInputController: IMKInputController {
     }
 
     override func deactivateServer(_ sender: Any!) {
+        textInputBridge.hide(candidatePanel: candidatePanel)
         if let client = activeClient as? IMKTextInput {
             textInputBridge.clearComposition(in: client)
         }
         inputSession.cancel()
         textInputBridge.clearAnchorCache()
-        textInputBridge.hide(candidatePanel: candidatePanel)
         eventRouter.reset()
         lastHandledKeySignature = nil
         didLogFirstHandledKey = false
@@ -272,6 +272,8 @@ final class BilineInputController: IMKInputController {
             return inputSession.snapshot.isComposing
         }
 
+        textInputBridge.hide(candidatePanel: candidatePanel)
+        textInputBridge.clearAnchorCache()
         textInputBridge.insertCommittedText(committedText, into: client)
         #if DEBUG
             let snapshot = inputSession.snapshot
@@ -279,7 +281,6 @@ final class BilineInputController: IMKInputController {
                 "SMOKE_COMMIT committedText=\(self.smokeValue(committedText), privacy: .public) postCommitRawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public)"
             )
         #endif
-        textInputBridge.clearAnchorCache()
         render(client: client)
         return true
     }
@@ -383,6 +384,8 @@ final class BilineInputController: IMKInputController {
         case .toggleLayer:
             inputSession.toggleActiveLayer()
         case .commitChineseAndInsert(let text):
+            textInputBridge.hide(candidatePanel: candidatePanel)
+            textInputBridge.clearAnchorCache()
             let committedText = inputSession.commitChineseSelection()
             if let committedText, !committedText.isEmpty {
                 textInputBridge.insertCommittedText(committedText, into: client)
@@ -391,7 +394,6 @@ final class BilineInputController: IMKInputController {
                 inputSession.renderCommittedText(text),
                 into: client
             )
-            textInputBridge.clearAnchorCache()
             render(client: client)
             return true
         case .deleteBackward:
@@ -399,6 +401,7 @@ final class BilineInputController: IMKInputController {
         case .commit:
             return commitSelection(using: client)
         case .cancel:
+            textInputBridge.hide(candidatePanel: candidatePanel)
             inputSession.cancel()
             textInputBridge.clearAnchorCache()
         case .moveColumn(let direction):
@@ -438,6 +441,18 @@ final class BilineInputController: IMKInputController {
 
     private func rememberHandled(_ signature: RoutedKeySignature) {
         lastHandledKeySignature = signature
+    }
+
+    private func switchActiveClient(to clientObject: AnyObject) {
+        textInputBridge.hide(candidatePanel: candidatePanel)
+        if let previousClient = activeClient as? IMKTextInput {
+            textInputBridge.clearComposition(in: previousClient)
+        }
+        inputSession.cancel()
+        textInputBridge.clearAnchorCache()
+        eventRouter.reset()
+        lastHandledKeySignature = nil
+        didLogFirstComposingSnapshot = false
     }
 
     #if DEBUG

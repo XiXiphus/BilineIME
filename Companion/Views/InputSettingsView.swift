@@ -29,12 +29,6 @@ struct InputSettingsView: View {
                     Toggle("", isOn: $model.fuzzyPinyinEnabled)
                         .labelsHidden()
                 }
-                SettingsRow(title: "已保存字形", subtitle: "defaults: BilineCharacterForm") {
-                    StatusBadge(text: model.characterFormDefaultsStatus, isPositive: true)
-                }
-                SettingsRow(title: "已保存标点", subtitle: "defaults: BilinePunctuationForm") {
-                    StatusBadge(text: model.punctuationFormDefaultsStatus, isPositive: true)
-                }
                 SettingsRow(title: "候选列数") {
                     Stepper(value: $model.compactColumnCount, in: 1...5) {
                         Text("\(model.compactColumnCount)")
@@ -49,6 +43,10 @@ struct InputSettingsView: View {
                 }
                 HStack {
                     Button("保存输入设置") { model.saveInputSettings() }
+                    if !model.inputSaveStatus.isEmpty {
+                        Text(model.inputSaveStatus)
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
                 }
                 .padding(20)

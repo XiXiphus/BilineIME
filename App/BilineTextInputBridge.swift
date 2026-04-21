@@ -27,7 +27,7 @@ final class BilineTextInputBridge: @unchecked Sendable {
                 return
             }
 
-            guard let anchorRect = resolveAnchorRect(for: client) else {
+            guard let anchorRect = resolveAnchorRect(for: client, snapshot: snapshot) else {
                 if !didLogMissingAnchor {
                     didLogMissingAnchor = true
                     logger.info("Candidate panel hidden because anchor rect could not be resolved")
@@ -109,12 +109,36 @@ final class BilineTextInputBridge: @unchecked Sendable {
     }
 
     @MainActor
-    private func resolveAnchorRect(for client: IMKTextInput) -> NSRect? {
+    private func resolveAnchorRect(
+        for client: IMKTextInput,
+        snapshot: BilingualCompositionSnapshot
+    ) -> NSRect? {
         var lineHeightRect = NSRect.zero
         _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &lineHeightRect)
 
-        let resolved = anchorTracker.resolve(currentRect: CandidateAnchorRect(lineHeightRect))
+        let currentRect = trustedAnchorRect(lineHeightRect)
+        let context = CandidateAnchorContext(
+            clientID: String(ObjectIdentifier(client as AnyObject).hashValue),
+            revision: snapshot.revision
+        )
+        let resolved = anchorTracker.resolve(currentRect: currentRect, context: context)
         return resolved?.nsRect
+    }
+
+    @MainActor
+    private func trustedAnchorRect(_ rect: NSRect) -> CandidateAnchorRect? {
+        let anchorRect = CandidateAnchorRect(rect)
+        guard anchorRect.isValid else { return nil }
+        let probeRect = NSRect(
+            x: rect.minX,
+            y: rect.minY,
+            width: max(rect.width, 1),
+            height: max(rect.height, 1)
+        )
+        guard NSScreen.screens.contains(where: { $0.frame.intersects(probeRect) }) else {
+            return nil
+        }
+        return anchorRect
     }
 
     @MainActor
@@ -123,8 +147,8 @@ final class BilineTextInputBridge: @unchecked Sendable {
     }
 }
 
-private extension CandidateAnchorRect {
-    init(_ rect: NSRect) {
+extension CandidateAnchorRect {
+    fileprivate init(_ rect: NSRect) {
         self.init(
             x: rect.origin.x,
             y: rect.origin.y,
@@ -133,7 +157,7 @@ private extension CandidateAnchorRect {
         )
     }
 
-    var nsRect: NSRect {
+    fileprivate var nsRect: NSRect {
         NSRect(x: x, y: y, width: width, height: height)
     }
 }

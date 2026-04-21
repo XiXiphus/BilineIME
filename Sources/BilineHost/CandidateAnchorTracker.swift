@@ -18,20 +18,36 @@ public struct CandidateAnchorRect: Sendable, Equatable {
     }
 }
 
+public struct CandidateAnchorContext: Sendable, Equatable {
+    public let clientID: String
+    public let revision: Int
+
+    public init(clientID: String, revision: Int) {
+        self.clientID = clientID
+        self.revision = revision
+    }
+}
+
 public final class CandidateAnchorTracker: @unchecked Sendable {
     private var lastValidRect: CandidateAnchorRect?
+    private var lastContext: CandidateAnchorContext?
 
     public init() {}
 
-    public func resolve(currentRect: CandidateAnchorRect?) -> CandidateAnchorRect? {
+    public func resolve(
+        currentRect: CandidateAnchorRect?,
+        context: CandidateAnchorContext
+    ) -> CandidateAnchorRect? {
         if let currentRect, currentRect.isValid {
             lastValidRect = currentRect
+            lastContext = context
             return currentRect
         }
-        return lastValidRect
+        return lastContext == context ? lastValidRect : nil
     }
 
     public func clear() {
         lastValidRect = nil
+        lastContext = nil
     }
 }

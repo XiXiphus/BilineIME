@@ -5,6 +5,7 @@ extension BilingualInputSession {
         withStateLock {
             let normalized = normalize(text)
             guard !normalized.isEmpty else { return }
+            advanceCompositionRevision()
             rawInput.append(contentsOf: normalized)
             refreshCompositionState()
         }
@@ -13,6 +14,7 @@ extension BilingualInputSession {
     public func appendLiteral(text: String) {
         withStateLock {
             guard !text.isEmpty else { return }
+            advanceCompositionRevision()
             rawInput.append(contentsOf: text)
             refreshCompositionState()
         }
@@ -21,6 +23,7 @@ extension BilingualInputSession {
     public func deleteBackward() {
         withStateLock {
             guard !rawInput.isEmpty else { return }
+            advanceCompositionRevision()
             rawInput.removeLast()
             refreshCompositionState()
         }
@@ -28,6 +31,7 @@ extension BilingualInputSession {
 
     public func cancel() {
         withStateLock {
+            advanceCompositionRevision()
             resetCompositionState()
         }
     }

@@ -33,10 +33,12 @@ extension BilineCandidatePanelView {
         let widths = columnWidths()
         let rowCount = max(1, snapshot.visibleRowCount)
         let widestRowWidth = blockContentWidth(rowCount: rowCount, columnWidths: widths)
-        let width = contentInsets.left
+        let width =
+            contentInsets.left
             + widestRowWidth
             + contentInsets.right
-        let height = contentInsets.top
+        let height =
+            contentInsets.top
             + blockHeight(rowHeight: chineseRowHeight, rowCount: rowCount)
             + blockSpacing
             + blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
@@ -55,7 +57,8 @@ extension BilineCandidatePanelView {
 
     var rawBufferRowPreferredWidth: CGFloat {
         let textWidth = rawBufferLine(active: true).size().width
-        return rowInsets.left + textWidth + segmentPadding.left + segmentPadding.right + 4 + rowInsets.right
+        return rowInsets.left + textWidth + segmentPadding.left + segmentPadding.right + 4
+            + rowInsets.right
     }
 
     func blockHeight(rowHeight: CGFloat, rowCount: Int) -> CGFloat {
@@ -91,7 +94,8 @@ extension BilineCandidatePanelView {
     }
 
     func columnWidths() -> [CGFloat] {
-        let maxVisibleColumns = (0..<snapshot.visibleRowCount)
+        let maxVisibleColumns =
+            (0..<snapshot.visibleRowCount)
             .map { snapshot.items(inRow: $0).count }
             .max() ?? 0
         guard maxVisibleColumns > 0 else { return [] }
@@ -101,10 +105,11 @@ extension BilineCandidatePanelView {
         for column in 0..<maxVisibleColumns {
             for row in 0..<snapshot.visibleRowCount {
                 guard let item = snapshot.item(row: row, column: column) else { continue }
-                let chineseWidth = candidateLine(column: column, item: item, active: false).size().width
-                let englishWidth = englishLine(column: column, item: item, active: false).size().width
+                let chineseWidth = candidateLineSize(column: column, item: item).width
+                let englishWidth = englishLineSize(column: column, item: item).width
                 let contentWidth = ceil(max(chineseWidth, englishWidth))
-                let fittedWidth = contentWidth
+                let fittedWidth =
+                    contentWidth
                     + segmentPadding.left
                     + segmentPadding.right
                     + segmentBreathingRoom
@@ -139,7 +144,8 @@ extension BilineCandidatePanelView {
         }
 
         let rowRect = rowRect(in: blockRect, row: row, rowHeight: rowHeight)
-        let originX = rowRect.minX
+        let originX =
+            rowRect.minX
             + rowInsets.left
             + columnWidths.prefix(column).reduce(0, +)
             + CGFloat(column) * columnSpacing

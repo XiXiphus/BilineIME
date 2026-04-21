@@ -502,9 +502,8 @@ final class BilingualInputSessionTests: XCTestCase {
 
         session.append(text: "haopingguo")
         session.setActiveLayer(.english)
-        await fulfillment(of: [ready], timeout: 1.0)
-
         session.moveColumn(.next)
+        await fulfillment(of: [ready], timeout: 1.0)
 
         XCTAssertEqual(session.commitSelection(), "good")
         XCTAssertEqual(session.snapshot.rawInput, "pingguo")
@@ -546,9 +545,9 @@ final class BilingualInputSessionTests: XCTestCase {
 
         session.append(text: "haopingguo")
         session.setActiveLayer(.english)
+        session.moveColumn(.next)
         await fulfillment(of: [ready], timeout: 1.0)
 
-        session.moveColumn(.next)
         XCTAssertEqual(session.commitSelection(), "good")
 
         session.deleteBackward()
@@ -588,6 +587,41 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.items.map(\.candidate.surface), ["事", "市"])
         XCTAssertEqual(session.snapshot.items.first?.englishText, "matter")
         session.cancel()
+    }
+
+    func testOnlySelectedCandidateStartsPreview() async {
+        let session = DemoFixtures.makeBilingualSession(delay: .milliseconds(40))
+
+        session.append(text: "haopingguo")
+
+        XCTAssertEqual(session.snapshot.items.first?.previewState, .loading)
+        XCTAssertEqual(session.snapshot.items.dropFirst().first?.previewState, .unavailable)
+
+        session.moveColumn(.next)
+
+        XCTAssertEqual(session.snapshot.items.first?.previewState, .unavailable)
+        XCTAssertEqual(session.snapshot.items.dropFirst().first?.previewState, .loading)
+    }
+
+    func testStalePreviewAfterCancelDoesNotPublishComposingSnapshot() async {
+        let session = DemoFixtures.makeBilingualSession(delay: .milliseconds(80))
+        var snapshots: [BilingualCompositionSnapshot] = []
+        session.onSnapshotUpdate = { snapshot in
+            snapshots.append(snapshot)
+        }
+
+        session.append(text: "nihao")
+        let composingRevision = session.snapshot.revision
+        session.cancel()
+
+        try? await Task.sleep(for: .milliseconds(180))
+
+        XCTAssertFalse(session.snapshot.isComposing)
+        XCTAssertFalse(
+            snapshots.contains {
+                $0.revision > composingRevision && $0.isComposing
+            }
+        )
     }
     func testAppendIgnoresNonAsciiLettersForPinyinQuery() {
         let session = DemoFixtures.makeBilingualSession()

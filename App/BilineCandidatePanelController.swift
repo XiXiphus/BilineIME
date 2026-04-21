@@ -6,6 +6,8 @@ final class BilineCandidatePanelController: @unchecked Sendable {
     private let panel: CandidatePanelWindow
     private let contentView: BilineCandidatePanelView
     private let layout = CandidatePanelLayout()
+    private var isVisible = false
+    private var lastFrame = NSRect.zero
 
     init() {
         self.contentView = BilineCandidatePanelView(frame: .zero)
@@ -35,15 +37,26 @@ final class BilineCandidatePanelController: @unchecked Sendable {
             return
         }
 
-        contentView.snapshot = snapshot
+        if contentView.snapshot != snapshot {
+            contentView.snapshot = snapshot
+        }
         let panelSize = contentView.preferredSize
         let panelFrame = layout.positionedFrame(size: panelSize, anchorRect: anchorRect)
         panel.level = windowLevel
-        panel.setFrame(panelFrame, display: true)
-        panel.orderFrontRegardless()
+        if panelFrame != lastFrame {
+            panel.setFrame(panelFrame, display: true)
+            lastFrame = panelFrame
+        }
+        if !isVisible {
+            panel.orderFrontRegardless()
+            isVisible = true
+        }
     }
 
     func hide() {
+        guard isVisible else { return }
         panel.orderOut(nil)
+        isVisible = false
+        lastFrame = .zero
     }
 }

@@ -50,6 +50,7 @@ public struct BilingualCandidateItem: Sendable, Equatable, Identifiable {
 }
 
 public struct BilingualCompositionSnapshot: Sendable, Equatable {
+    public let revision: Int
     public let rawInput: String
     public let remainingRawInput: String
     public let displayRawInput: String
@@ -65,6 +66,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
     public let isComposing: Bool
 
     public init(
+        revision: Int = 0,
         rawInput: String,
         remainingRawInput: String,
         displayRawInput: String,
@@ -79,6 +81,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         expandedRowCount: Int,
         isComposing: Bool
     ) {
+        self.revision = revision
         self.rawInput = rawInput
         self.remainingRawInput = remainingRawInput
         self.displayRawInput = displayRawInput
@@ -95,6 +98,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
     }
 
     public static let idle = BilingualCompositionSnapshot(
+        revision: 0,
         rawInput: "",
         remainingRawInput: "",
         displayRawInput: "",
@@ -109,6 +113,25 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         expandedRowCount: 5,
         isComposing: false
     )
+
+    public static func idleSnapshot(revision: Int) -> BilingualCompositionSnapshot {
+        BilingualCompositionSnapshot(
+            revision: revision,
+            rawInput: "",
+            remainingRawInput: "",
+            displayRawInput: "",
+            markedText: "",
+            items: [],
+            pageIndex: 0,
+            activeLayer: .chinese,
+            presentationMode: .compact,
+            selectedRow: 0,
+            selectedColumn: 0,
+            compactColumnCount: 5,
+            expandedRowCount: 5,
+            isComposing: false
+        )
+    }
 
     public var selectedFlatIndex: Int {
         selectedRow * compactColumnCount + selectedColumn
@@ -145,5 +168,24 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         guard startIndex < items.count else { return [] }
         let endIndex = min(startIndex + compactColumnCount, items.count)
         return Array(items[startIndex..<endIndex])
+    }
+
+    public static func == (
+        lhs: BilingualCompositionSnapshot,
+        rhs: BilingualCompositionSnapshot
+    ) -> Bool {
+        lhs.rawInput == rhs.rawInput
+            && lhs.remainingRawInput == rhs.remainingRawInput
+            && lhs.displayRawInput == rhs.displayRawInput
+            && lhs.markedText == rhs.markedText
+            && lhs.items == rhs.items
+            && lhs.pageIndex == rhs.pageIndex
+            && lhs.activeLayer == rhs.activeLayer
+            && lhs.presentationMode == rhs.presentationMode
+            && lhs.selectedRow == rhs.selectedRow
+            && lhs.selectedColumn == rhs.selectedColumn
+            && lhs.compactColumnCount == rhs.compactColumnCount
+            && lhs.expandedRowCount == rhs.expandedRowCount
+            && lhs.isComposing == rhs.isComposing
     }
 }

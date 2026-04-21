@@ -27,20 +27,32 @@ extension BilingualInputSession {
             return
         }
 
-        for candidate in visibleCandidates where previewStates[candidate.id] == nil {
-            previewStates[candidate.id] = .loading
-            startPreview(for: candidate)
-        }
-
         publishSnapshot()
     }
 
-    func startPreview(for candidate: Candidate) {
+    func prepareSelectedPreview() {
+        guard settingsStore.previewEnabled, engineSnapshot.isComposing else { return }
+        guard let selectedID = currentSelectedCandidateID,
+            let selectedCandidate = engineSnapshot.candidates.first(where: { $0.id == selectedID })
+        else {
+            cancelUnselectedPreviewTasks(selectedID: nil)
+            return
+        }
+
+        cancelUnselectedPreviewTasks(selectedID: selectedID)
+
+        if previewStates[selectedID] == nil {
+            previewStates[selectedID] = .loading
+            startPreview(for: selectedCandidate, revision: compositionRevision)
+        }
+    }
+
+    func startPreview(for candidate: Candidate, revision: Int) {
         previewTasks[candidate.id]?.cancel()
 
         let requestID = candidate.id
         let targetLanguage = settingsStore.targetLanguage
-        let selectionRevision = engineSnapshot.pageIndex
+        let selectionRevision = revision
         let priority: PreviewRequestPriority =
             candidate.id == currentSelectedCandidateID ? .selected : .visible
         previewTasks[candidate.id] = Task { [weak self, previewCoordinator, sessionID] in
@@ -56,7 +68,12 @@ extension BilingualInputSession {
             )
 
             await MainActor.run {
-                self.applyPreviewState(initialState, for: candidate.id, candidate: candidate)
+                self.applyPreviewState(
+                    initialState,
+                    for: candidate.id,
+                    candidate: candidate,
+                    revision: revision
+                )
             }
 
             guard case .loading = initialState else { return }
@@ -71,7 +88,12 @@ extension BilingualInputSession {
             )
 
             await MainActor.run {
-                self.applyPreviewState(resolvedState, for: candidate.id, candidate: candidate)
+                self.applyPreviewState(
+                    resolvedState,
+                    for: candidate.id,
+                    candidate: candidate,
+                    revision: revision
+                )
             }
         }
     }
@@ -79,9 +101,16 @@ extension BilingualInputSession {
     func applyPreviewState(
         _ state: PreviewState,
         for candidateID: String,
-        candidate: Candidate
+        candidate: Candidate,
+        revision: Int
     ) {
         withStateLock {
+            guard revision == compositionRevision else {
+                return
+            }
+            guard engineSnapshot.isComposing, candidateID == currentSelectedCandidateID else {
+                return
+            }
             guard visibleCandidateIDs(for: engineSnapshot).contains(candidateID) else {
                 return
             }
@@ -106,6 +135,20 @@ extension BilingualInputSession {
             }
 
             publishSnapshot()
+        }
+    }
+
+    func cancelUnselectedPreviewTasks(selectedID: String?) {
+        let unselectedIDs = previewTasks.keys.filter { $0 != selectedID }
+        for candidateID in unselectedIDs {
+            previewTasks[candidateID]?.cancel()
+            previewTasks.removeValue(forKey: candidateID)
+            if case .loading = previewStates[candidateID] {
+                previewStates.removeValue(forKey: candidateID)
+            }
+            Task { [previewCoordinator, sessionID] in
+                await previewCoordinator.cancel(sessionID: sessionID, requestID: candidateID)
+            }
         }
     }
 
@@ -135,6 +178,6 @@ extension BilingualInputSession {
     }
 
     func fallbackPreviewState() -> BilingualPreviewState {
-        settingsStore.previewEnabled ? .loading : .unavailable
+        .unavailable
     }
 }

@@ -4,6 +4,11 @@ import Cocoa
 final class BilineCandidatePanelView: NSView {
     var snapshot: BilingualCompositionSnapshot = .idle {
         didSet {
+            if oldValue.rawInput != snapshot.rawInput
+                || oldValue.items.map(\.candidate.id) != snapshot.items.map(\.candidate.id)
+            {
+                lineSizeCache.removeAll()
+            }
             needsDisplay = true
             invalidateIntrinsicContentSize()
         }
@@ -22,6 +27,7 @@ final class BilineCandidatePanelView: NSView {
     let chineseFont = NSFont.systemFont(ofSize: 16, weight: .semibold)
     let englishFont = NSFont.systemFont(ofSize: 13, weight: .regular)
     let fallbackFontResolver = SystemFallbackFontResolver()
+    private var lineSizeCache: [CandidatePanelLineSizeKey: NSSize] = [:]
 
     override var intrinsicContentSize: NSSize {
         preferredSize
@@ -29,5 +35,72 @@ final class BilineCandidatePanelView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         drawSnapshot()
+    }
+
+    func candidateLineSize(column: Int, item: BilingualCandidateItem) -> NSSize {
+        cachedLineSize(
+            kind: "candidate",
+            column: column,
+            item: item,
+            previewKey: ""
+        ) {
+            candidateLine(column: column, item: item, active: false).size()
+        }
+    }
+
+    func englishLineSize(column: Int, item: BilingualCandidateItem) -> NSSize {
+        cachedLineSize(
+            kind: "english",
+            column: column,
+            item: item,
+            previewKey: item.previewState.cacheKey
+        ) {
+            englishLine(column: column, item: item, active: false).size()
+        }
+    }
+
+    private func cachedLineSize(
+        kind: String,
+        column: Int,
+        item: BilingualCandidateItem,
+        previewKey: String,
+        measure: () -> NSSize
+    ) -> NSSize {
+        let key = CandidatePanelLineSizeKey(
+            kind: kind,
+            column: column,
+            candidateID: item.candidate.id,
+            candidateSurface: item.candidate.surface,
+            previewKey: previewKey
+        )
+        if let cached = lineSizeCache[key] {
+            return cached
+        }
+        let measured = measure()
+        lineSizeCache[key] = measured
+        return measured
+    }
+}
+
+private struct CandidatePanelLineSizeKey: Hashable {
+    let kind: String
+    let column: Int
+    let candidateID: String
+    let candidateSurface: String
+    let previewKey: String
+}
+
+extension BilingualPreviewState {
+    fileprivate var cacheKey: String {
+        switch self {
+        case .unavailable:
+            return "unavailable"
+        case .loading:
+            return "loading"
+        case .ready(let text):
+            return "ready:\(text)"
+        case .failed:
+            return "failed"
+        }
     }
 }

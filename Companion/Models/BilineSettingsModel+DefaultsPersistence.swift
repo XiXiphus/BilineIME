@@ -11,6 +11,7 @@ extension BilineSettingsModel {
         defaultsStore.set(characterForm.rawValue, forKey: BilineDefaultsKey.characterForm)
         defaultsStore.set(punctuationForm.rawValue, forKey: BilineDefaultsKey.punctuationForm)
         defaultsStore.synchronize()
+        inputSaveStatus = "已保存"
         refresh()
     }
 

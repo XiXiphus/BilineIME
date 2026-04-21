@@ -52,6 +52,7 @@ final class BilineSettingsModel: ObservableObject {
     @Published var connectionTestStatus = ""
     @Published var connectionTestSucceeded = false
     @Published var isTestingConnection = false
+    @Published var inputSaveStatus = ""
 
     var rimeUserDirectory: URL {
         BilineAppPath.rimeUserDirectory(inputMethodBundleIdentifier: imeBundleID)
@@ -105,10 +106,6 @@ final class BilineSettingsModel: ObservableObject {
         }
     }
 
-    var characterFormDefaultsStatus: String {
-        characterFormDefaultsRawValue.isEmpty ? "未保存，默认简体" : characterFormDefaultsRawValue
-    }
-
     var punctuationFormTitle: String {
         switch punctuationForm {
         case .fullwidth:
@@ -118,7 +115,4 @@ final class BilineSettingsModel: ObservableObject {
         }
     }
 
-    var punctuationFormDefaultsStatus: String {
-        punctuationFormDefaultsRawValue.isEmpty ? "未保存，默认全角" : punctuationFormDefaultsRawValue
-    }
 }

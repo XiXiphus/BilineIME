@@ -28,6 +28,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     var previewStates: [String: BilingualPreviewState] = [:]
     var previewTasks: [String: Task<Void, Never>] = [:]
     let sessionID = UUID()
+    var compositionRevision = 0
 
     var lockDepth = 0
     var hasPendingNotification = false

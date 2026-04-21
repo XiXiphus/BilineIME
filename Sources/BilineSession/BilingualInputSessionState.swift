@@ -6,6 +6,10 @@ extension BilingualInputSession {
         !rawInput.isEmpty && rawInput == normalize(rawInput)
     }
 
+    func advanceCompositionRevision() {
+        compositionRevision += 1
+    }
+
     func withStateLock<T>(_ body: () throws -> T) rethrows -> T {
         stateLock.lock()
         lockDepth += 1

@@ -54,6 +54,8 @@ extension BilingualInputSession {
             return nil
         }
 
+        advanceCompositionRevision()
+
         if commitsWholeComposition {
             resetCompositionState()
             return committedText

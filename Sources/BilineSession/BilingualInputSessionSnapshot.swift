@@ -43,11 +43,12 @@ extension BilingualInputSession {
 
     func makeSnapshot() -> BilingualCompositionSnapshot {
         guard engineSnapshot.isComposing else {
-            return .idle
+            return .idleSnapshot(revision: compositionRevision)
         }
 
         if engineSnapshot.candidates.isEmpty {
             return BilingualCompositionSnapshot(
+                revision: compositionRevision,
                 rawInput: rawInput,
                 remainingRawInput: rawInput,
                 displayRawInput: renderedRawInput,
@@ -72,6 +73,7 @@ extension BilingualInputSession {
         }
 
         return BilingualCompositionSnapshot(
+            revision: compositionRevision,
             rawInput: engineSnapshot.rawInput,
             remainingRawInput: engineSnapshot.remainingRawInput,
             displayRawInput: renderedRawInput,
@@ -89,6 +91,7 @@ extension BilingualInputSession {
     }
 
     func publishSnapshot() {
+        prepareSelectedPreview()
         currentSnapshot = makeSnapshot()
         hasPendingNotification = true
     }

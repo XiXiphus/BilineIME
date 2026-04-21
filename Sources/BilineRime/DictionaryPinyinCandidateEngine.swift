@@ -1,5 +1,4 @@
 import BilineCore
-import BilinePreview
 import Foundation
 
 public struct BilinePinyinEngineFactory: CandidateEngineFactory, Sendable {
@@ -12,15 +11,6 @@ public struct BilinePinyinEngineFactory: CandidateEngineFactory, Sendable {
         self.backend = try RimeCandidateEngineFactory(
             fuzzyPinyinEnabled: fuzzyPinyinEnabled,
             characterForm: characterForm
-        )
-    }
-
-    public static func appDefault(settingsStore: any SettingsStore) throws
-        -> BilinePinyinEngineFactory
-    {
-        try BilinePinyinEngineFactory(
-            fuzzyPinyinEnabled: settingsStore.fuzzyPinyinEnabled,
-            characterForm: settingsStore.characterForm
         )
     }
 
@@ -226,78 +216,6 @@ private final class DictionaryPinyinCandidateEngineSession: CandidateEngineSessi
             return surface.applyingCommonSimplifiedFallbacks()
         case .traditional:
             return surface
-        }
-    }
-}
-
-private enum PinyinResourceLocator {
-    struct ResourceURLs {
-        let tokenizerSeed: URL
-        let lexiconFiles: [URL]
-    }
-
-    static func dictionaryURLs() throws -> ResourceURLs {
-        let candidates = [
-            repoVendorFile("rime-luna-pinyin/luna_pinyin.dict.yaml"),
-            bundleResource("luna_pinyin.dict", ext: "yaml", subdirectory: nil),
-            bundleResource("luna_pinyin.dict", ext: "yaml", subdirectory: "RimeTemplates"),
-        ].compactMap { $0 }
-
-        guard
-            let tokenizerSeed = candidates.first(where: {
-                FileManager.default.fileExists(atPath: $0.path)
-            })
-        else {
-            throw RimeError.missingResource("luna_pinyin.dict.yaml")
-        }
-
-        let lexiconFiles = [
-            tokenizerSeed,
-            bundleResource("biline_phrases.dict", ext: "yaml", subdirectory: "RimeTemplates"),
-            bundleResource(
-                "biline_modern_phrases.dict", ext: "yaml", subdirectory: "RimeTemplates"),
-            repoResource("Sources/BilineRime/Resources/RimeTemplates/biline_phrases.dict.yaml"),
-            repoResource(
-                "Sources/BilineRime/Resources/RimeTemplates/biline_modern_phrases.dict.yaml"),
-        ].compactMap { $0 }.filter { FileManager.default.fileExists(atPath: $0.path) }
-
-        return ResourceURLs(tokenizerSeed: tokenizerSeed, lexiconFiles: lexiconFiles)
-    }
-
-    private static func bundleResource(_ name: String, ext: String, subdirectory: String?) -> URL? {
-        Bundle.module.url(forResource: name, withExtension: ext, subdirectory: subdirectory)
-            ?? Bundle.module.url(forResource: name, withExtension: ext)
-    }
-
-    private static func repoResource(_ relativePath: String) -> URL? {
-        let url = repoRoot().appendingPathComponent(relativePath)
-        return FileManager.default.fileExists(atPath: url.path) ? url : nil
-    }
-
-    private static func repoVendorFile(_ relativePath: String) -> URL? {
-        repoResource("Vendor/\(relativePath)")
-    }
-
-    private static func repoRoot() -> URL {
-        URL(fileURLWithPath: #filePath)
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-            .deletingLastPathComponent()
-    }
-}
-
-extension String {
-    fileprivate func applyingCommonSimplifiedFallbacks() -> String {
-        let table: [Character: String] = [
-            "學": "学", "習": "习", "國": "国", "語": "语", "電": "电", "腦": "脑", "網": "网", "絡": "络",
-            "軟": "软", "體": "体", "開": "开", "發": "发", "數": "数", "據": "据", "庫": "库", "雲": "云",
-            "臺": "台", "台": "台", "後": "后", "裏": "里", "裡": "里", "麼": "么", "為": "为", "與": "与",
-            "這": "这", "個": "个", "們": "们", "會": "会", "來": "来", "時": "时", "間": "间", "現": "现",
-            "讓": "让", "對": "对", "應": "应", "問": "问", "題": "题", "無": "无", "線": "线", "測": "测",
-            "試": "试", "設": "设", "計": "计", "產": "产", "業": "业", "機": "机", "器": "器",
-        ]
-        return reduce(into: "") { result, character in
-            result.append(table[character] ?? String(character))
         }
     }
 }

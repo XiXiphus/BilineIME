@@ -2,27 +2,49 @@ import AppKit
 import BilineSettings
 import Foundation
 
+public protocol ApplicationWorkspaceQuerying {
+    func urlsForApplications(withBundleIdentifier bundleIdentifier: String) -> [URL]
+    func urlForApplication(withBundleIdentifier bundleIdentifier: String) -> URL?
+}
+
+public struct SystemWorkspaceQuery: ApplicationWorkspaceQuerying {
+    public init() {}
+
+    public func urlsForApplications(withBundleIdentifier bundleIdentifier: String) -> [URL] {
+        NSWorkspace.shared.urlsForApplications(withBundleIdentifier: bundleIdentifier)
+    }
+
+    public func urlForApplication(withBundleIdentifier bundleIdentifier: String) -> URL? {
+        NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+    }
+}
+
 public struct DevEnvironmentDiagnostics {
     public let paths: BilineOperationPaths
     public let runner: any CommandRunning
     private let fileManager: FileManager
+    private let workspace: any ApplicationWorkspaceQuerying
 
     public init(
         paths: BilineOperationPaths = BilineOperationPaths(),
         runner: any CommandRunning = ProcessCommandRunner(),
-        fileManager: FileManager = .default
+        fileManager: FileManager = .default,
+        workspace: any ApplicationWorkspaceQuerying = SystemWorkspaceQuery()
     ) {
         self.paths = paths
         self.runner = runner
         self.fileManager = fileManager
+        self.workspace = workspace
     }
 
     public func snapshot() -> DevEnvironmentSnapshot {
-        let settingsURLs = NSWorkspace.shared.urlsForApplications(
+        let settingsURLs = workspace.urlsForApplications(
             withBundleIdentifier: BilineAppIdentifier.devSettingsBundle)
-        let imeURLs = NSWorkspace.shared.urlsForApplications(
+        let defaultSettingsURL = workspace.urlForApplication(
+            withBundleIdentifier: BilineAppIdentifier.devSettingsBundle)
+        let imeURLs = workspace.urlsForApplications(
             withBundleIdentifier: BilineAppIdentifier.devInputMethodBundle)
-        let releaseURLs = NSWorkspace.shared.urlsForApplications(
+        let releaseURLs = workspace.urlsForApplications(
             withBundleIdentifier: BilineAppIdentifier.releaseInputMethodBundle)
         let hitoolbox = readHitoolboxState()
         let credentialStatus = BilineCredentialFileStore(
@@ -66,6 +88,7 @@ public struct DevEnvironmentDiagnostics {
             settingsInstalled: fileManager.fileExists(atPath: paths.devSettingsInstallURL.path),
             settingsRunning: isProcessRunning(BilineAppProcessName.devSettings),
             settingsLaunchServicesPathCount: settingsPathCount,
+            defaultSettingsApplicationPath: defaultSettingsURL?.path,
             imeLaunchServicesPathCount: imePathCount,
             hasStaleLaunchServicesEntry: staleLS,
             hasBilineHitoolboxState: hasHitoolbox,
@@ -81,6 +104,8 @@ public struct DevEnvironmentDiagnostics {
             rimeRuntimeResourceCount: resourceCount(at: runtimeResourceURL),
             recommendedRepairLevel: recommendedRepairLevel(
                 settingsPathCount: settingsPathCount,
+                defaultSettingsAtStablePath: defaultSettingsURL?.path.hasSuffix(
+                    "/Applications/BilineSettingsDev.app") == true,
                 imePathCount: imePathCount,
                 staleLS: staleLS,
                 hasHitoolbox: hasHitoolbox,
@@ -101,6 +126,8 @@ public struct DevEnvironmentDiagnostics {
             "settings_installed=\(snapshot.settingsInstalled)",
             "settings_running=\(snapshot.settingsRunning)",
             "settings_launchservices_path_count=\(snapshot.settingsLaunchServicesPathCount)",
+            "settings_launchservices_default_path=\(snapshot.defaultSettingsApplicationPath ?? "<none>")",
+            "settings_launchservices_default_stable=\(snapshot.defaultSettingsAtStablePath)",
             "ime_launchservices_path_count=\(snapshot.imeLaunchServicesPathCount)",
             "stale_launchservices_entry=\(snapshot.hasStaleLaunchServicesEntry)",
             "hitoolbox_biline_state=\(snapshot.hasBilineHitoolboxState)",
@@ -158,6 +185,7 @@ public struct DevEnvironmentDiagnostics {
 
     private func recommendedRepairLevel(
         settingsPathCount: Int,
+        defaultSettingsAtStablePath: Bool,
         imePathCount: Int,
         staleLS: Bool,
         hasHitoolbox: Bool,
@@ -165,7 +193,8 @@ public struct DevEnvironmentDiagnostics {
         settingsInstalled: Bool
     ) -> Int {
         if staleLS { return 3 }
-        if settingsPathCount > 1 || imePathCount > 1 { return 2 }
+        if imePathCount > 1 { return 2 }
+        if settingsPathCount > 1 && !defaultSettingsAtStablePath { return 2 }
         if hasHitoolbox && !imeInstalled { return 2 }
         if settingsPathCount == 0 || imePathCount == 0 || !imeInstalled || !settingsInstalled {
             return 1

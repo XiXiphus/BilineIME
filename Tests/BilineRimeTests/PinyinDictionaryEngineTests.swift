@@ -1,6 +1,5 @@
 @testable import BilineRime
 import BilineCore
-import BilinePreview
 import XCTest
 
 final class PinyinDictionaryEngineTests: XCTestCase {

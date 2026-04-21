@@ -1,5 +1,4 @@
 import BilineCore
-import BilinePreview
 import XCTest
 
 @testable import BilineRime

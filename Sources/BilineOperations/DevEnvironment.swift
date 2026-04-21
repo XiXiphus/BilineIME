@@ -121,6 +121,7 @@ public struct DevEnvironmentSnapshot: Sendable, Equatable {
     public let settingsInstalled: Bool
     public let settingsRunning: Bool
     public let settingsLaunchServicesPathCount: Int
+    public let defaultSettingsApplicationPath: String?
     public let imeLaunchServicesPathCount: Int
     public let hasStaleLaunchServicesEntry: Bool
     public let hasBilineHitoolboxState: Bool
@@ -138,6 +139,11 @@ public struct DevEnvironmentSnapshot: Sendable, Equatable {
 
     public var settingsInstalledAtStablePath: Bool {
         settingsInstalled && settingsInstallPath.hasSuffix("/Applications/BilineSettingsDev.app")
+    }
+
+    public var defaultSettingsAtStablePath: Bool {
+        guard let defaultSettingsApplicationPath else { return false }
+        return defaultSettingsApplicationPath.hasSuffix("/Applications/BilineSettingsDev.app")
     }
 
     public var imeInstalledAtStablePath: Bool {

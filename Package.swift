@@ -41,7 +41,7 @@ let package = Package(
         ),
         .target(
             name: "BilineRime",
-            dependencies: ["BilineCore", "BilinePreview", "CBilineRime"],
+            dependencies: ["BilineCore", "CBilineRime"],
             resources: [
                 .process("Resources")
             ]

@@ -1,56 +1,8 @@
 import BilineCore
-import BilinePreview
 import CBilineRime
 import Foundation
 
 private let rimeBackspaceKeycode: Int32 = 0xff08
-
-public struct RimeCandidateEngineFactory: CandidateEngineFactory, Sendable {
-    private let settings: RimeSettings
-    private let tokenizer: PinyinTokenizer
-    private let lexicon: RimeLexicon
-
-    public init(
-        fuzzyPinyinEnabled: Bool,
-        characterForm: CharacterForm
-    ) throws {
-        let settings = RimeSettings(
-            pageSize: 25,
-            fuzzyPinyinEnabled: fuzzyPinyinEnabled,
-            characterForm: characterForm
-        )
-        self.settings = settings
-        let runtime = RimeRuntime.shared
-        self.tokenizer = try runtime.makeTokenizer(settings: settings)
-        self.lexicon = try runtime.makeLexicon(settings: settings)
-    }
-
-    public static func appDefault(settingsStore: any SettingsStore) throws
-        -> RimeCandidateEngineFactory
-    {
-        try RimeCandidateEngineFactory(
-            fuzzyPinyinEnabled: settingsStore.fuzzyPinyinEnabled,
-            characterForm: settingsStore.characterForm
-        )
-    }
-
-    public func makeSession(config: EngineConfig) -> any CandidateEngineSession {
-        do {
-            return try RimeCandidateEngineSession(
-                schemaID: settings.schemaID,
-                settings: RimeSettings(
-                    pageSize: config.pageSize,
-                    fuzzyPinyinEnabled: settings.fuzzyPinyinEnabled,
-                    characterForm: settings.characterForm
-                ),
-                tokenizer: tokenizer,
-                lexicon: lexicon
-            )
-        } catch {
-            fatalError("Unable to create Rime engine session: \(error)")
-        }
-    }
-}
 
 final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Sendable {
     private let schemaID: String

@@ -149,6 +149,30 @@ Repair is separate from install:
 Installation success does not require automatic input-source selection. The user
 must manually select the input source and verify in a real host.
 
+## Settings App Structure
+
+The Settings app is a native SwiftUI companion app. It configures the dev input
+method bundle and reports lifecycle diagnostics, but it does not own composition
+state or host-facing IME behavior.
+
+Settings code is split by responsibility:
+
+- `BilineSettingsModel` stores observable Settings state and small derived
+  display strings.
+- Defaults persistence owns reads and writes for `BilineDefaultsKey` values.
+- Diagnostics owns dev install state, Launch Services registration, current
+  input source reporting, Rime user dictionary status, and repair plan text.
+- Translation credentials owns Alibaba credential save flow and the manual
+  connection test.
+- System actions open macOS Settings or local Rime directories only from user
+  button actions.
+- SwiftUI pages are file-scoped by section: status, translation, input,
+  appearance, and advanced, with shared row/card scaffolding kept separate.
+
+The Settings app must preserve existing defaults keys, bundle identifiers, and
+credential paths. It should not duplicate IME session rules, candidate behavior,
+or preview scheduling logic.
+
 ## Verification Model
 
 Package tests cover deterministic state transitions, preview scheduling, Rime

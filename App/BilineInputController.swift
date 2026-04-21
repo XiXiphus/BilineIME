@@ -34,7 +34,7 @@ final class BilineInputController: IMKInputController {
     private let inputSession: BilingualInputSession
     private let characterForm: CharacterForm
     private let punctuationForm: PunctuationForm
-    private let candidatePanel = BilineCandidatePanelController()
+    private let candidatePanel: BilineCandidatePanelController
     private let textInputBridge = BilineTextInputBridge()
     private let eventRouter = InputControllerEventRouter()
     private let logger = Logger(
@@ -100,7 +100,10 @@ final class BilineInputController: IMKInputController {
         )
         let engineFactory: any CandidateEngineFactory
         do {
-            engineFactory = try BilinePinyinEngineFactory.appDefault(settingsStore: settingsStore)
+            engineFactory = try BilinePinyinEngineFactory(
+                fuzzyPinyinEnabled: settingsStore.fuzzyPinyinEnabled,
+                characterForm: settingsStore.characterForm
+            )
         } catch {
             fatalError("Unable to initialize Biline pinyin engine: \(error)")
         }
@@ -109,6 +112,9 @@ final class BilineInputController: IMKInputController {
             engineFactory: engineFactory,
             previewCoordinator: previewCoordinator
         )
+        self.candidatePanel = MainThreadExecutor.sync {
+            BilineCandidatePanelController()
+        }
         super.init(server: server, delegate: delegate, client: inputClient)
 
         inputSession.onSnapshotUpdate = { [weak self] snapshot in
@@ -241,7 +247,7 @@ final class BilineInputController: IMKInputController {
         }
         inputSession.cancel()
         textInputBridge.clearAnchorCache()
-        candidatePanel.hide()
+        textInputBridge.hide(candidatePanel: candidatePanel)
         eventRouter.reset()
         lastHandledKeySignature = nil
         didLogFirstHandledKey = false
@@ -256,7 +262,7 @@ final class BilineInputController: IMKInputController {
         } else {
             inputSession.cancel()
             textInputBridge.clearAnchorCache()
-            candidatePanel.hide()
+            textInputBridge.hide(candidatePanel: candidatePanel)
         }
     }
 

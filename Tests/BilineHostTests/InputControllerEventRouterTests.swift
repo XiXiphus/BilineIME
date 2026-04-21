@@ -49,6 +49,80 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
+    func testReturnCommitsRawInputBeforeExpansionOrSelection() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            isExpandedPresentation: false,
+            hasExplicitCandidateSelection: false
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 36),
+                state: state
+            ),
+            .commitRawInput
+        )
+    }
+
+    func testReturnCommitsSelectedCandidateAfterExpansionOrSelection() {
+        let router = InputControllerEventRouter()
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 36),
+                state: InputControllerState(
+                    compositionMode: .candidateExpanded,
+                    isComposing: true,
+                    canDeleteBackward: true,
+                    hasCandidates: true,
+                    compactColumnCount: 5,
+                    isExpandedPresentation: true
+                )
+            ),
+            .commit
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 36),
+                state: InputControllerState(
+                    compositionMode: .candidateCompact,
+                    isComposing: true,
+                    canDeleteBackward: true,
+                    hasCandidates: true,
+                    compactColumnCount: 5,
+                    hasExplicitCandidateSelection: true
+                )
+            ),
+            .commit
+        )
+    }
+
+    func testSpaceStillCommitsSelectedCandidateInCompactMode() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 49),
+                state: state
+            ),
+            .commit
+        )
+    }
+
     func testArrowKeysPassThroughWhenNotComposing() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(

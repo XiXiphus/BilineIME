@@ -14,6 +14,7 @@ public final class BilingualInputSession: @unchecked Sendable {
     public var punctuationForm: PunctuationForm { settingsStore.punctuationForm }
     public internal(set) var compositionMode: CompositionMode = .candidateCompact
     public internal(set) var hasEverExpandedInCurrentComposition = false
+    public internal(set) var hasExplicitCandidateSelection = false
 
     let stateLock = NSRecursiveLock()
     let settingsStore: any SettingsStore

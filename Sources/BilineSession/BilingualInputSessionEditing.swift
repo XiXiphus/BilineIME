@@ -71,6 +71,7 @@ extension BilingualInputSession {
         activeLayer = .chinese
         compositionMode = .candidateCompact
         hasEverExpandedInCurrentComposition = false
+        hasExplicitCandidateSelection = false
         presentationMode = .compact
         clearPreviews()
         publishSnapshot()

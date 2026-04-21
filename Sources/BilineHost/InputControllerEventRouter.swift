@@ -32,7 +32,11 @@ public final class InputControllerEventRouter: @unchecked Sendable {
                 return state.hasCandidates ? .toggleLayer : .consume
             }
             return .passThrough
-        case InputControllerKeyBinding.returnKey, InputControllerKeyBinding.space:
+        case InputControllerKeyBinding.returnKey:
+            guard state.isComposing else { return .passThrough }
+            return state.isExpandedPresentation || state.hasExplicitCandidateSelection
+                ? .commit : .commitRawInput
+        case InputControllerKeyBinding.space:
             return state.isComposing ? .commit : .passThrough
         case InputControllerKeyBinding.deleteBackward:
             return state.isComposing && state.canDeleteBackward ? .deleteBackward : .passThrough

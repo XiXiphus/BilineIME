@@ -20,6 +20,27 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(after.activeLayer, .english)
     }
 
+    func testCommitRawInputCommitsPinyinBeforeExplicitCandidateSelection() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "nihao")
+
+        XCTAssertEqual(session.commitRawInput(), "nihao")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testMovingColumnMarksSelectionExplicitForReturnSemantics() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        XCTAssertFalse(session.hasExplicitCandidateSelection)
+
+        session.moveColumn(.next)
+
+        XCTAssertTrue(session.hasExplicitCandidateSelection)
+        XCTAssertEqual(session.commitSelection(), "时")
+    }
+
     func testToggleActiveLayerChangesLayerWithoutChangingCell() {
         let session = DemoFixtures.makeBilingualSession()
 

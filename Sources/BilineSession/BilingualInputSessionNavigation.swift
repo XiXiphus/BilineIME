@@ -200,6 +200,7 @@ extension BilingualInputSession {
             return
         }
 
+        hasExplicitCandidateSelection = true
         let direction: SelectionDirection = delta > 0 ? .next : .previous
         for _ in 0..<abs(delta) {
             engineSnapshot = engineSession.moveSelection(direction)

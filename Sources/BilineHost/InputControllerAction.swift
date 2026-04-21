@@ -11,6 +11,7 @@ public enum InputControllerAction: Sendable, Equatable {
     case toggleLayer
     case deleteBackward
     case commit
+    case commitRawInput
     case cancel
     case moveColumn(SelectionDirection)
     case browseNextRow

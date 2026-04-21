@@ -348,7 +348,8 @@ final class BilineInputController: IMKInputController {
                 selectedRow: inputSession.snapshot.selectedRow,
                 isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded,
                 hasEverExpandedInCurrentComposition: inputSession
-                    .hasEverExpandedInCurrentComposition
+                    .hasEverExpandedInCurrentComposition,
+                hasExplicitCandidateSelection: inputSession.hasExplicitCandidateSelection
             )
         )
 
@@ -400,6 +401,8 @@ final class BilineInputController: IMKInputController {
             inputSession.deleteBackward()
         case .commit:
             return commitSelection(using: client)
+        case .commitRawInput:
+            return commitRawInput(using: client)
         case .cancel:
             textInputBridge.hide(candidatePanel: candidatePanel)
             inputSession.cancel()
@@ -421,6 +424,19 @@ final class BilineInputController: IMKInputController {
             return commitSelection(using: client)
         }
 
+        render(client: client)
+        return true
+    }
+
+    private func commitRawInput(using client: IMKTextInput) -> Bool {
+        guard let committedText = inputSession.commitRawInput() else {
+            render(client: client)
+            return inputSession.snapshot.isComposing
+        }
+
+        textInputBridge.hide(candidatePanel: candidatePanel)
+        textInputBridge.clearAnchorCache()
+        textInputBridge.insertCommittedText(committedText, into: client)
         render(client: client)
         return true
     }

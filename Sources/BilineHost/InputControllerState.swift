@@ -18,6 +18,7 @@ public struct InputControllerState: Sendable, Equatable {
     public let selectedRow: Int
     public let isExpandedPresentation: Bool
     public let hasEverExpandedInCurrentComposition: Bool
+    public let hasExplicitCandidateSelection: Bool
 
     public init(
         compositionMode: InputCompositionMode = .candidateCompact,
@@ -29,7 +30,8 @@ public struct InputControllerState: Sendable, Equatable {
         pageIndex: Int = 0,
         selectedRow: Int = 0,
         isExpandedPresentation: Bool = false,
-        hasEverExpandedInCurrentComposition: Bool = false
+        hasEverExpandedInCurrentComposition: Bool = false,
+        hasExplicitCandidateSelection: Bool = false
     ) {
         self.compositionMode = compositionMode
         self.isComposing = isComposing
@@ -41,5 +43,6 @@ public struct InputControllerState: Sendable, Equatable {
         self.selectedRow = max(0, selectedRow)
         self.isExpandedPresentation = isExpandedPresentation
         self.hasEverExpandedInCurrentComposition = hasEverExpandedInCurrentComposition
+        self.hasExplicitCandidateSelection = hasExplicitCandidateSelection
     }
 }

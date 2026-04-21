@@ -13,6 +13,20 @@ extension BilingualInputSession {
         }
     }
 
+    public func commitRawInput() -> String? {
+        withStateLock {
+            guard engineSnapshot.isComposing else { return nil }
+            let committedText = engineSnapshot.candidates.isEmpty ? renderedRawInput : rawInput
+            guard !committedText.isEmpty else {
+                publishSnapshot()
+                return nil
+            }
+            advanceCompositionRevision()
+            resetCompositionState()
+            return committedText
+        }
+    }
+
     public func renderCommittedText(_ text: String) -> String {
         PunctuationPolicy.renderCommittedText(text, form: settingsStore.punctuationForm)
     }
@@ -73,6 +87,7 @@ extension BilingualInputSession {
             rawInput = engineCommit.snapshot.rawInput
             activeLayer = layer
             hasEverExpandedInCurrentComposition = false
+            hasExplicitCandidateSelection = false
             presentationMode = .compact
             clearPreviews()
             updateEngineSnapshot(engineCommit.snapshot)
@@ -83,6 +98,7 @@ extension BilingualInputSession {
             rawInput = fallbackTailInput
             activeLayer = layer
             hasEverExpandedInCurrentComposition = false
+            hasExplicitCandidateSelection = false
             presentationMode = .compact
             clearPreviews()
             updateEngineSnapshot(engineSession.updateInput(rawInput))

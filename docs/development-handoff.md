@@ -111,7 +111,7 @@ Create a RAM user for development rather than using the main account key:
 
 For normal use, enter credentials in the native settings app. It stores the key
 material in the dev IME container with user-only file permissions, so the IME
-can read it without a cross-process Keychain authorization prompt. Do not pass
+can read it without a cross-process authorization prompt. Do not pass
 secrets as command-line arguments, because shell history and process listings
 are easy to leak from a public project workflow.
 
@@ -134,7 +134,7 @@ BilineAlibabaRegionId=cn-hangzhou
 BilineAlibabaEndpoint=https://mt.cn-hangzhou.aliyuncs.com
 ```
 
-The older CLI helper remains available as a Keychain fallback for development:
+The CLI helper writes the same local credential file for development:
 
 ```bash
 make configure-aliyun-credentials
@@ -148,32 +148,8 @@ make aliyun-credentials-status
 
 Do not commit credentials. Do not paste production secrets into docs, tests, or
 commits. If a key was shared in chat or logs, rotate it after validation.
-Do not use `BilineAlibabaAccessKeyId` or `BilineAlibabaAccessKeySecret` defaults
-for normal development; those fallback keys are intentionally not part of the
-public setup flow.
-
-Optional direct local verification without printing secrets:
-
-```bash
-python3 - <<'PY'
-import subprocess
-service = 'BilineIME.AlibabaMachineTranslation'
-for account in ('accessKeyId', 'accessKeySecret'):
-    try:
-        value = subprocess.check_output(
-            ['security', 'find-generic-password', '-s', service, '-a', account, '-w'],
-            stderr=subprocess.DEVNULL,
-        ).decode().strip()
-        print(f'{account}: present length={len(value)}')
-    except subprocess.CalledProcessError:
-        print(f'{account}: missing')
-for key in ('BilineTranslationProvider', 'BilineAlibabaRegionId', 'BilineAlibabaEndpoint'):
-    value = subprocess.check_output(
-        ['defaults', 'read', 'io.github.xixiphus.inputmethod.BilineIME.dev', key],
-    ).decode().strip()
-    print(f'{key}: {value}')
-PY
-```
+The app and IME runtime do not read AccessKey values from environment
+variables, defaults, or system credential stores.
 
 Live API tests are intentionally skipped unless credentials are provided through
 environment variables:
@@ -281,8 +257,8 @@ Alibaba preview always fails:
 
 - Confirm `com.apple.security.network.client` is present in entitlements.
 - Confirm provider defaults are written to the dev domain.
-- Confirm the native settings app has saved both AccessKey fields, or confirm
-  the Keychain fallback has both `accessKeyId` and `accessKeySecret`.
+- Confirm the native settings app has saved both AccessKey fields to the local
+  credential file.
 - Confirm the RAM user has machine translation permission.
 - Run live tests only after explicitly opting in with environment variables.
 

@@ -24,7 +24,6 @@ final class BilineSettingsModel: ObservableObject {
 
     private let defaultsDomain = "io.github.xixiphus.inputmethod.BilineIME.dev"
     private let imeBundleID = "io.github.xixiphus.inputmethod.BilineIME.dev"
-    private let keychainStore = KeychainCredentialStore()
     private var credentialFileStore: AlibabaCredentialFileStore {
         AlibabaCredentialFileStore(
             fileURL: AlibabaCredentialFileStore.defaultURL(inputMethodBundleIdentifier: imeBundleID)
@@ -42,7 +41,6 @@ final class BilineSettingsModel: ObservableObject {
     @Published var imeRunning = false
     @Published var currentInputSource = ""
     @Published var credentialFileStatus = AlibabaCredentialFileStatus(accessKeyIdLength: nil, accessKeySecretLength: nil)
-    @Published var keychainStatus = KeychainCredentialStatus(accessKeyIDLength: nil, accessKeySecretLength: nil)
     @Published var credentialSaveStatus = ""
     @Published var connectionTestStatus = ""
     @Published var connectionTestSucceeded = false
@@ -61,18 +59,12 @@ final class BilineSettingsModel: ObservableObject {
         if let length = credentialFileStatus.accessKeyIdLength {
             return "已保存，长度 \(length)"
         }
-        if let length = keychainStatus.accessKeyIDLength {
-            return "Keychain 回退，长度 \(length)"
-        }
         return "未保存"
     }
 
     var accessKeySecretStatus: String {
         if let length = credentialFileStatus.accessKeySecretLength {
             return "已保存，长度 \(length)"
-        }
-        if let length = keychainStatus.accessKeySecretLength {
-            return "Keychain 回退，长度 \(length)"
         }
         return "未保存"
     }
@@ -81,9 +73,6 @@ final class BilineSettingsModel: ObservableObject {
         if provider == .aliyun {
             if credentialFileStatus.isComplete {
                 return "已保存到本机输入法容器"
-            }
-            if keychainStatus.isComplete {
-                return "使用 Keychain 兼容回退"
             }
             return "需要保存 AccessKey"
         } else {
@@ -94,7 +83,6 @@ final class BilineSettingsModel: ObservableObject {
     func refresh() {
         loadDefaults()
         credentialFileStatus = credentialFileStore.status()
-        keychainStatus = keychainStore.status()
         imeInstalled = FileManager.default.fileExists(
             atPath: FileManager.default.homeDirectoryForCurrentUser
                 .appendingPathComponent("Library/Input Methods/BilineIMEDev.app", isDirectory: true)
@@ -155,7 +143,7 @@ final class BilineSettingsModel: ObservableObject {
         Task {
             defer { Task { @MainActor in self.isTestingConnection = false } }
             do {
-                guard let credentials = credentialFileStore.load()?.credentials ?? keychainStore.credentials() else {
+                guard let credentials = credentialFileStore.load()?.credentials else {
                     await setConnectionResult("需要保存 AccessKey", success: false)
                     return
                 }

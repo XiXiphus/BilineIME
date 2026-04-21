@@ -2,9 +2,6 @@
 set -euo pipefail
 
 DOMAIN="${BILINE_DEFAULTS_DOMAIN:-io.github.xixiphus.inputmethod.BilineIME.dev}"
-SERVICE="BilineIME.AlibabaMachineTranslation"
-ACCESS_KEY_ID_ACCOUNT="accessKeyId"
-ACCESS_KEY_SECRET_ACCOUNT="accessKeySecret"
 DEFAULT_REGION="cn-hangzhou"
 DEFAULT_ENDPOINT="https://mt.cn-hangzhou.aliyuncs.com"
 CREDENTIAL_FILE="${BILINE_CREDENTIAL_FILE:-$HOME/Library/Containers/$DOMAIN/Data/Library/Application Support/BilineIME/alibaba-credentials.json}"
@@ -13,12 +10,13 @@ usage() {
   cat <<EOF
 usage: $0 [configure|status|clear]
 
-configure  Prompt for Alibaba Cloud AccessKey values and store them in Keychain.
+configure  Prompt for Alibaba Cloud AccessKey values and store them locally.
 status     Print provider and credential presence without revealing secrets.
-clear      Remove Biline Alibaba credentials from Keychain and provider defaults.
+clear      Remove Biline Alibaba credentials and provider defaults.
 
 Environment:
   BILINE_DEFAULTS_DOMAIN  Defaults domain to configure. Defaults to dev IME.
+  BILINE_CREDENTIAL_FILE  Credential file path. Defaults to the IME container.
 EOF
 }
 
@@ -41,26 +39,6 @@ read_plain_default() {
     printf "%s" "$fallback"
   else
     printf "%s" "$value"
-  fi
-}
-
-store_keychain_password() {
-  local account="$1"
-  local value="$2"
-  security add-generic-password \
-    -s "$SERVICE" \
-    -a "$account" \
-    -w "$value" \
-    -U >/dev/null
-}
-
-keychain_password_length() {
-  local account="$1"
-  local value=""
-  if value="$(security find-generic-password -s "$SERVICE" -a "$account" -w 2>/dev/null)"; then
-    printf "%s" "${#value}"
-  else
-    printf "missing"
   fi
 }
 
@@ -106,8 +84,25 @@ configure() {
     exit 1
   fi
 
-  store_keychain_password "$ACCESS_KEY_ID_ACCOUNT" "$access_key_id"
-  store_keychain_password "$ACCESS_KEY_SECRET_ACCOUNT" "$access_key_secret"
+  install -d -m 700 "$(dirname "$CREDENTIAL_FILE")"
+  printf '%s\0%s\0%s\0%s' "$access_key_id" "$access_key_secret" "$region" "$endpoint" \
+    | python3 -c '
+import json
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+access_key_id, access_key_secret, region, endpoint = [
+    item.decode() for item in sys.stdin.buffer.read().split(b"\0")
+]
+path.write_text(json.dumps({
+    "accessKeyId": access_key_id,
+    "accessKeySecret": access_key_secret,
+    "regionId": region,
+    "endpoint": endpoint,
+}, separators=(",", ":")))
+' "$CREDENTIAL_FILE"
+  chmod 600 "$CREDENTIAL_FILE"
   unset access_key_id access_key_secret
 
   defaults write "$DOMAIN" BilineTranslationProvider aliyun
@@ -120,41 +115,23 @@ configure() {
 }
 
 status() {
-  local provider region endpoint access_key_id_length access_key_secret_length
+  local provider region endpoint
   provider="$(defaults_value BilineTranslationProvider)"
   region="$(defaults_value BilineAlibabaRegionId)"
   endpoint="$(defaults_value BilineAlibabaEndpoint)"
-  access_key_id_length="$(keychain_password_length "$ACCESS_KEY_ID_ACCOUNT")"
-  access_key_secret_length="$(keychain_password_length "$ACCESS_KEY_SECRET_ACCOUNT")"
 
   echo "domain=$DOMAIN"
   echo "provider=${provider:-<missing>}"
   echo "region=${region:-<missing>}"
   echo "endpoint=${endpoint:-<missing>}"
   credential_file_lengths
-  echo "keychain_accessKeyId=${access_key_id_length}"
-  echo "keychain_accessKeySecret=${access_key_secret_length}"
-  if defaults read "$DOMAIN" BilineAlibabaAccessKeyId >/dev/null 2>&1; then
-    echo "defaults_accessKeyId=present"
-  else
-    echo "defaults_accessKeyId=missing"
-  fi
-  if defaults read "$DOMAIN" BilineAlibabaAccessKeySecret >/dev/null 2>&1; then
-    echo "defaults_accessKeySecret=present"
-  else
-    echo "defaults_accessKeySecret=missing"
-  fi
 }
 
 clear() {
   rm -f "$CREDENTIAL_FILE" >/dev/null 2>&1 || true
-  security delete-generic-password -s "$SERVICE" -a "$ACCESS_KEY_ID_ACCOUNT" >/dev/null 2>&1 || true
-  security delete-generic-password -s "$SERVICE" -a "$ACCESS_KEY_SECRET_ACCOUNT" >/dev/null 2>&1 || true
   defaults delete "$DOMAIN" BilineTranslationProvider >/dev/null 2>&1 || true
   defaults delete "$DOMAIN" BilineAlibabaRegionId >/dev/null 2>&1 || true
   defaults delete "$DOMAIN" BilineAlibabaEndpoint >/dev/null 2>&1 || true
-  defaults delete "$DOMAIN" BilineAlibabaAccessKeyId >/dev/null 2>&1 || true
-  defaults delete "$DOMAIN" BilineAlibabaAccessKeySecret >/dev/null 2>&1 || true
   killall cfprefsd >/dev/null 2>&1 || true
   echo "Alibaba translation provider credentials cleared for $DOMAIN."
 }

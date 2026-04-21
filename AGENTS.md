@@ -14,21 +14,18 @@ Always run this sequence:
 1. Narrow package tests for the behavior you changed.
 2. `make build-ime`
 3. `make install-ime`
-4. `make smoke-ime`
+4. Stop and ask the user to run the real-host typing step manually.
 
-The smoke test baseline is:
+Real-host verification is manual-only:
 
 - use `TextEdit` as the first host
-- switch the host app to `BilineIME Dev` manually
-- confirm the current source with `./scripts/select-input-source.sh current`
-- use `./scripts/smoke-ime.sh prepare` to confirm the system is actually ready before any scripted key injection
-- use `./scripts/smoke-ime.sh observe` for passive user-driven reproduction capture
-- use `./scripts/smoke-ime.sh probe <name>` for one focused active scenario
-- active probe injection should default to CGEvent/HID; only use `System Events` as a fallback for keys that prove unstable
-- for browse keys whose semantic names may map incorrectly on macOS, prefer `./scripts/press-macos-key.swift`
-- if candidate UI may render on another monitor, capture or inspect all displays instead of trusting a single app-local screenshot or host accessibility tree
+- the user manually selects `BilineIME Dev`, focuses the host, types, browses, commits, and reports the result
+- Codex must not switch input sources, focus the host, inject keys, or run scripts that do those actions
+- `./scripts/select-input-source.sh current` is read-only and may be used only to report the current source
+- if candidate UI may render on another monitor, ask the user for screenshots across displays instead of driving the host
+- dev lifecycle install/repair/diagnose flows go through `bilinectl`; Make targets and shell scripts should remain thin wrappers
 
-When diagnosing a failure interactively inside Codex, use the `Computer Use` plugin as a follow-up tool rather than the primary smoke-test entrypoint.
+When diagnosing a failure interactively inside Codex, do not use `Computer Use` to operate the input method unless the user explicitly asks for that specific action in the moment.
 
 Report verification in two layers:
 

@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  🧪 Experimental · 🍎 macOS · ⌨️ Input Method Kit · 📝 MIT
+  🧪 Experimental · 🍎 macOS · ⌨️ Input Method Kit · 📝 GPL-3.0
 </p>
 <!-- markdownlint-enable MD033 -->
 
@@ -160,27 +160,27 @@ What they do:
 - `make test` runs Swift Package tests
 - `make build-ime` builds the developer input method target
 - `make build-ime-release` builds the release input method target in a temporary derived-data directory and unregisters it afterwards
-- `make install-ime` installs the developer build into `~/Library/Input Methods`
+- `make install-ime` runs the unified level 1 dev lifecycle reinstall for both the IME and Settings App
 - `make uninstall-ime` removes the developer bundle and unregisters the local dev lane
-- `make reset-ime` runs the safe uninstall flow first, then reinstalls the dev lane
-- `make repair-ime` runs the staged local repair flow for ghost Biline sources and broken Keyboard settings state
+- `make reset-ime` runs the unified level 1 dev lifecycle reinstall
+- `make repair-ime` prints the staged repair plan by default; execute with `CONFIRM=1`
 - `make package-release` builds the release installer package
-- `make diagnose-ime` prints bundle, TIS, HIToolbox, Launch Services, and recent IMK logs
+- `make diagnose-ime` prints the unified dev lifecycle snapshot
 - `make verify` runs tests plus both IME build variants
 
 Build products are generated under `~/Library/Caches/BilineIME/DerivedData` instead of the repo tree. This avoids Finder/file-provider metadata inside the workspace from breaking app signing.
 
 ### Input Method Registration Notes
 
-- The dev lane installs to `~/Library/Input Methods` so it does not collide with the release lane in `HIToolbox`, `TIS`, or Launch Services.
+- The dev lane has two stable app locations: `~/Library/Input Methods/BilineIMEDev.app` and `~/Applications/BilineSettingsDev.app`.
 - `make build-ime` and `make install-ime` now try to detect a local Xcode development team from `com.apple.dt.Xcode.plist`. Override that auto-detection with `BILINE_DEV_TEAM_ID=<TEAM_ID>` if needed.
-- `make install-ime` now stops at a conservative install boundary:
-  - build the dev bundle
-  - replace `~/Library/Input Methods/BilineIMEDev.app`
-  - refresh Launch Services and `TextInputMenuAgent`
-  - leave source enabling and selection to macOS UI
-- `make install-ime` no longer treats `TISSelectInputSource == 0` as part of install success. Re-select `BilineIME Dev` manually in Keyboard settings or from the input menu.
-- `make uninstall-ime` no longer doubles as a system-cache repair tool. Use `make repair-ime` when Keyboard settings shows blank Biline rows, stale raw ids, or crashes.
+- `make install-ime`, `make install-settings-dev`, and `make reset-dev-apps` now share the same level 1 lifecycle path:
+  - build the dev IME and Settings App
+  - replace both stable app bundles
+  - refresh Launch Services and text-input agents
+  - leave source enabling, selection, host focus, and typing to the user
+- `make install-ime` no longer treats automatic input-source selection as part of install success. Re-select `BilineIME Dev` manually in Keyboard settings or from the input menu.
+- `bilinectl` is the source of truth for dev lifecycle operations. Make targets and compatibility shell scripts are thin wrappers.
 - The release lane installs to `/Library/Input Methods` and should be distributed via the installer package, not by manually copying a debug build into the system directory.
 - Installing into an Input Methods directory is necessary, but it is not sufficient. The bundle must also expose keyboard input modes through both `ComponentInputModeDict` and `InputMethodServerModeDictionary`, and `IMKInputController.modes(_:)` must return that dictionary.
 - `tsVisibleInputModeOrderedArrayKey` must reference the keys inside `tsInputModeListKey`, not the `TISInputSourceID` values.
@@ -191,10 +191,10 @@ Build products are generated under `~/Library/Caches/BilineIME/DerivedData` inst
   - `BLANK_TIS_NAME=1` means `TIS` still has a Biline source whose localized name is empty.
 - If the input-source picker shows a raw `io.github...` Biline row, that is usually stale Biline state. Run `make repair-ime`.
 - `make repair-ime` is staged:
-  - level 1: uninstall Biline dev/release, unregister Biline bundles, prune Biline from `HIToolbox`, restart text-input agents
-  - level 2: clear `IntlDataCache` and require a reboot
-  - level 3: delete the Launch Services database and require a reboot
-- `make repair-ime` defaults to level 2. Run `make repair-ime REPAIR_LEVEL=3` only as a last resort.
+  - level 1: reinstall both dev apps and refresh Launch Services/text-input agents
+  - level 2: remove Biline dev/release bundles, clear Biline HIToolbox state and `IntlDataCache`, then require reboot before level 1 reinstall
+  - level 3: level 2 plus Launch Services database reset, then require reboot before level 1 reinstall
+- `make repair-ime` defaults to a dry-run level 2 plan. Run `make repair-ime CONFIRM=1` only when ready to execute; use `REPAIR_LEVEL=3 CONFIRM=1` only as a last resort.
 - First install, bundle-id changes, mode-list changes, and display-name/icon changes should be treated as metadata changes. For those cases, log out and log back in before adding the input source in Keyboard > Input Sources.
 - Code-only updates usually do not require a full relogin. Reinstall the bundle, then re-select the input source in the system UI if needed.
 - Do not `open` the input method app as part of installation. The expected launch path is: add/select the input source, then let macOS and `imklaunchagent` start the process.
@@ -203,48 +203,37 @@ Build products are generated under `~/Library/Caches/BilineIME/DerivedData` inst
   - `sudo /System/Library/Frameworks/CoreServices.framework/Versions/Current/Frameworks/LaunchServices.framework/Versions/Current/Support/lsregister -delete`
   - reboot
 
-### Post-install IME Smoke Test
+### Post-install IME Manual Host Gate
 
-For IME-facing changes, build success is not enough. Run a real-host smoke test after `make install-ime`.
+For IME-facing changes, build success is not enough. After `make install-ime`,
+stop and ask the user to do the real-host typing step.
 
-Recommended baseline:
+Rules:
 
-1. Switch the target host app to `BilineIME Dev` manually, then confirm:
-   - `./scripts/select-input-source.sh current`
-2. Prefer the staged flow:
-   - `./scripts/smoke-ime.sh prepare`
-   - `./scripts/smoke-ime.sh run`
-3. `prepare` is non-intrusive. It only verifies that the current host is already using `BilineIME Dev`, that the IME process is running, and that recent IMK logs are clean. If it fails, inspect `failure_kind` in the generated `prepare.txt`.
-4. `observe` is the passive mode for user-driven reproduction:
-   - `./scripts/smoke-ime.sh observe`
-5. `probe <name>` runs one short active probe and records screenshots, telemetry, system logs, host text, and input source:
-   - `./scripts/smoke-ime.sh probe type-shi`
-6. `make smoke-ime` keeps the default staged flow.
-7. If you diagnose a failure interactively with Codex `Computer Use`, use it to focus the host or handle system UI. Candidate visibility should still be judged from full-screen screenshots, not only the host AX tree.
-8. For browse keys whose semantic names may map incorrectly on macOS, prefer:
-   - `./scripts/press-macos-key.swift equal --activate com.apple.TextEdit`
-   - `./scripts/press-macos-key.swift minus --activate com.apple.TextEdit`
-   - active probes now default to `CGEvent` injection; `System Events` is only a fallback for a small set of unstable keys such as `Esc` or `Backspace`
-9. The smoke script exposes manual stop controls:
-   - `./scripts/smoke-ime.sh status`
-   - `./scripts/smoke-ime.sh stop`
-   - `Ctrl-C`
-10. If the candidate panel seems missing, inspect all displays. The panel may render on another monitor even when the host app stays on the current one.
+- the user manually selects `BilineIME Dev`, focuses TextEdit, types, browses,
+  commits, and reports the result
+- Codex and project scripts must not switch input sources, focus TextEdit, or
+  inject keyboard events
+- `./scripts/select-input-source.sh current` is read-only and may only be used
+  to report the current source
+- candidate-panel visibility comes from user-provided screenshots or manual
+  observation across all displays
 
-### Release First-Install Smoke Test
+### Release First-Install Manual Host Gate
 
 Release install readiness requires a real host check, not only a visible TIS row.
 After installing the package into `/Library/Input Methods`, log out and back in
-if macOS requires it, add/select `BilineIME`, then run:
+if macOS requires it, then ask the user to add/select `BilineIME` and manually
+type, browse, and commit in TextEdit. Codex may run only read-only diagnostics:
 
 ```bash
 make diagnose-ime-release
-make smoke-ime-release
 ```
 
 The release is not usable until TextEdit actually launches `BilineIME` and the
-release smoke run passes. If TextEdit binds to ABC or Apple's SCIM endpoint,
-treat it as an install/registration failure.
+manual host check passes. If TextEdit binds to ABC or Apple's SCIM endpoint,
+treat it as an install/registration failure based on diagnostics and user
+evidence.
 
 ## 🧠 Architecture
 
@@ -276,7 +265,7 @@ Rules:
 - every upstream project we study or integrate must be recorded in `THIRD_PARTY_NOTICES.md`
 - every adapted dependency or code path must keep its source and license visible
 - reference-only and reusable sources must be distinguished clearly
-- GPL projects may be studied, but their code will not be copied into this MIT repository unless the license strategy changes explicitly
+- GPL components may be integrated when the repository license and notices make that boundary explicit
 
 If you care about open-source hygiene, this repo does too.
 

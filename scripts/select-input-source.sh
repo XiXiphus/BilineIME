@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
-  echo "usage: $0 <current|exists|enable|select|disable|dump-bundle> [argument]" >&2
+  echo "usage: $0 <current|exists|dump-bundle> [argument]" >&2
   exit 1
 fi
 
@@ -53,20 +53,6 @@ case "current":
         exit(2)
     }
     print(id)
-case "enable":
-    guard !argument.isEmpty else {
-        fputs("missing input source id\n", stderr)
-        exit(1)
-    }
-    guard let source = findSource(argument) else {
-        fputs("input source not found: \(argument)\n", stderr)
-        exit(2)
-    }
-    let status = TISEnableInputSource(source)
-    print("enable=\(status)")
-    if status != noErr {
-        exit(3)
-    }
 case "exists":
     guard !argument.isEmpty else {
         fputs("missing input source id\n", stderr)
@@ -76,38 +62,6 @@ case "exists":
         exit(4)
     }
     print("found")
-case "select":
-    guard !argument.isEmpty else {
-        fputs("missing input source id\n", stderr)
-        exit(1)
-    }
-    guard let source = findSource(argument) else {
-        fputs("input source not found: \(argument)\n", stderr)
-        exit(2)
-    }
-
-    let enableStatus = TISEnableInputSource(source)
-    let selectStatus = TISSelectInputSource(source)
-
-    print("enable=\(enableStatus)")
-    print("select=\(selectStatus)")
-
-    if enableStatus != noErr || selectStatus != noErr {
-        exit(3)
-    }
-case "disable":
-    guard !argument.isEmpty else {
-        fputs("missing input source id\n", stderr)
-        exit(1)
-    }
-    guard let source = findSource(argument) else {
-        exit(0)
-    }
-    let status = TISDisableInputSource(source)
-    print("disable=\(status)")
-    if status != noErr {
-        exit(3)
-    }
 case "dump-bundle":
     guard !argument.isEmpty else {
         fputs("missing bundle id\n", stderr)

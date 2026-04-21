@@ -80,6 +80,6 @@ Installation notes:
 - This package installs BilineIME to /Library/Input Methods.
 - Release packaging now builds from a temporary derived-data directory and unregisters the release app after packaging, so local packaging does not leak a release source into the dev machine.
 - First install and input-source metadata changes may require log out / log in before adding BilineIME in Keyboard > Input Sources.
-- Treat the package as ready only after the installed release source passes make smoke-ime-release in a real host.
+- Treat the package as ready only after the user manually selects the installed release source in a real host and verifies typing, browsing, and commit behavior.
 - Set PKG_SIGNING_IDENTITY to produce a signed installer package.
 EOF

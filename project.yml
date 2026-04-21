@@ -75,6 +75,8 @@ targetTemplates:
         product: BilinePreview
       - package: BilineModules
         product: BilineSettings
+      - package: BilineModules
+        product: BilineOperations
     info:
       path: Companion/Support/Info.plist
       properties:

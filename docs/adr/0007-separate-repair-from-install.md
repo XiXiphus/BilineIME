@@ -41,6 +41,6 @@ Separating the workflows keeps ordinary install steps conservative while still d
 
 ## Consequences
 
-- automatic `TISSelectInputSource` success is no longer part of install success
+- automatic input-source selection success is no longer part of install success
 - developers should use the system UI to add or re-select `BilineIME Dev`
 - repair steps with higher blast radius are now explicit and documented instead of being hidden inside install scripts

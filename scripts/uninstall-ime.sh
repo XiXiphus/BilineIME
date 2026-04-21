@@ -29,10 +29,6 @@ run_ls_unregister() {
   "$LSREGISTER" -u "$1" >/dev/null 2>&1 || true
 }
 
-current_source_id() {
-  "$ROOT_DIR/scripts/select-input-source.sh" current 2>/dev/null || true
-}
-
 cleanup_release_install() {
   if [[ "$REMOVE_RELEASE" == "1" && -e "$RELEASE_INSTALL_PATH" ]]; then
     log "Cleaning release bundle at $RELEASE_INSTALL_PATH"
@@ -41,17 +37,7 @@ cleanup_release_install() {
   fi
 }
 
-current_id="$(current_source_id)"
-if [[ "$current_id" == "$DEV_SOURCE_ID" || "$current_id" == "$RELEASE_SOURCE_ID" ]]; then
-  log "Switching current input source back to ABC"
-  "$ROOT_DIR/scripts/select-input-source.sh" select "$ABC_SOURCE_ID" >/dev/null 2>&1 || true
-fi
-
-log "Disabling Biline input sources"
-"$ROOT_DIR/scripts/select-input-source.sh" disable "$DEV_SOURCE_ID" >/dev/null 2>&1 || true
-if [[ "$REMOVE_RELEASE" == "1" ]]; then
-  "$ROOT_DIR/scripts/select-input-source.sh" disable "$RELEASE_SOURCE_ID" >/dev/null 2>&1 || true
-fi
+log "Input-source switching is manual-only. Switch away from Biline before uninstalling if the host is currently using it."
 
 log "Unregistering Biline bundles before removal"
 run_ls_unregister "$DEV_INSTALL_PATH"

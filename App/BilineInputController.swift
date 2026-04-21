@@ -4,6 +4,7 @@ import BilineMocks
 import BilinePreview
 import BilineRime
 import BilineSession
+import BilineSettings
 import Cocoa
 @preconcurrency import InputMethodKit
 import OSLog
@@ -31,6 +32,7 @@ final class BilineInputController: IMKInputController {
     }
 
     private let inputSession: BilingualInputSession
+    private let characterForm: CharacterForm
     private let candidatePanel = BilineCandidatePanelController()
     private let textInputBridge = BilineTextInputBridge()
     private let eventRouter = InputControllerEventRouter()
@@ -54,6 +56,7 @@ final class BilineInputController: IMKInputController {
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
         let settingsStore = DefaultSettingsStore()
+        self.characterForm = settingsStore.characterForm
         #if DEBUG
             let smokePreviewDelay = SmokeDefaults.milliseconds(
                 forKey: SmokeDefaults.previewDelayMs,
@@ -334,7 +337,8 @@ final class BilineInputController: IMKInputController {
                 pageIndex: inputSession.snapshot.pageIndex,
                 selectedRow: inputSession.snapshot.selectedRow,
                 isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded,
-                hasEverExpandedInCurrentComposition: inputSession.hasEverExpandedInCurrentComposition
+                hasEverExpandedInCurrentComposition: inputSession
+                    .hasEverExpandedInCurrentComposition
             )
         )
 
@@ -410,7 +414,8 @@ final class BilineInputController: IMKInputController {
         }
 
         let isFresh = signature.timestamp - previous.timestamp < 0.05
-        let matches = signature.keyCode == previous.keyCode
+        let matches =
+            signature.keyCode == previous.keyCode
             && signature.text == previous.text
             && signature.modifiersRawValue == previous.modifiersRawValue
         lastHandledKeySignature = nil
@@ -430,11 +435,14 @@ final class BilineInputController: IMKInputController {
             let selectedCandidate = selectedItem?.candidate.surface ?? "<none>"
             let selectedCandidateReading = selectedItem?.candidate.reading ?? "<none>"
             let selectedConsumedTokenCount = selectedItem?.candidate.consumedTokenCount ?? 0
-            let selectedPreviewState = selectedItem.map { smokePreviewState($0.previewState) } ?? "<none>"
+            let selectedPreviewState =
+                selectedItem.map { smokePreviewState($0.previewState) } ?? "<none>"
             let selectedEnglishText = selectedItem?.englishText ?? "<none>"
             let visibleCandidates = smokeCandidateList(snapshot)
+            let rimeUserDictionaryPath = BilineAppPath.inputMethodRuntimeRimeUserDictionaryURL()
+                .path
             smokeLogger.notice(
-                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) selectedCandidateReading=\(self.smokeValue(selectedCandidateReading), privacy: .public) selectedConsumedTokenCount=\(selectedConsumedTokenCount) selectedPreviewState=\(selectedPreviewState, privacy: .public) selectedEnglishText=\(self.smokeValue(selectedEnglishText), privacy: .public) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public) visibleCandidates=\(visibleCandidates, privacy: .public)"
+                "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) selectedCandidateReading=\(self.smokeValue(selectedCandidateReading), privacy: .public) selectedConsumedTokenCount=\(selectedConsumedTokenCount) selectedPreviewState=\(selectedPreviewState, privacy: .public) selectedEnglishText=\(self.smokeValue(selectedEnglishText), privacy: .public) characterForm=\(self.characterForm.rawValue, privacy: .public) rimeUserDB=\(self.smokeValue(rimeUserDictionaryPath), privacy: .public) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public) visibleCandidates=\(visibleCandidates, privacy: .public)"
             )
         }
 

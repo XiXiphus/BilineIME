@@ -2,8 +2,6 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT_DIR"
 
-"$ROOT_DIR/scripts/install-settings-dev.sh"
-"$ROOT_DIR/scripts/install-ime-dev.sh"
-
-echo "Reset dev apps complete."
+exec swift run bilinectl reinstall dev --level 1 --confirm

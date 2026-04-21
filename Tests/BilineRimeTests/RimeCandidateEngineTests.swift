@@ -1,13 +1,16 @@
 import BilineCore
 import BilinePreview
-@testable import BilineRime
 import XCTest
+
+@testable import BilineRime
 
 final class RimeCandidateEngineTests: XCTestCase {
     private let runtimeLibraryPath = URL(fileURLWithPath: NSHomeDirectory())
         .appendingPathComponent("Library/Caches/BilineIME/RimeVendor/1.16.1/lib/librime.1.dylib")
 
-    private func makeSession(characterForm: CharacterForm = .simplified) throws -> any CandidateEngineSession {
+    private func makeSession(characterForm: CharacterForm = .simplified) throws
+        -> any CandidateEngineSession
+    {
         guard FileManager.default.fileExists(atPath: runtimeLibraryPath.path) else {
             throw XCTSkip("librime runtime has not been built yet.")
         }
@@ -76,5 +79,25 @@ final class RimeCandidateEngineTests: XCTestCase {
 
         XCTAssertEqual(result.committedText, "中国")
         XCTAssertEqual(result.snapshot, .idle)
+    }
+
+    func testTraditionalModeConvertsSimplifiedDictionaryOutput() throws {
+        let session = try makeSession(characterForm: .traditional)
+        _ = session.updateInput("zhongguo")
+
+        let result = session.commitSelected()
+
+        XCTAssertEqual(result.committedText, "中國")
+        XCTAssertEqual(result.snapshot, .idle)
+    }
+
+    func testRimeIceRanksModernSimplifiedPhrases() throws {
+        let session = try makeSession()
+
+        let shuangyu = session.updateInput("shuangyu")
+        XCTAssertEqual(shuangyu.candidates.first?.surface, "双语")
+
+        let jianti = session.updateInput("jiantizhongwen")
+        XCTAssertEqual(jianti.candidates.first?.surface, "简体中文")
     }
 }

@@ -4,6 +4,8 @@ RELEASE_SCHEME := BilineIME
 SETTINGS_SCHEME := BilineSettingsDev
 DERIVED_DATA := $(HOME)/Library/Caches/BilineIME/DerivedData
 CONFIGURATION ?= Debug
+REPAIR_LEVEL ?= 2
+BILINECTL := swift run bilinectl
 
 .PHONY: bootstrap project test build-ime build-ime-release build-settings install-settings-dev install-ime uninstall-ime reset-ime reset-dev-apps repair-ime package-release package-internal diagnose-ime diagnose-ime-dev diagnose-ime-release diagnose-dev-apps configure-aliyun-credentials aliyun-credentials-status smoke-ime smoke-ime-aliyun smoke-ime-release verify-ime format verify
 
@@ -27,23 +29,27 @@ build-settings: project
 	xcodebuild -project $(PROJECT_NAME).xcodeproj -scheme $(SETTINGS_SCHEME) -configuration $(CONFIGURATION) -derivedDataPath $(DERIVED_DATA) build
 
 install-settings-dev:
-	./scripts/install-settings-dev.sh
+	$(BILINECTL) reinstall dev --level 1 --confirm
 
 install-ime:
-	./scripts/install-ime-dev.sh
+	$(BILINECTL) reinstall dev --level 1 --confirm
 
 uninstall-ime:
 	./scripts/uninstall-ime.sh
 
 reset-ime:
-	./scripts/uninstall-ime.sh
-	./scripts/install-ime-dev.sh
+	$(BILINECTL) reinstall dev --level 1 --confirm
 
 reset-dev-apps:
-	./scripts/reset-dev-apps.sh
+	$(BILINECTL) reinstall dev --level 1 --confirm
 
 repair-ime:
-	./scripts/repair-ime.sh $(REPAIR_LEVEL)
+	@if [ "$(CONFIRM)" = "1" ]; then \
+		$(BILINECTL) reinstall dev --level $(REPAIR_LEVEL) --confirm; \
+	else \
+		$(BILINECTL) plan reinstall dev --level $(REPAIR_LEVEL); \
+		echo "Dry run only. Re-run with CONFIRM=1 to execute."; \
+	fi
 
 package-release:
 	./scripts/build-release-pkg.sh
@@ -51,16 +57,16 @@ package-release:
 package-internal: package-release
 
 diagnose-ime:
-	./scripts/diagnose-ime.sh dev
+	$(BILINECTL) diagnose dev
 
 diagnose-ime-dev:
-	./scripts/diagnose-ime.sh dev
+	$(BILINECTL) diagnose dev
 
 diagnose-ime-release:
 	./scripts/diagnose-ime.sh release
 
 diagnose-dev-apps:
-	./scripts/diagnose-dev-apps.sh
+	$(BILINECTL) diagnose dev
 
 configure-aliyun-credentials:
 	./scripts/configure-aliyun-credentials.sh configure
@@ -69,23 +75,23 @@ aliyun-credentials-status:
 	./scripts/configure-aliyun-credentials.sh status
 
 smoke-ime:
-	./scripts/smoke-ime.sh prepare
-	./scripts/smoke-ime.sh run
+	@echo "Automated real-host smoke was removed. Stop here and ask the user to manually select BilineIME Dev, focus the host, type, and report the result."
+	@exit 2
 
 smoke-ime-aliyun:
-	./scripts/smoke-ime.sh prepare
-	./scripts/smoke-ime.sh aliyun
+	@echo "Automated real-host smoke was removed. Stop here and ask the user to manually verify Aliyun preview in the host."
+	@exit 2
 
 smoke-ime-release:
-	TARGET_SOURCE_ID=io.github.xixiphus.inputmethod.BilineIME.pinyin APP_PROCESS=BilineIME SMOKE_DEFAULTS_DOMAIN=io.github.xixiphus.inputmethod.BilineIME SMOKE_DISPLAY_NAME=BilineIME ./scripts/smoke-ime.sh prepare
-	TARGET_SOURCE_ID=io.github.xixiphus.inputmethod.BilineIME.pinyin APP_PROCESS=BilineIME SMOKE_DEFAULTS_DOMAIN=io.github.xixiphus.inputmethod.BilineIME SMOKE_DISPLAY_NAME=BilineIME ./scripts/smoke-ime.sh run
+	@echo "Automated real-host smoke was removed. Stop here and ask the user to manually select the release input source, type in TextEdit, and report the result."
+	@exit 2
 
 verify-ime:
 	./scripts/build-librime.sh
 	swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests|BilineRimeTests'
 	$(MAKE) build-ime
 	$(MAKE) install-ime
-	$(MAKE) smoke-ime
+	@echo "Manual host verification required: stop here and ask the user to select BilineIME Dev, focus TextEdit, and type the requested cases."
 
 format:
 	swift-format format -i $$(find App Sources Tests -name '*.swift' -print)

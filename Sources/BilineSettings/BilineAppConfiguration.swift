@@ -13,6 +13,7 @@ public enum BilineDefaultsKey {
     public static let compactColumnCount = "BilineCompactColumnCount"
     public static let expandedRowCount = "BilineExpandedRowCount"
     public static let fuzzyPinyinEnabled = "BilineFuzzyPinyinEnabled"
+    public static let characterForm = "BilineCharacterForm"
 }
 
 public enum BilineAppIdentifier {
@@ -50,14 +51,30 @@ public enum BilineAppPath {
     }
 
     public static func inputMethodRuntimeCredentialFileURL() -> URL {
-        let applicationSupport = FileManager.default.urls(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask
-        ).first ?? FileManager.default.homeDirectoryForCurrentUser
+        let applicationSupport =
+            FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+            ?? FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support", isDirectory: true)
-        return applicationSupport
+        return
+            applicationSupport
             .appendingPathComponent("BilineIME", isDirectory: true)
             .appendingPathComponent("alibaba-credentials.json", isDirectory: false)
+    }
+
+    public static func inputMethodRuntimeRimeUserDictionaryURL() -> URL {
+        let applicationSupport =
+            FileManager.default.urls(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask
+            ).first
+            ?? FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support", isDirectory: true)
+        return
+            applicationSupport
+            .appendingPathComponent("Rime/user/biline_pinyin.userdb", isDirectory: true)
     }
 
     public static func rimeUserDirectory(inputMethodBundleIdentifier: String) -> URL {
@@ -66,6 +83,11 @@ public enum BilineAppPath {
                 "Library/Containers/\(inputMethodBundleIdentifier)/Data/Library/Application Support/Rime",
                 isDirectory: true
             )
+    }
+
+    public static func rimeUserDictionaryURL(inputMethodBundleIdentifier: String) -> URL {
+        rimeUserDirectory(inputMethodBundleIdentifier: inputMethodBundleIdentifier)
+            .appendingPathComponent("user/biline_pinyin.userdb", isDirectory: true)
     }
 }
 
@@ -85,7 +107,8 @@ public struct BilineDefaultsStore: Sendable {
     }
 
     public func integer(forKey key: String) -> Int? {
-        if let number = CFPreferencesCopyAppValue(key as CFString, domain as CFString) as? NSNumber {
+        if let number = CFPreferencesCopyAppValue(key as CFString, domain as CFString) as? NSNumber
+        {
             return number.intValue
         }
         return nil

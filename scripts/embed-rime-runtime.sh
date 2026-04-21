@@ -147,11 +147,17 @@ for file in \
   "$ROOT_DIR/Vendor/rime-prelude/default.yaml" \
   "$ROOT_DIR/Vendor/rime-luna-pinyin/luna_pinyin.dict.yaml" \
   "$ROOT_DIR/Vendor/rime-luna-pinyin/pinyin.yaml" \
-  "$ROOT_DIR/Vendor/rime-essay/essay.txt"; do
+  "$ROOT_DIR/Vendor/rime-essay/essay.txt" \
+  "$ROOT_DIR/Vendor/rime-ice/rime_ice.dict.yaml"; do
   if [[ -f "$file" ]]; then
     ditto "$file" "$APP_RIME_DATA/$(basename "$file")"
   fi
 done
+
+if [[ -d "$ROOT_DIR/Vendor/rime-ice/cn_dicts" ]]; then
+  rm -rf "$APP_RIME_DATA/cn_dicts"
+  ditto "$ROOT_DIR/Vendor/rime-ice/cn_dicts" "$APP_RIME_DATA/cn_dicts"
+fi
 
 for file in "$ROOT_DIR"/Sources/BilineRime/Resources/RimeTemplates/*.yaml; do
   if [[ -f "$file" ]]; then

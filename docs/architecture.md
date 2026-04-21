@@ -97,7 +97,7 @@ The project does not treat `open /path/to/InputMethod.app` as a normal installat
 
 ## Attribution And License Policy
 
-This project is MIT-licensed, so upstream reuse must be intentional and documented.
+This project is GPL-3.0-licensed, so upstream reuse must be intentional and documented.
 
 The project will use four different labels for external work:
 
@@ -110,16 +110,17 @@ The project will use four different labels for external work:
 
 Practical rules:
 
-- never copy code from a project unless its license is compatible with BilineIME's MIT license or the repository license is deliberately changed
-- keep GPL projects as reference-only unless the licensing strategy is revisited explicitly
+- never copy code from a project unless its license is compatible with BilineIME's GPL-3.0 license
+- keep stronger-copyleft or incompatible projects as reference-only unless the licensing strategy is revisited explicitly
 - when adapting code from a permissive project, keep the source project and license visible in both `THIRD_PARTY_NOTICES.md` and the relevant implementation area
 - if a future commit vendors a third-party component, that commit must update notices in the same change
 
 Current implications for the projects already referenced in this blueprint:
 
-- `librime` is BSD-3-Clause and is a viable future dependency candidate
-- Squirrel is GPL-3.0 and should be treated as an architecture reference, not a copy source, under the current MIT license
-- `libpinyin` is GPL-3.0 and should also stay reference-only unless licensing changes
+- `librime` is BSD-3-Clause and is bundled as the Rime engine backend
+- `rime-ice` is GPL-3.0 and is bundled as the simplified Chinese dictionary baseline
+- Squirrel is GPL-3.0 and remains an architecture reference, not a copied implementation
+- `libpinyin` is GPL-3.0 and should stay reference-only unless the engine strategy changes
 - `IMKitSample_2021` and `pinyinIME` are permissively licensed references and may be adapted only with explicit attribution
 
 ## Option Analysis

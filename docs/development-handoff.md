@@ -56,8 +56,10 @@ make diagnose-ime
 make repair-ime
 ```
 
-Use `make repair-ime REPAIR_LEVEL=3` only as a last resort because it resets
-Launch Services state and requires a reboot.
+`make repair-ime` is a dry-run plan by default. Use `make repair-ime CONFIRM=1`
+only when ready to execute Level 2 repair, and use
+`make repair-ime REPAIR_LEVEL=3 CONFIRM=1` only as a last resort because it
+resets Launch Services state and requires a reboot.
 
 ## 3. Rime Runtime Notes
 
@@ -188,54 +190,37 @@ make install-ime
 ```
 
 Then manually switch the target host app, usually TextEdit, to `BilineIME Dev`.
-The script must only verify this; it must not switch the input source for you.
+Codex and project scripts must stop here. The user must select the input source,
+focus TextEdit, type, browse, commit, and report the result manually.
 
 ```bash
 ./scripts/select-input-source.sh current
-./scripts/smoke-ime.sh prepare
-./scripts/smoke-ime.sh observe
 ```
 
 For release package first-install validation, the same rule applies to the
 release source. Install the package, log out and back in if macOS requires it,
-add/select `BilineIME`, then verify that TextEdit actually launches the release
-IME process and passes:
+add/select `BilineIME`, then manually verify that TextEdit actually launches the
+release IME process and accepts input:
 
 ```bash
 make diagnose-ime-release
-make smoke-ime-release
 ```
 
 Seeing a Biline entry in TIS is not enough. The host must bind to the Biline
 InputMethodKit endpoint, not ABC or Apple's SCIM endpoint.
 
-Use focused probes only after `prepare` passes:
-
-```bash
-./scripts/smoke-ime.sh probe type-shi
-./scripts/smoke-ime.sh probe phrase-hao-ping-guo-chinese
-./scripts/smoke-ime.sh probe phrase-hao-ping-guo-english
-```
-
-`make smoke-ime` is still available, but it runs active probes and can send real
-keyboard events. Keep the stop interface visible:
-
-```bash
-./scripts/smoke-ime.sh status
-./scripts/smoke-ime.sh stop
-```
+Automated probes and key-injection scripts were removed. Do not recreate them
+without an explicit project decision that reverses the manual-only host rule.
 
 ## 6. Smoke-Test Rules
 
-The smoke harness is evidence-first, not a replacement for the user-visible
-screen:
+The smoke harness is manual-only and evidence-first:
 
 - User manually switches the host app to `BilineIME Dev`.
-- `prepare` is non-intrusive and must not type keys.
-- `prepare` records a concrete failure kind for source mismatch, IME crash,
-  SCIM fallback, sandbox write denial, and IME process launch failure.
-- `observe` is passive and records user-driven behavior.
-- `probe` is active and should stay short.
+- User manually types, browses candidates, commits, and reports host text.
+- Codex may read logs and run read-only diagnostics after the user finishes.
+- Codex must not switch input sources, focus TextEdit, inject keys, or drive
+  candidate browsing.
 - Candidate panel visibility is proven by all-display screenshots, not only by
   a host accessibility tree.
 - `Computer Use` is a visual/debugging aid, not the primary smoke runner.
@@ -255,9 +240,8 @@ make repair-ime
 IME process exists but no panel appears:
 
 - Confirm the host app is actually using `BilineIME Dev`.
-- Run `./scripts/smoke-ime.sh prepare`.
-- Use `observe` while typing manually and inspect screenshots, host text,
-  telemetry, and system logs.
+- Ask the user to type manually and provide screenshots, host text, telemetry,
+  and system logs as evidence.
 
 Candidate commits leak raw pinyin:
 

@@ -4,7 +4,7 @@
 schema:
   schema_id: biline_pinyin
   name: Biline 现代简体拼音
-  version: "0.3"
+  version: "0.4"
   author:
     - BilineIME
   description: |
@@ -12,9 +12,9 @@ schema:
     双层候选、英文预览、英文层提交由上层 Biline 会话负责。
 
 switches:
-  - name: zh_simp
-    reset: 1
-    states: [ 简体, 简体 ]
+  - name: zh_trad
+    reset: 0
+    states: [ 简体, 繁体 ]
 
 engine:
   processors:
@@ -29,7 +29,7 @@ engine:
   translators:
     - script_translator
   filters:
-    - simplifier
+    - simplifier@zh_trad
     - uniquifier
 
 speller:
@@ -44,6 +44,7 @@ speller:
 
 translator:
   dictionary: biline_pinyin
+  user_dict: biline_pinyin
   enable_sentence: true
   enable_completion: true
   enable_user_dict: true
@@ -54,9 +55,9 @@ translator:
     - xform/([nl])ue/$1üe/
     - xform/([jqxy])v/$1u/
 
-simplifier:
-  option_name: zh_simp
-  opencc_config: t2s.json
+zh_trad:
+  option_name: zh_trad
+  opencc_config: s2t.json
   tips: none
 
 ascii_composer:

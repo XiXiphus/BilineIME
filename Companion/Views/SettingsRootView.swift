@@ -1,3 +1,4 @@
+import BilinePreview
 import SwiftUI
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
@@ -158,25 +159,50 @@ struct StatusView: View {
         SettingsPage(title: "状态") {
             SettingsCard {
                 SettingsRow(title: "输入法安装") {
-                    StatusBadge(text: model.imeInstalled ? "已安装" : "未安装", isPositive: model.imeInstalled)
+                    StatusBadge(
+                        text: model.imeInstalled ? "已安装" : "未安装", isPositive: model.imeInstalled)
                 }
                 SettingsRow(title: "输入法路径", subtitle: model.imeInstallPath) {
-                    StatusBadge(text: model.imeInstalled ? "存在" : "缺失", isPositive: model.imeInstalled)
+                    StatusBadge(
+                        text: model.imeInstalled ? "存在" : "缺失", isPositive: model.imeInstalled)
                 }
                 SettingsRow(title: "当前输入源", subtitle: model.currentInputSource) {
-                    StatusBadge(text: model.currentInputSource == BilineSettingsModel.devInputSourceID ? "BilineIME Dev" : "未选择", isPositive: model.currentInputSource == BilineSettingsModel.devInputSourceID)
+                    StatusBadge(
+                        text: model.currentInputSource == BilineSettingsModel.devInputSourceID
+                            ? "BilineIME Dev" : "未选择",
+                        isPositive: model.currentInputSource == BilineSettingsModel.devInputSourceID
+                    )
                 }
                 SettingsRow(title: "输入法进程") {
-                    StatusBadge(text: model.imeRunning ? "运行中" : "未运行", isPositive: model.imeRunning)
+                    StatusBadge(
+                        text: model.imeRunning ? "运行中" : "未运行", isPositive: model.imeRunning)
+                }
+                SettingsRow(title: "字形输出") {
+                    StatusBadge(text: model.characterFormTitle, isPositive: true)
                 }
                 SettingsRow(title: "设置 App 路径", subtitle: model.settingsAppPath) {
-                    StatusBadge(text: model.settingsAppPath.contains("/Applications/") ? "稳定路径" : "临时路径", isPositive: model.settingsAppPath.contains("/Applications/"))
+                    StatusBadge(
+                        text: model.settingsInstalledAtStablePath ? "稳定路径" : "临时路径",
+                        isPositive: model.settingsInstalledAtStablePath)
                 }
-                SettingsRow(title: "LaunchServices 注册", subtitle: model.settingsRegisteredPaths.joined(separator: "\n")) {
-                    StatusBadge(text: model.settingsRegisteredPaths.count == 1 ? "单一路径" : "\(model.settingsRegisteredPaths.count) 个路径", isPositive: model.settingsRegisteredPaths.count == 1)
+                SettingsRow(
+                    title: "LaunchServices 注册",
+                    subtitle: model.settingsRegisteredPaths.joined(separator: "\n")
+                ) {
+                    StatusBadge(
+                        text: model.settingsLaunchServicesPathCount == 1
+                            ? "单一路径" : "\(model.settingsLaunchServicesPathCount) 个路径",
+                        isPositive: model.settingsLaunchServicesPathCount == 1)
+                }
+                SettingsRow(title: "生命周期建议") {
+                    StatusBadge(
+                        text: model.lifecycleRecommendation,
+                        isPositive: model.lifecycleRecommendation == "无需修复")
                 }
                 SettingsRow(title: "翻译服务", subtitle: model.translationStatusText) {
-                    StatusBadge(text: model.provider == .aliyun ? "阿里云" : "关闭", isPositive: model.provider == .aliyun)
+                    StatusBadge(
+                        text: model.provider == .aliyun ? "阿里云" : "关闭",
+                        isPositive: model.provider == .aliyun)
                 }
                 HStack {
                     Button("刷新状态") { model.refresh() }
@@ -240,8 +266,11 @@ struct TranslationSettingsView: View {
                     }
                     ProgressView()
                         .opacity(model.isTestingConnection ? 1 : 0)
-                    Text(model.connectionTestStatus.isEmpty ? model.credentialSaveStatus : model.connectionTestStatus)
-                        .foregroundStyle(model.connectionTestSucceeded ? .green : .secondary)
+                    Text(
+                        model.connectionTestStatus.isEmpty
+                            ? model.credentialSaveStatus : model.connectionTestStatus
+                    )
+                    .foregroundStyle(model.connectionTestSucceeded ? .green : .secondary)
                     Spacer()
                 }
                 .padding(20)
@@ -256,9 +285,21 @@ struct InputSettingsView: View {
     var body: some View {
         SettingsPage(title: "输入") {
             SettingsCard {
+                SettingsRow(title: "字形输出") {
+                    Picker("", selection: $model.characterForm) {
+                        Text("简体").tag(CharacterForm.simplified)
+                        Text("繁体").tag(CharacterForm.traditional)
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .frame(width: 160)
+                }
                 SettingsRow(title: "模糊拼音") {
                     Toggle("", isOn: $model.fuzzyPinyinEnabled)
                         .labelsHidden()
+                }
+                SettingsRow(title: "已保存字形", subtitle: "defaults: BilineCharacterForm") {
+                    StatusBadge(text: model.characterFormDefaultsStatus, isPositive: true)
                 }
                 SettingsRow(title: "候选列数") {
                     Stepper(value: $model.compactColumnCount, in: 1...5) {
@@ -309,10 +350,20 @@ struct AdvancedSettingsView: View {
         SettingsPage(title: "高级") {
             SettingsCard {
                 SettingsRow(title: "阿里云凭据文件", subtitle: model.credentialFileURL.path) {
-                    StatusBadge(text: model.credentialFileStatus.isComplete ? "已保存" : "未保存", isPositive: model.credentialFileStatus.isComplete)
+                    StatusBadge(
+                        text: model.credentialFileStatus.isComplete ? "已保存" : "未保存",
+                        isPositive: model.credentialFileStatus.isComplete)
                 }
                 SettingsRow(title: "Rime 用户目录", subtitle: model.rimeUserDirectory.path) {
                     Button("打开") { model.openRimeUserDirectory() }
+                }
+                SettingsRow(title: "Rime 用户词典", subtitle: model.rimeUserDictionaryURL.path) {
+                    StatusBadge(
+                        text: model.rimeUserDictionaryExists ? "存在" : "未生成",
+                        isPositive: model.rimeUserDictionaryExists)
+                }
+                SettingsRow(title: "Level 1 重装计划", subtitle: model.lifecyclePlanText) {
+                    StatusBadge(text: "手动宿主", isPositive: true)
                 }
                 SettingsRow(title: "诊断") {
                     Button("刷新状态") { model.refresh() }

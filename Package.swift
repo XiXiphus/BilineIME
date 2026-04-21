@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "BilineModules",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v14)
     ],
     products: [
         .library(name: "BilineCore", targets: ["BilineCore"]),
@@ -12,9 +12,11 @@ let package = Package(
         .library(name: "BilinePreview", targets: ["BilinePreview"]),
         .library(name: "BilineRime", targets: ["BilineRime"]),
         .library(name: "BilineSettings", targets: ["BilineSettings"]),
+        .library(name: "BilineOperations", targets: ["BilineOperations"]),
         .library(name: "BilineSession", targets: ["BilineSession"]),
         .library(name: "BilineMocks", targets: ["BilineMocks"]),
         .library(name: "BilineTestSupport", targets: ["BilineTestSupport"]),
+        .executable(name: "bilinectl", targets: ["bilinectl"]),
     ],
     targets: [
         .target(
@@ -41,7 +43,7 @@ let package = Package(
             name: "BilineRime",
             dependencies: ["BilineCore", "BilinePreview", "CBilineRime"],
             resources: [
-                .process("Resources"),
+                .process("Resources")
             ]
         ),
         .target(
@@ -52,10 +54,18 @@ let package = Package(
             name: "BilineSettings"
         ),
         .target(
+            name: "BilineOperations",
+            dependencies: ["BilineSettings"]
+        ),
+        .executableTarget(
+            name: "bilinectl",
+            dependencies: ["BilineOperations"]
+        ),
+        .target(
             name: "BilineMocks",
             dependencies: ["BilineCore", "BilinePreview"],
             resources: [
-                .process("Resources"),
+                .process("Resources")
             ]
         ),
         .target(
@@ -85,6 +95,10 @@ let package = Package(
         .testTarget(
             name: "BilineSettingsTests",
             dependencies: ["BilineSettings"]
+        ),
+        .testTarget(
+            name: "BilineOperationsTests",
+            dependencies: ["BilineOperations"]
         ),
     ]
 )

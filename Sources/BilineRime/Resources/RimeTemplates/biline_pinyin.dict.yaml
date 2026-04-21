@@ -3,11 +3,16 @@
 
 ---
 name: biline_pinyin
-version: "0.1"
+version: "0.2"
 sort: by_weight
-use_preset_vocabulary: true
+use_preset_vocabulary: false
 import_tables:
   - biline_phrases
   - biline_modern_phrases
-  - luna_pinyin
+  - rime_ice
+  - cn_dicts/8105
+  - cn_dicts/base
+  - cn_dicts/ext
+  - cn_dicts/tencent
+  - cn_dicts/others
 ...

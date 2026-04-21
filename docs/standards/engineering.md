@@ -36,23 +36,16 @@
   - run focused tests
   - `make build-ime`
   - `make install-ime`
-  - `make smoke-ime`
-- `make smoke-ime` is the default real-host smoke-test entry.
-- `scripts/smoke-ime.sh prepare` must succeed before any scripted key injection starts.
-- `prepare` only validates the current host state. It must not switch the input source on the user's behalf.
-- The host app input source must already be `BilineIME Dev` before `observe`, `probe`, or `run` starts.
-- `observe` is the passive capture mode for user-driven reproduction.
-- `probe <name>` is the active single-scenario mode for short, focused IME checks.
-- `run` is a curated probe bundle, not a full system-takeover macro.
+- stop and ask the user to manually select the input source, focus the host, type, browse, commit, and report the result
+- Automated real-host operation is prohibited. Codex and scripts must not switch input sources, focus TextEdit, inject keys, or drive candidate browsing.
+- `scripts/select-input-source.sh current` is read-only and may be used only to report the current source.
 - The baseline smoke-test host is `TextEdit`.
-- Active probes should default to `CGEvent` / HID injection. `System Events` is only a fallback path for a small set of unstable keys such as `Esc` and `Backspace`.
-- For browse keys whose automation-layer key names are ambiguous on macOS, prefer `scripts/press-macos-key.swift` so the smoke test uses the exact physical virtual key code.
-- When validating candidate UI, do not trust the host accessibility tree alone. Candidate visibility is judged from full-screen screenshots across all active displays.
-- `Computer Use` is for focus recovery, permission UI, and manual reproduction support. It is not the primary evidence source for candidate visibility.
+- When validating candidate UI, ask for user-provided screenshots across all active displays when needed.
+- `Computer Use` must not operate the input method unless the user explicitly asks for that specific action in the moment.
 
 ### IME Smoke Baseline
 
-`make smoke-ime` should cover, at minimum:
+Manual host verification should cover, at minimum:
 
 - candidate browsing:
   - `shi`
@@ -80,15 +73,6 @@
   - `haopingguo` defaults to phrase candidate `好苹果`
   - confirming the phrase in English commits `good apple`
   - selecting the later short-prefix candidate `好` commits `good` and keeps `pingguo` as the new tail composition
-
-`scripts/smoke-ime.sh` supports:
-
-- `prepare`
-- `observe`
-- `probe <name>`
-- `run`
-- `status`
-- `stop`
 
 ## Dependency policy
 

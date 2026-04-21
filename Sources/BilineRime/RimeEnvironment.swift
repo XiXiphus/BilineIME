@@ -11,15 +11,15 @@ enum RimeError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case let .missingLibrary(url):
+        case .missingLibrary(let url):
             return "Missing librime runtime at \(url.path)"
-        case let .missingResource(name):
+        case .missingResource(let name):
             return "Missing required Rime resource: \(name)"
-        case let .setupFailed(message):
+        case .setupFailed(let message):
             return "Failed to initialize librime: \(message)"
-        case let .deployFailed(message):
+        case .deployFailed(let message):
             return "Failed to deploy Rime schema: \(message)"
-        case let .sessionCreateFailed(message):
+        case .sessionCreateFailed(let message):
             return "Failed to create Rime session: \(message)"
         }
     }
@@ -58,13 +58,15 @@ final class RimeRuntime: @unchecked Sendable {
             isInitialized = false
         }
 
-        guard BRimeSetup(
-            resolvedPaths.libraryPath.path,
-            resolvedPaths.sharedDataDir.path,
-            resolvedPaths.userDataDir.path,
-            resolvedPaths.logDir.path,
-            "rime.bilineime"
-        ) else {
+        guard
+            BRimeSetup(
+                resolvedPaths.libraryPath.path,
+                resolvedPaths.sharedDataDir.path,
+                resolvedPaths.userDataDir.path,
+                resolvedPaths.logDir.path,
+                "rime.bilineime"
+            )
+        else {
             throw RimeError.setupFailed(Self.lastError())
         }
 
@@ -81,8 +83,15 @@ final class RimeRuntime: @unchecked Sendable {
         lexicon = try RimeLexicon.fromDictionaryFiles(
             at: [
                 resolvedPaths.sharedDataDir.appendingPathComponent("luna_pinyin.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent("rime_ice.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent("cn_dicts/8105.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent("cn_dicts/base.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent("cn_dicts/ext.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent("cn_dicts/tencent.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent("cn_dicts/others.dict.yaml"),
                 resolvedPaths.sharedDataDir.appendingPathComponent("biline_phrases.dict.yaml"),
-                resolvedPaths.sharedDataDir.appendingPathComponent("biline_modern_phrases.dict.yaml"),
+                resolvedPaths.sharedDataDir.appendingPathComponent(
+                    "biline_modern_phrases.dict.yaml"),
             ]
         )
         preparedSettings = settings
@@ -107,7 +116,9 @@ final class RimeRuntime: @unchecked Sendable {
         return sessionID
     }
 
-    func resetSession(_ sessionID: BRimeSessionId, schemaID: String, settings: RimeSettings) throws -> BRimeSessionId {
+    func resetSession(_ sessionID: BRimeSessionId, schemaID: String, settings: RimeSettings) throws
+        -> BRimeSessionId
+    {
         _ = BRimeDestroySession(sessionID)
         return try makeSession(schemaID: schemaID, settings: settings)
     }
@@ -117,7 +128,7 @@ final class RimeRuntime: @unchecked Sendable {
             ("ascii_mode", false),
             ("full_shape", false),
             ("ascii_punct", false),
-            ("zh_simp", true),
+            ("zh_trad", settings.characterForm == .traditional),
         ]
 
         for (optionName, enabled) in requiredOptions {
@@ -169,16 +180,20 @@ private struct RimePaths {
 
         let baseDir = appSupport.appendingPathComponent("Rime", isDirectory: true)
         let smokeUserDataDir = UserDefaults.standard.string(forKey: RimeDefaults.smokeUserDataDir)
-        let userDataDir = smokeUserDataDir.map(URL.init(fileURLWithPath:))
+        let userDataDir =
+            smokeUserDataDir.map(URL.init(fileURLWithPath:))
             ?? baseDir.appendingPathComponent("user", isDirectory: true)
         let sharedDataDir = baseDir.appendingPathComponent("shared", isDirectory: true)
         let logDir = baseDir.appendingPathComponent("log", isDirectory: true)
 
         let fallbackLibrary = URL(fileURLWithPath: NSHomeDirectory())
-            .appendingPathComponent("Library/Caches/BilineIME/RimeVendor/1.16.1/lib/librime.1.dylib")
+            .appendingPathComponent(
+                "Library/Caches/BilineIME/RimeVendor/1.16.1/lib/librime.1.dylib")
 
-        let bundleLibrary = Bundle.main.privateFrameworksURL?.appendingPathComponent("librime.1.dylib")
-        let resourceLibrary = Bundle.main.resourceURL?.appendingPathComponent("RimeRuntime/librime.1.dylib")
+        let bundleLibrary = Bundle.main.privateFrameworksURL?.appendingPathComponent(
+            "librime.1.dylib")
+        let resourceLibrary = Bundle.main.resourceURL?.appendingPathComponent(
+            "RimeRuntime/librime.1.dylib")
         let libraryPath = [bundleLibrary, resourceLibrary, fallbackLibrary]
             .compactMap { $0 }
             .first { fileManager.fileExists(atPath: $0.path) }
@@ -225,19 +240,44 @@ private struct RimePaths {
         .first { fileManager.fileExists(atPath: $0.path) }
 
         let vendorFiles = [
-            "luna_pinyin.dict.yaml",
-            "pinyin.yaml",
-            "essay.txt",
+            RimeDataFile(
+                relativePath: "luna_pinyin.dict.yaml",
+                repoRelativePath: "rime-luna-pinyin/luna_pinyin.dict.yaml"),
+            RimeDataFile(
+                relativePath: "pinyin.yaml", repoRelativePath: "rime-luna-pinyin/pinyin.yaml"),
+            RimeDataFile(relativePath: "essay.txt", repoRelativePath: "rime-essay/essay.txt"),
+            RimeDataFile(
+                relativePath: "rime_ice.dict.yaml", repoRelativePath: "rime-ice/rime_ice.dict.yaml"),
+            RimeDataFile(
+                relativePath: "cn_dicts/8105.dict.yaml",
+                repoRelativePath: "rime-ice/cn_dicts/8105.dict.yaml"),
+            RimeDataFile(
+                relativePath: "cn_dicts/base.dict.yaml",
+                repoRelativePath: "rime-ice/cn_dicts/base.dict.yaml"),
+            RimeDataFile(
+                relativePath: "cn_dicts/ext.dict.yaml",
+                repoRelativePath: "rime-ice/cn_dicts/ext.dict.yaml"),
+            RimeDataFile(
+                relativePath: "cn_dicts/tencent.dict.yaml",
+                repoRelativePath: "rime-ice/cn_dicts/tencent.dict.yaml"),
+            RimeDataFile(
+                relativePath: "cn_dicts/others.dict.yaml",
+                repoRelativePath: "rime-ice/cn_dicts/others.dict.yaml"),
         ]
 
-        for fileName in vendorFiles {
-            guard let source = candidateSource(
-                appBundleRoot: vendorDataDir,
-                vendorPath: repoVendorFile(named: fileName)
-            ) else {
-                throw RimeError.missingResource(fileName)
+        for file in vendorFiles {
+            guard
+                let source = candidateSource(
+                    appBundleRoot: vendorDataDir,
+                    relativePath: file.relativePath,
+                    vendorPath: repoVendorFile(relativePath: file.repoRelativePath)
+                )
+            else {
+                throw RimeError.missingResource(file.relativePath)
             }
-            try copyItem(at: source, to: sharedDataDir.appendingPathComponent(fileName), using: fileManager)
+            try copyItem(
+                at: source, to: sharedDataDir.appendingPathComponent(file.relativePath),
+                using: fileManager)
         }
 
         for (resourceName, ext) in [
@@ -247,14 +287,16 @@ private struct RimePaths {
             ("biline_phrases.dict", "yaml"),
             ("biline_modern_phrases.dict", "yaml"),
         ] {
-            let source = Bundle.module.url(
-                forResource: resourceName,
-                withExtension: ext,
-                subdirectory: "RimeTemplates"
-            ) ?? Bundle.module.url(
-                forResource: resourceName,
-                withExtension: ext
-            )
+            let source =
+                Bundle.module.url(
+                    forResource: resourceName,
+                    withExtension: ext,
+                    subdirectory: "RimeTemplates"
+                )
+                ?? Bundle.module.url(
+                    forResource: resourceName,
+                    withExtension: ext
+                )
 
             guard let source else {
                 throw RimeError.missingResource("\(resourceName).\(ext)")
@@ -276,7 +318,8 @@ private struct RimePaths {
     }
 
     private func writeCustomConfig(settings: RimeSettings) throws {
-        let fuzzyPatches: [String] = settings.fuzzyPinyinEnabled
+        let fuzzyPatches: [String] =
+            settings.fuzzyPinyinEnabled
             ? [
                 "      - pinyin:/zh_z_bufen",
                 "      - pinyin:/n_l_bufen",
@@ -285,27 +328,29 @@ private struct RimePaths {
             ]
             : []
 
-        let lines = [
-            "patch:",
-            "  menu/page_size: \(max(1, settings.pageSize))",
-            "  switches/@0/reset: 1",
-            "  simplifier/option_name: zh_simp",
-            "  speller/algebra:",
-            "    __patch:",
-            "      - pinyin:/abbreviation",
-            "      - pinyin:/spelling_correction",
-            "      - pinyin:/key_correction",
-        ] + fuzzyPatches
+        let lines =
+            [
+                "patch:",
+                "  menu/page_size: \(max(1, settings.pageSize))",
+                "  switches/@0/reset: \(settings.characterForm == .traditional ? 1 : 0)",
+                "  zh_trad/option_name: zh_trad",
+                "  speller/algebra:",
+                "    __patch:",
+                "      - pinyin:/abbreviation",
+                "      - pinyin:/spelling_correction",
+                "      - pinyin:/key_correction",
+            ] + fuzzyPatches
 
         let contents = lines.joined(separator: "\n") + "\n"
         let url = userDataDir.appendingPathComponent("biline_pinyin.custom.yaml")
         try contents.write(to: url, atomically: true, encoding: .utf8)
     }
 
-    private func candidateSource(appBundleRoot: URL?, vendorPath: URL) -> URL? {
+    private func candidateSource(appBundleRoot: URL?, relativePath: String, vendorPath: URL) -> URL?
+    {
         let fileManager = FileManager.default
         if let appBundleRoot {
-            let candidate = appBundleRoot.appendingPathComponent(vendorPath.lastPathComponent)
+            let candidate = appBundleRoot.appendingPathComponent(relativePath)
             if fileManager.fileExists(atPath: candidate.path) {
                 return candidate
             }
@@ -320,19 +365,28 @@ private struct RimePaths {
         Bundle.main.resourceURL?.appendingPathComponent("RimeRuntime/rime-data")
     }
 
-    private func repoVendorFile(named fileName: String) -> URL {
+    private func repoVendorFile(relativePath: String) -> URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .appendingPathComponent("Vendor")
-            .appendingPathComponent(fileName == "essay.txt" ? "rime-essay/essay.txt" : "rime-luna-pinyin/\(fileName)")
+            .appendingPathComponent(relativePath)
     }
 
-    private func copyItem(at source: URL, to destination: URL, using fileManager: FileManager) throws {
+    private func copyItem(at source: URL, to destination: URL, using fileManager: FileManager)
+        throws
+    {
+        try fileManager.createDirectory(
+            at: destination.deletingLastPathComponent(), withIntermediateDirectories: true)
         if fileManager.fileExists(atPath: destination.path) {
             try fileManager.removeItem(at: destination)
         }
         try fileManager.copyItem(at: source, to: destination)
     }
+}
+
+private struct RimeDataFile {
+    let relativePath: String
+    let repoRelativePath: String
 }

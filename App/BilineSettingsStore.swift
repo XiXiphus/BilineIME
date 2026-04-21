@@ -17,17 +17,20 @@ struct DefaultSettingsStore: SettingsStore {
     init(
         targetLanguage: TargetLanguage = .english,
         previewEnabled: Bool = Self.boolDefault(forKey: BilineDefaultsKey.previewEnabled) ?? true,
-        compactColumnCount: Int = Self.integerDefault(forKey: BilineDefaultsKey.compactColumnCount) ?? 5,
-        expandedRowCount: Int = Self.integerDefault(forKey: BilineDefaultsKey.expandedRowCount) ?? 5,
-        fuzzyPinyinEnabled: Bool = Self.boolDefault(forKey: BilineDefaultsKey.fuzzyPinyinEnabled) ?? false,
-        characterForm: CharacterForm = .simplified
+        compactColumnCount: Int = Self.integerDefault(forKey: BilineDefaultsKey.compactColumnCount)
+            ?? 5,
+        expandedRowCount: Int = Self.integerDefault(forKey: BilineDefaultsKey.expandedRowCount)
+            ?? 5,
+        fuzzyPinyinEnabled: Bool = Self.boolDefault(forKey: BilineDefaultsKey.fuzzyPinyinEnabled)
+            ?? false,
+        characterForm: CharacterForm = Self.characterFormDefault() ?? .simplified
     ) {
         self.targetLanguage = targetLanguage
         self.previewEnabled = previewEnabled
         self.compactColumnCount = max(1, compactColumnCount)
         self.expandedRowCount = max(1, expandedRowCount)
         self.fuzzyPinyinEnabled = fuzzyPinyinEnabled
-        self.characterForm = .simplified
+        self.characterForm = characterForm
     }
 
     private static func boolDefault(forKey key: String) -> Bool? {
@@ -37,5 +40,13 @@ struct DefaultSettingsStore: SettingsStore {
     private static func integerDefault(forKey key: String) -> Int? {
         let value = UserDefaults.standard.integer(forKey: key)
         return value > 0 ? value : nil
+    }
+
+    private static func characterFormDefault() -> CharacterForm? {
+        guard let rawValue = UserDefaults.standard.string(forKey: BilineDefaultsKey.characterForm)
+        else {
+            return nil
+        }
+        return CharacterForm(rawValue: rawValue)
     }
 }

@@ -1,7 +1,7 @@
 import AppKit
+import BilineOperations
 import BilinePreview
 import BilineSettings
-import Carbon
 import Combine
 import Foundation
 
@@ -31,6 +31,8 @@ final class BilineSettingsModel: ObservableObject {
     private var credentialFileStore: BilineCredentialFileStore {
         BilineCredentialFileStore(inputMethodBundleIdentifier: imeBundleID)
     }
+    private let lifecycleDiagnostics = DevEnvironmentDiagnostics()
+    private let lifecyclePlanner = DevReinstallPlanner()
 
     @Published var provider: TranslationProviderChoice = .off
     @Published var region = "cn-hangzhou"
@@ -38,15 +40,24 @@ final class BilineSettingsModel: ObservableObject {
     @Published var compactColumnCount = 5
     @Published var expandedRowCount = 5
     @Published var fuzzyPinyinEnabled = false
+    @Published var characterForm: CharacterForm = .simplified
     @Published var previewEnabled = true
     @Published var imeInstalled = false
     @Published var imeRunning = false
+    @Published var rimeUserDictionaryExists = false
     @Published var currentInputSource = ""
     @Published var settingsAppPath = ""
     @Published var settingsRegisteredPaths: [String] = []
+    @Published var settingsLaunchServicesPathCount = 0
+    @Published var settingsInstalledAtStablePath = false
+    @Published var imeInstalledAtStablePath = false
+    @Published var lifecycleRecommendation = "未知"
+    @Published var lifecyclePlanText = ""
+    @Published var characterFormDefaultsRawValue = ""
     @Published var imeInstallPath = BilineAppPath.devInputMethodInstallURL.path
     @Published var credentialFileStatus = BilineCredentialFileStatus(
-        fileURL: BilineAppPath.credentialFileURL(inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle),
+        fileURL: BilineAppPath.credentialFileURL(
+            inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle),
         accessKeyIdLength: nil,
         accessKeySecretLength: nil,
         loadError: .missing
@@ -58,6 +69,10 @@ final class BilineSettingsModel: ObservableObject {
 
     var rimeUserDirectory: URL {
         BilineAppPath.rimeUserDirectory(inputMethodBundleIdentifier: imeBundleID)
+    }
+
+    var rimeUserDictionaryURL: URL {
+        BilineAppPath.rimeUserDictionaryURL(inputMethodBundleIdentifier: imeBundleID)
     }
 
     var credentialFileURL: URL {
@@ -92,7 +107,21 @@ final class BilineSettingsModel: ObservableObject {
         }
     }
 
+    var characterFormTitle: String {
+        switch characterForm {
+        case .simplified:
+            return "简体"
+        case .traditional:
+            return "繁体"
+        }
+    }
+
+    var characterFormDefaultsStatus: String {
+        characterFormDefaultsRawValue.isEmpty ? "未保存，默认简体" : characterFormDefaultsRawValue
+    }
+
     func refresh() {
+        let lifecycleSnapshot = lifecycleDiagnostics.snapshot()
         loadDefaults()
         credentialFileStatus = credentialFileStore.status()
         settingsAppPath = Bundle.main.bundleURL.path
@@ -100,10 +129,17 @@ final class BilineSettingsModel: ObservableObject {
             .urlsForApplications(withBundleIdentifier: BilineAppIdentifier.devSettingsBundle)
             .map(\.path)
             .sorted()
-        imeInstallPath = BilineAppPath.devInputMethodInstallURL.path
-        imeInstalled = FileManager.default.fileExists(atPath: imeInstallPath)
-        imeRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: imeBundleID).isEmpty
-        currentInputSource = currentKeyboardInputSourceID()
+        settingsLaunchServicesPathCount = lifecycleSnapshot.settingsLaunchServicesPathCount
+        settingsInstalledAtStablePath = lifecycleSnapshot.settingsInstalledAtStablePath
+        imeInstalledAtStablePath = lifecycleSnapshot.imeInstalledAtStablePath
+        lifecycleRecommendation = lifecycleSnapshot.recommendedRepairText
+        lifecyclePlanText = lifecyclePlanner.plan(level: .level1).rendered
+        characterFormDefaultsRawValue = lifecycleSnapshot.characterFormDefaultsRawValue
+        imeInstallPath = lifecycleSnapshot.imeInstallPath
+        imeInstalled = lifecycleSnapshot.imeInstalled
+        imeRunning = lifecycleSnapshot.imeRunning
+        rimeUserDictionaryExists = lifecycleSnapshot.rimeUserDictionaryExists
+        currentInputSource = lifecycleSnapshot.currentInputSource
     }
 
     func saveTranslationSettings(accessKeyId: String, accessKeySecret: String) {
@@ -133,8 +169,12 @@ final class BilineSettingsModel: ObservableObject {
         }
 
         defaultsStore.set(provider.rawValue, forKey: BilineDefaultsKey.translationProvider)
-        defaultsStore.set(region.trimmingCharacters(in: .whitespacesAndNewlines), forKey: BilineDefaultsKey.alibabaRegionId)
-        defaultsStore.set(endpoint.trimmingCharacters(in: .whitespacesAndNewlines), forKey: BilineDefaultsKey.alibabaEndpoint)
+        defaultsStore.set(
+            region.trimmingCharacters(in: .whitespacesAndNewlines),
+            forKey: BilineDefaultsKey.alibabaRegionId)
+        defaultsStore.set(
+            endpoint.trimmingCharacters(in: .whitespacesAndNewlines),
+            forKey: BilineDefaultsKey.alibabaEndpoint)
         defaultsStore.synchronize()
         refresh()
     }
@@ -144,6 +184,7 @@ final class BilineSettingsModel: ObservableObject {
         defaultsStore.set(previewEnabled, forKey: BilineDefaultsKey.previewEnabled)
         defaultsStore.set(compactColumnCount, forKey: BilineDefaultsKey.compactColumnCount)
         defaultsStore.set(expandedRowCount, forKey: BilineDefaultsKey.expandedRowCount)
+        defaultsStore.set(characterForm.rawValue, forKey: BilineDefaultsKey.characterForm)
         defaultsStore.synchronize()
         refresh()
     }
@@ -194,25 +235,38 @@ final class BilineSettingsModel: ObservableObject {
     }
 
     func openInputSourceSettings() {
-        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension") {
+        if let url = URL(string: "x-apple.systempreferences:com.apple.Keyboard-Settings.extension")
+        {
             NSWorkspace.shared.open(url)
         } else {
-            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
+            NSWorkspace.shared.open(
+                URL(fileURLWithPath: "/System/Applications/System Settings.app"))
         }
     }
 
     func openRimeUserDirectory() {
-        try? FileManager.default.createDirectory(at: rimeUserDirectory, withIntermediateDirectories: true)
+        try? FileManager.default.createDirectory(
+            at: rimeUserDirectory, withIntermediateDirectories: true)
         NSWorkspace.shared.open(rimeUserDirectory)
     }
 
     private func loadDefaults() {
-        let providerRaw = defaultsStore.string(forKey: BilineDefaultsKey.translationProvider) ?? TranslationProviderChoice.off.rawValue
+        let providerRaw =
+            defaultsStore.string(forKey: BilineDefaultsKey.translationProvider)
+            ?? TranslationProviderChoice.off.rawValue
         provider = TranslationProviderChoice(rawValue: providerRaw) ?? .off
         region = defaultsStore.string(forKey: BilineDefaultsKey.alibabaRegionId) ?? "cn-hangzhou"
-        endpoint = defaultsStore.string(forKey: BilineDefaultsKey.alibabaEndpoint) ?? "https://mt.cn-hangzhou.aliyuncs.com"
-        fuzzyPinyinEnabled = defaultsStore.bool(forKey: BilineDefaultsKey.fuzzyPinyinEnabled) ?? false
-        compactColumnCount = resolvedInteger(forKey: BilineDefaultsKey.compactColumnCount, fallback: 5)
+        endpoint =
+            defaultsStore.string(forKey: BilineDefaultsKey.alibabaEndpoint)
+            ?? "https://mt.cn-hangzhou.aliyuncs.com"
+        fuzzyPinyinEnabled =
+            defaultsStore.bool(forKey: BilineDefaultsKey.fuzzyPinyinEnabled) ?? false
+        characterForm =
+            CharacterForm(
+                rawValue: defaultsStore.string(forKey: BilineDefaultsKey.characterForm) ?? "")
+            ?? .simplified
+        compactColumnCount = resolvedInteger(
+            forKey: BilineDefaultsKey.compactColumnCount, fallback: 5)
         expandedRowCount = resolvedInteger(forKey: BilineDefaultsKey.expandedRowCount, fallback: 5)
         previewEnabled = defaultsStore.bool(forKey: BilineDefaultsKey.previewEnabled) ?? true
     }
@@ -229,12 +283,4 @@ final class BilineSettingsModel: ObservableObject {
         }
     }
 
-    private func currentKeyboardInputSourceID() -> String {
-        guard let source = TISCopyCurrentKeyboardInputSource()?.takeRetainedValue(),
-            let pointer = TISGetInputSourceProperty(source, kTISPropertyInputSourceID)
-        else {
-            return ""
-        }
-        return Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue() as? String ?? ""
-    }
 }

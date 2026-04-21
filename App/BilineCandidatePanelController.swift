@@ -8,6 +8,7 @@ final class BilineCandidatePanelController: @unchecked Sendable {
     private let layout = CandidatePanelLayout()
     private var isVisible = false
     private var lastFrame = NSRect.zero
+    private var lastWindowLevelRawValue: Int?
 
     init() {
         self.contentView = BilineCandidatePanelView(frame: .zero)
@@ -42,7 +43,10 @@ final class BilineCandidatePanelController: @unchecked Sendable {
         }
         let panelSize = contentView.preferredSize
         let panelFrame = layout.positionedFrame(size: panelSize, anchorRect: anchorRect)
-        panel.level = windowLevel
+        if lastWindowLevelRawValue != windowLevel.rawValue {
+            panel.level = windowLevel
+            lastWindowLevelRawValue = windowLevel.rawValue
+        }
         if panelFrame != lastFrame {
             panel.setFrame(panelFrame, display: true)
             lastFrame = panelFrame
@@ -58,5 +62,6 @@ final class BilineCandidatePanelController: @unchecked Sendable {
         panel.orderOut(nil)
         isVisible = false
         lastFrame = .zero
+        lastWindowLevelRawValue = nil
     }
 }

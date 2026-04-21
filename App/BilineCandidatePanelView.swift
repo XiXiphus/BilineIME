@@ -4,13 +4,10 @@ import Cocoa
 final class BilineCandidatePanelView: NSView {
     var snapshot: BilingualCompositionSnapshot = .idle {
         didSet {
-            if oldValue.rawInput != snapshot.rawInput
-                || oldValue.items.map(\.candidate.id) != snapshot.items.map(\.candidate.id)
-            {
+            if shouldInvalidateLineSizeCache(oldValue: oldValue, newValue: snapshot) {
                 lineSizeCache.removeAll()
             }
             needsDisplay = true
-            invalidateIntrinsicContentSize()
         }
     }
 
@@ -29,12 +26,22 @@ final class BilineCandidatePanelView: NSView {
     let fallbackFontResolver = SystemFallbackFontResolver()
     private var lineSizeCache: [CandidatePanelLineSizeKey: NSSize] = [:]
 
-    override var intrinsicContentSize: NSSize {
-        preferredSize
-    }
-
     override func draw(_ dirtyRect: NSRect) {
         drawSnapshot()
+    }
+
+    private func shouldInvalidateLineSizeCache(
+        oldValue: BilingualCompositionSnapshot,
+        newValue: BilingualCompositionSnapshot
+    ) -> Bool {
+        if oldValue.rawInput != newValue.rawInput { return true }
+        if oldValue.items.count != newValue.items.count { return true }
+        for index in 0..<newValue.items.count {
+            if oldValue.items[index].candidate.id != newValue.items[index].candidate.id {
+                return true
+            }
+        }
+        return false
     }
 
     func candidateLineSize(column: Int, item: BilingualCandidateItem) -> NSSize {

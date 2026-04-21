@@ -2,7 +2,7 @@ import BilineHost
 import XCTest
 
 final class CandidateAnchorTrackerTests: XCTestCase {
-    private let context = CandidateAnchorContext(clientID: "client-a", revision: 1)
+    private let context = CandidateAnchorContext(clientID: "client-a")
 
     func testResolveReturnsCurrentRectWhenValid() {
         let tracker = CandidateAnchorTracker()
@@ -21,14 +21,24 @@ final class CandidateAnchorTrackerTests: XCTestCase {
         XCTAssertEqual(tracker.resolve(currentRect: nil, context: context), validRect)
     }
 
-    func testResolveDoesNotFallbackAcrossContexts() {
+    func testResolveReusesLastValidRectAcrossKeystrokesForSameClient() {
+        // The cache is keyed by clientID so that a momentary invalid rect
+        // from the host (common during marked-text reflows) does not jump
+        // the candidate panel back to (0, 0). Successive keystrokes against
+        // the same client must continue to see the last good rect.
         let tracker = CandidateAnchorTracker()
         let validRect = CandidateAnchorRect(x: 10, y: 20, width: 0, height: 18)
-        let nextRevision = CandidateAnchorContext(clientID: "client-a", revision: 2)
-        let nextClient = CandidateAnchorContext(clientID: "client-b", revision: 1)
 
         XCTAssertEqual(tracker.resolve(currentRect: validRect, context: context), validRect)
-        XCTAssertNil(tracker.resolve(currentRect: nil, context: nextRevision))
+        XCTAssertEqual(tracker.resolve(currentRect: nil, context: context), validRect)
+    }
+
+    func testResolveDoesNotFallbackAcrossClients() {
+        let tracker = CandidateAnchorTracker()
+        let validRect = CandidateAnchorRect(x: 10, y: 20, width: 0, height: 18)
+        let nextClient = CandidateAnchorContext(clientID: "client-b")
+
+        XCTAssertEqual(tracker.resolve(currentRect: validRect, context: context), validRect)
         XCTAssertNil(tracker.resolve(currentRect: nil, context: nextClient))
     }
 

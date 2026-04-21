@@ -18,7 +18,11 @@ extension BilingualInputSession {
             let snapshotToFire: BilingualCompositionSnapshot?
             if lockDepth == 0, hasPendingNotification {
                 hasPendingNotification = false
-                snapshotToFire = currentSnapshot
+                if suppressSnapshotNotification {
+                    snapshotToFire = nil
+                } else {
+                    snapshotToFire = currentSnapshot
+                }
             } else {
                 snapshotToFire = nil
             }

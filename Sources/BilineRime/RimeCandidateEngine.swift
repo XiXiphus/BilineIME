@@ -227,9 +227,17 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
             .flatMap { $0.isEmpty ? nil : $0 }
             ?? rawInput
 
+        // Tokenize the rawInput once and share the result across every
+        // candidate's consumption probe. Without this, `tokenizeAll` (a
+        // recursive DP) ran once per candidate per keystroke — ≈25 times
+        // for a 5-column page — re-doing the same work and dominating CPU
+        // time on the key-event hot path.
+        let tokenizations = tokenizer.tokenizeAll(rawInput)
         var candidates: [Candidate] = []
         var consumptions: [RimeConsumption] = []
         if let basePointer = snapshot.candidates {
+            candidates.reserveCapacity(candidateCount)
+            consumptions.reserveCapacity(candidateCount)
             for index in 0..<candidateCount {
                 let candidate = basePointer[index]
                 let rawText = candidate.text.map { String(cString: $0) } ?? ""
@@ -239,7 +247,8 @@ final class RimeCandidateEngineSession: CandidateEngineSession, @unchecked Senda
                     forSurface: rawText,
                     rawInput: rawInput,
                     comment: comment,
-                    tokenizer: tokenizer
+                    tokenizer: tokenizer,
+                    tokenizations: tokenizations
                 )
                 consumptions.append(consumption)
                 candidates.append(

@@ -272,16 +272,17 @@ final class BilineInputController: IMKInputController {
             return inputSession.snapshot.isComposing
         }
 
-        textInputBridge.hide(candidatePanel: candidatePanel)
-        textInputBridge.clearAnchorCache()
         textInputBridge.insertCommittedText(committedText, into: client)
+        let postSnapshot = inputSession.snapshot
+        if !postSnapshot.isComposing {
+            textInputBridge.clearAnchorCache()
+        }
         #if DEBUG
-            let snapshot = inputSession.snapshot
             smokeLogger.notice(
-                "SMOKE_COMMIT committedText=\(self.smokeValue(committedText), privacy: .public) postCommitRawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public)"
+                "SMOKE_COMMIT committedText=\(self.smokeValue(committedText), privacy: .public) postCommitRawInput=\(self.smokeValue(postSnapshot.rawInput), privacy: .public) isComposing=\(postSnapshot.isComposing, privacy: .public)"
             )
         #endif
-        render(client: client)
+        render(client: client, snapshot: postSnapshot)
         return true
     }
 
@@ -325,6 +326,20 @@ final class BilineInputController: IMKInputController {
         client: IMKTextInput,
         loggingSource: StaticString
     ) -> Bool {
+        // Suppress the session's snapshot-update callback for the duration
+        // of this sync key-event handling. Each routeAndApply call performs
+        // exactly one explicit render at the end (or inside a commit
+        // helper), so we do not want the session's per-mutation callback to
+        // also fire and double-render through IMK/AppKit.
+        inputSession.suppressSnapshotNotification = true
+        defer { inputSession.suppressSnapshotNotification = false }
+
+        // Snapshot session state once. The previous implementation acquired
+        // the recursive state lock five separate times while building the
+        // router state, which adds overhead and (more importantly) lets the
+        // engine snapshot drift mid-construction if another thread mutates
+        // it.
+        let snapshot = inputSession.snapshot
         let compositionMode: InputCompositionMode
         switch inputSession.compositionMode {
         case .candidateCompact:
@@ -339,14 +354,14 @@ final class BilineInputController: IMKInputController {
             event: event,
             state: InputControllerState(
                 compositionMode: compositionMode,
-                isComposing: inputSession.snapshot.isComposing,
-                canDeleteBackward: inputSession.canDeleteBackward,
-                hasCandidates: inputSession.hasCandidates,
-                compactColumnCount: inputSession.snapshot.compactColumnCount,
+                isComposing: snapshot.isComposing,
+                canDeleteBackward: !snapshot.rawInput.isEmpty,
+                hasCandidates: !snapshot.items.isEmpty,
+                compactColumnCount: snapshot.compactColumnCount,
                 punctuationForm: inputSession.punctuationForm,
-                pageIndex: inputSession.snapshot.pageIndex,
-                selectedRow: inputSession.snapshot.selectedRow,
-                isExpandedPresentation: inputSession.snapshot.presentationMode == .expanded,
+                pageIndex: snapshot.pageIndex,
+                selectedRow: snapshot.selectedRow,
+                isExpandedPresentation: snapshot.presentationMode == .expanded,
                 hasEverExpandedInCurrentComposition: inputSession
                     .hasEverExpandedInCurrentComposition,
                 hasExplicitCandidateSelection: inputSession.hasExplicitCandidateSelection
@@ -360,7 +375,7 @@ final class BilineInputController: IMKInputController {
                     "First handled key keyCode=\(event.keyCode) chars=\(event.characters ?? "", privacy: .public) charsIgnoring=\(event.charactersIgnoringModifiers ?? "", privacy: .public) action=\(String(describing: action), privacy: .public)"
                 )
             }
-            if inputSession.snapshot.isComposing, action == .passThrough {
+            if snapshot.isComposing, action == .passThrough {
                 logger.info(
                     "[\(loggingSource, privacy: .public)] unhandled composing event type=\(String(describing: event.type), privacy: .public) keyCode=\(event.keyCode) chars=\(event.characters ?? "", privacy: .public) charsIgnoring=\(event.charactersIgnoringModifiers ?? "", privacy: .public) modifiers=\(event.modifierFlags.rawValue)"
                 )
@@ -385,8 +400,6 @@ final class BilineInputController: IMKInputController {
         case .toggleLayer:
             inputSession.toggleActiveLayer()
         case .commitChineseAndInsert(let text):
-            textInputBridge.hide(candidatePanel: candidatePanel)
-            textInputBridge.clearAnchorCache()
             let committedText = inputSession.commitChineseSelection()
             if let committedText, !committedText.isEmpty {
                 textInputBridge.insertCommittedText(committedText, into: client)
@@ -395,6 +408,10 @@ final class BilineInputController: IMKInputController {
                 inputSession.renderCommittedText(text),
                 into: client
             )
+            // Punctuation always finalizes composition; clear the anchor
+            // cache so the next composing keystroke re-anchors against the
+            // fresh caret position.
+            textInputBridge.clearAnchorCache()
             render(client: client)
             return true
         case .deleteBackward:
@@ -404,7 +421,6 @@ final class BilineInputController: IMKInputController {
         case .commitRawInput:
             return commitRawInput(using: client)
         case .cancel:
-            textInputBridge.hide(candidatePanel: candidatePanel)
             inputSession.cancel()
             textInputBridge.clearAnchorCache()
         case .moveColumn(let direction):
@@ -434,10 +450,12 @@ final class BilineInputController: IMKInputController {
             return inputSession.snapshot.isComposing
         }
 
-        textInputBridge.hide(candidatePanel: candidatePanel)
-        textInputBridge.clearAnchorCache()
         textInputBridge.insertCommittedText(committedText, into: client)
-        render(client: client)
+        let postSnapshot = inputSession.snapshot
+        if !postSnapshot.isComposing {
+            textInputBridge.clearAnchorCache()
+        }
+        render(client: client, snapshot: postSnapshot)
         return true
     }
 

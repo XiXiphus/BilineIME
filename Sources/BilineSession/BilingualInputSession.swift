@@ -34,6 +34,15 @@ public final class BilingualInputSession: @unchecked Sendable {
     var lockDepth = 0
     var hasPendingNotification = false
 
+    /// When true, snapshot updates produced inside `withStateLock` are
+    /// "consumed" without invoking `onSnapshotUpdate`. Sync key-event
+    /// handling sets this to render exactly once at the end of
+    /// `routeAndApply`, eliminating the redundant render that previously
+    /// fired both from the snapshot callback and from the controller's
+    /// trailing `render(client:)`. Async preview tasks leave this `false`
+    /// so their state changes still notify subscribers.
+    public var suppressSnapshotNotification = false
+
     public init(
         settingsStore: any SettingsStore,
         engineFactory: any CandidateEngineFactory,

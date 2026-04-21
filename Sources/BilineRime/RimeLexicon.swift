@@ -84,7 +84,29 @@ struct RimeLexicon: Sendable {
         comment: String?,
         tokenizer: PinyinTokenizer
     ) -> RimeConsumption {
-        let tokenizations = tokenizer.tokenizeAll(rawInput)
+        consumption(
+            forSurface: surface,
+            rawInput: rawInput,
+            comment: comment,
+            tokenizer: tokenizer,
+            tokenizations: tokenizer.tokenizeAll(rawInput)
+        )
+    }
+
+    /// Variant that accepts pre-computed tokenizations so a hot path that
+    /// processes many candidates against the same `rawInput` (e.g. the Rime
+    /// candidate-engine snapshot mapper) can tokenize once and reuse the
+    /// result for every candidate. `tokenizeAll` runs a recursive DP over
+    /// the input, which is non-trivial for typical 5–10 syllable inputs and
+    /// gets called per keystroke per candidate (≈ 25 times) without this
+    /// overload.
+    func consumption(
+        forSurface surface: String,
+        rawInput: String,
+        comment: String?,
+        tokenizer: PinyinTokenizer,
+        tokenizations: [[String]]
+    ) -> RimeConsumption {
         guard !tokenizations.isEmpty else {
             let tokens = tokenizer.readingTokens(from: comment ?? "") ?? []
             return RimeConsumption(tokenCount: tokens.count, tokens: tokens)

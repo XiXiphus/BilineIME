@@ -18,13 +18,21 @@ public struct CandidateAnchorRect: Sendable, Equatable {
     }
 }
 
+/// Identifies the input client whose caret rect we are tracking.
+///
+/// The cache is intentionally keyed only by `clientID` so that a momentary
+/// invalid rect from the host (which happens often around marked-text resets,
+/// IMK XPC races, or background-thread queries) can fall back to the most
+/// recent good rect for the same client. Apple's IMK guidance is that hosts
+/// may temporarily return a zero/garbage rect for `attributesForCharacterIndex:lineHeightRectangle:`
+/// while their layout settles; we should remember the last known good rect
+/// for the lifetime of the client and only invalidate it when the client
+/// changes (or `clear()` is called explicitly on commit/cancel/deactivate).
 public struct CandidateAnchorContext: Sendable, Equatable {
     public let clientID: String
-    public let revision: Int
 
-    public init(clientID: String, revision: Int) {
+    public init(clientID: String) {
         self.clientID = clientID
-        self.revision = revision
     }
 }
 
@@ -38,12 +46,15 @@ public final class CandidateAnchorTracker: @unchecked Sendable {
         currentRect: CandidateAnchorRect?,
         context: CandidateAnchorContext
     ) -> CandidateAnchorRect? {
+        if lastContext != context {
+            lastValidRect = nil
+            lastContext = context
+        }
         if let currentRect, currentRect.isValid {
             lastValidRect = currentRect
-            lastContext = context
             return currentRect
         }
-        return lastContext == context ? lastValidRect : nil
+        return lastValidRect
     }
 
     public func clear() {

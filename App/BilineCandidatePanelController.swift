@@ -34,10 +34,24 @@ final class BilineCandidatePanelController: @unchecked Sendable {
         windowLevel: NSWindow.Level
     ) {
         guard snapshot.isComposing, !snapshot.rawInput.isEmpty else {
-            hide()
+            hide(reason: "snapshot-not-composing-or-empty")
             return
         }
 
+        #if DEBUG
+            BilineHostSmokeReporter.shared.record(
+                .panelRenderRequested,
+                fields: [
+                    "rawInput": snapshot.rawInput,
+                    "candidateCount": String(snapshot.items.count),
+                    "anchorX": String(describing: anchorRect.origin.x),
+                    "anchorY": String(describing: anchorRect.origin.y),
+                    "anchorWidth": String(describing: anchorRect.size.width),
+                    "anchorHeight": String(describing: anchorRect.size.height),
+                    "windowLevel": String(windowLevel.rawValue),
+                ]
+            )
+        #endif
         if contentView.snapshot != snapshot {
             contentView.snapshot = snapshot
         }
@@ -54,15 +68,50 @@ final class BilineCandidatePanelController: @unchecked Sendable {
         if !isVisible {
             panel.orderFrontRegardless()
             isVisible = true
+            #if DEBUG
+                BilineHostSmokeReporter.shared.record(
+                    .panelShown,
+                    fields: [
+                        "frameX": String(describing: panelFrame.origin.x),
+                        "frameY": String(describing: panelFrame.origin.y),
+                        "frameWidth": String(describing: panelFrame.size.width),
+                        "frameHeight": String(describing: panelFrame.size.height),
+                        "candidateCount": String(snapshot.items.count),
+                        "rawInput": snapshot.rawInput,
+                    ]
+                )
+            #endif
+        } else {
+            #if DEBUG
+                BilineHostSmokeReporter.shared.record(
+                    .panelUpdated,
+                    fields: [
+                        "frameX": String(describing: panelFrame.origin.x),
+                        "frameY": String(describing: panelFrame.origin.y),
+                        "frameWidth": String(describing: panelFrame.size.width),
+                        "frameHeight": String(describing: panelFrame.size.height),
+                        "candidateCount": String(snapshot.items.count),
+                        "rawInput": snapshot.rawInput,
+                    ]
+                )
+            #endif
         }
     }
 
-    func hide() {
+    func hide(reason: String = "unspecified") {
         guard isVisible else { return }
         panel.orderOut(nil)
         isVisible = false
         lastFrame = .zero
         lastWindowLevelRawValue = nil
+        #if DEBUG
+            BilineHostSmokeReporter.shared.record(
+                .panelHidden,
+                fields: [
+                    "reason": reason
+                ]
+            )
+        #endif
     }
 
     /// Applies a new theme to the contained view. Layout-affecting changes

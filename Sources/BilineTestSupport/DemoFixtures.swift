@@ -19,11 +19,13 @@ public enum DemoFixtures {
         delay: Duration = .zero,
         failures: Set<String> = [],
         previewEnabled: Bool = true,
+        bilingualModeEnabled: Bool = true,
         punctuationForm: PunctuationForm = .fullwidth
     ) -> BilingualInputSession {
         BilingualInputSession(
             settingsStore: DemoSettingsStore(
                 previewEnabled: previewEnabled,
+                bilingualModeEnabled: bilingualModeEnabled,
                 compactColumnCount: compactColumnCount,
                 expandedRowCount: expandedRowCount,
                 punctuationForm: punctuationForm
@@ -55,6 +57,7 @@ public enum DemoFixtures {
 private struct DemoSettingsStore: SettingsStore {
     let targetLanguage: TargetLanguage = .english
     let previewEnabled: Bool
+    let bilingualModeEnabled: Bool
     let compactColumnCount: Int
     let expandedRowCount: Int
     let fuzzyPinyinEnabled: Bool = false

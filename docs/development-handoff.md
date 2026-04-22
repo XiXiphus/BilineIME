@@ -40,6 +40,9 @@ make project
 make test
 make build-ime
 make install-ime
+make remove-ime
+make reset-ime
+make dev-pkg
 ```
 
 Important constraints:
@@ -48,18 +51,19 @@ Important constraints:
 - Do not launch the IME app directly with `open`.
 - Do not script System Settings permission dialogs. Click macOS prompts manually.
 - After install, manually add/select `BilineIME Dev` in the target host app.
+- `make dev-pkg` is only for prerelease tester packaging; it does not replace the local dev lifecycle.
 
 If the input source does not appear or looks stale:
 
 ```bash
 make diagnose-ime
-make repair-ime
+make reset-ime
 ```
 
-`make repair-ime` is a dry-run plan by default. Use `make repair-ime CONFIRM=1`
-only when ready to execute Level 2 repair, and use
-`make repair-ime REPAIR_LEVEL=3 CONFIRM=1` only as a last resort because it
-resets Launch Services state and requires a reboot.
+`make reset-ime` is a dry-run plan by default. Use `make reset-ime CONFIRM=1`
+only when ready to execute a destructive reset. The default `RESET_DEPTH` is
+`cache-prune`; use `RESET_DEPTH=launch-services-reset CONFIRM=1` only as a last
+resort because it resets the Launch Services database and requires a reboot.
 
 ## 3. Rime Runtime Notes
 
@@ -189,32 +193,95 @@ make build-ime
 make install-ime
 ```
 
-Then manually switch the target host app, usually TextEdit, to `BilineIME Dev`.
-Codex and project scripts must stop here. The user must select the input source,
-focus TextEdit, type, browse, commit, and report the result manually.
+Then validate in the target host app, usually TextEdit. The default flow is
+manual: the user selects `BilineIME Dev`, focuses TextEdit, types, browses,
+commits, and reports the result.
 
 ```bash
 ./scripts/select-input-source.sh current
 ```
 
-Release packaging is paused. The release target remains in `project.yml`, but
-there is no supported Make or script entrypoint for release packaging until the
-dev lifecycle and first-use flow are stable.
+Formal release packaging is paused. The release target remains in `project.yml`,
+but there is still no supported Make or script entrypoint for notarized release
+distribution until the dev lifecycle and first-use flow are stable.
 
-Automated probes and key-injection scripts were removed. Do not recreate them
-without an explicit project decision that reverses the manual-only host rule.
+The supported tester distribution path is:
+
+```bash
+make dev-pkg
+```
+
+It writes three unsigned packages to `build/dist`:
+
+- `BilineIMEDev-<version>.pkg` installs the dev IME into `/Library/Input Methods`
+  and the dev Settings app into `/Applications`.
+- `BilineIMEDev-Uninstall-<version>.pkg` removes the packaged dev apps while
+  preserving Biline-local data.
+- `BilineIMEDev-DeepClean-<version>.pkg` removes the packaged dev apps and clears
+  Biline-local data before a future formal release install.
+
+After install or deep clean, testers should log out and back in, then manually
+add or re-add `BilineIME Dev` from System Settings.
+
+Ad hoc automated probes and key-injection scripts remain out of bounds. Use only
+the supported `bilinectl smoke-host dev --confirm` / `make smoke-ime-host`
+entrypoint for explicit local host smoke.
 
 ## 6. Smoke-Test Rules
 
-The smoke harness is manual-only and evidence-first:
+Smoke testing is layered and evidence-first. Treat install, manual source
+enrollment, and source-ready host smoke as three separate phases — never mix
+them in a single command path.
 
-- User manually switches the host app to `BilineIME Dev`.
-- User manually types, browses candidates, commits, and reports host text.
-- Codex may read logs and run read-only diagnostics after the user finishes.
-- Codex must not switch input sources, focus TextEdit, inject keys, or drive
-  candidate browsing.
-- Candidate panel visibility is proven by all-display screenshots, not only by
-  a host accessibility tree.
+- CI-safe tests cover session, router, settings, and anchor ordering without a
+  host app.
+- The default real-host flow is manual: the user switches TextEdit to
+  `BilineIME Dev`, types, browses candidates, commits, and reports host text.
+- Inspect input source readiness without driving the host:
+
+```bash
+make smoke-ime-host-check
+# or
+bilinectl smoke-host dev --check
+```
+
+- Open System Settings → Keyboard → Input Sources to finish manual onboarding
+  (this helper does NOT click `Allow`, does NOT enable the source, and does NOT
+  switch sources):
+
+```bash
+make smoke-ime-host-prepare
+# or
+bilinectl smoke-host dev --prepare
+```
+
+- Once readiness is `ready` or `source-not-selected`, the explicit local
+  harness is available through:
+
+```bash
+make smoke-ime-host SMOKE_SCENARIO=candidate-popup
+make smoke-ime-host SMOKE_SCENARIO=browse
+make smoke-ime-host SMOKE_SCENARIO=commit
+make smoke-ime-host SMOKE_SCENARIO=settings-refresh
+make smoke-ime-host SMOKE_SCENARIO=full
+```
+
+- `bilinectl smoke-host dev --confirm` may switch input sources, focus TextEdit,
+  inject keys, and capture artifacts only when the user asks for that exact
+  automated smoke action in the moment.
+- The harness fails fast if readiness is `bundle-missing`, `source-missing`,
+  `source-disabled`, or `source-not-selectable`, and prints a remediation hint
+  pointing back to install / manual onboarding rather than continuing into host
+  automation.
+- The `--install` flag has been removed from `smoke-host`. Run
+  `bilinectl install dev --confirm` (or `make install-ime`) explicitly when you
+  need to (re)install bundles before running the harness.
+- The harness is local-only and must not become a CI gate.
+- The harness must keep exactly one `TextEdit` session alive. If the document or
+  focus state is dirty, restart that single session instead of opening multiple
+  `TextEdit` windows/documents.
+- Candidate panel visibility is proven by host-smoke telemetry plus
+  all-display screenshots when needed.
 - `Computer Use` is a visual/debugging aid, not the primary smoke runner.
 
 If a macOS prompt asks whether to allow an input method or `swift-frontend`, the
@@ -226,7 +293,7 @@ Input source is missing or stale:
 
 ```bash
 make diagnose-ime
-make repair-ime
+make reset-ime
 ```
 
 IME process exists but no panel appears:

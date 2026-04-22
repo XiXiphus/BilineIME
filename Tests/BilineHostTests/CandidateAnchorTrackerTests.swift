@@ -58,4 +58,36 @@ final class CandidateAnchorTrackerTests: XCTestCase {
         tracker.clear()
         XCTAssertNil(tracker.resolve(currentRect: nil, context: context))
     }
+
+    func testAttributeQueryPlannerStartsAtCursorThenScansBackToZero() {
+        XCTAssertEqual(
+            CandidateAnchorQueryPlanner.attributeQueries(anchorIndex: 3),
+            [
+                CandidateAnchorAttributeQuery(index: 3, source: "attributes-cursor"),
+                CandidateAnchorAttributeQuery(index: 2, source: "attributes-scan"),
+                CandidateAnchorAttributeQuery(index: 1, source: "attributes-scan"),
+                CandidateAnchorAttributeQuery(index: 0, source: "attributes-zero"),
+            ]
+        )
+    }
+
+    func testAttributeQueryPlannerUsesZeroForStartOfInlineSession() {
+        XCTAssertEqual(
+            CandidateAnchorQueryPlanner.attributeQueries(anchorIndex: 0),
+            [
+                CandidateAnchorAttributeQuery(index: 0, source: "attributes-cursor")
+            ]
+        )
+    }
+
+    func testAttributeQueryPlannerLabelsInvalidationPass() {
+        XCTAssertEqual(
+            CandidateAnchorQueryPlanner.attributeQueries(anchorIndex: 2, afterInvalidation: true),
+            [
+                CandidateAnchorAttributeQuery(index: 2, source: "attributes-after-invalidate"),
+                CandidateAnchorAttributeQuery(index: 1, source: "attributes-after-invalidate"),
+                CandidateAnchorAttributeQuery(index: 0, source: "attributes-after-invalidate"),
+            ]
+        )
+    }
 }

@@ -37,7 +37,16 @@
 - `make build-ime` succeeds on a machine with Xcode installed.
 - `make install-ime` installs the dev input method into `~/Library/Input Methods` without requiring manual bundle copying.
 - `make install-ime` does not depend on automatic source activation to count as a successful install.
-- IME-facing behavior changes are verified in a real host after install, with `TextEdit` as the baseline host and the user performing all input-source selection, focus, typing, browsing, and commit actions manually.
-- Codex and project scripts must not switch input sources, focus TextEdit, inject keys, or drive candidate browsing. Candidate-panel checks use user-provided screenshots across displays when necessary.
-- `make repair-ime` provides a staged recovery path for ghost Biline sources and broken Keyboard settings state.
-- Release packaging is intentionally paused; the release target may remain in project configuration, but it has no supported Make/script workflow.
+- `make remove-ime` removes the dev app bundles while preserving user data.
+- `make reset-ime` provides a dry-run/apply reset path for Launch Services and text-input cache damage.
+- `make dev-pkg` emits an unsigned tester installer pkg plus safe and deep-clean uninstall pkgs.
+- IME-facing behavior changes are verified in a real host after install, with `TextEdit` as the baseline host.
+- Install bundle, manual source enrollment, and source-ready host smoke are three distinct phases. The first two are not part of automated host smoke and are not CI responsibilities.
+- Real-host validation has two approved modes: user-driven manual smoke, and the explicit local harness `bilinectl smoke-host dev --confirm` / `make smoke-ime-host`.
+- Codex must not switch input sources, focus TextEdit, inject keys, or drive candidate browsing unless the user explicitly asks for that exact automated host-smoke action in the moment.
+- The local host harness must classify pre-run state as one of `bundle-missing`, `source-missing`, `source-disabled`, `source-not-selectable`, `source-not-selected`, or `ready`, and fail fast with explicit remediation when the source is not ready.
+- The local host harness is never a CI gate. It must perform preflight checks, drive exactly one TextEdit session, restore the original input source where possible, and export telemetry/artifacts.
+- If the harness needs a clean state, it must restart that one TextEdit session rather than opening multiple TextEdit windows/documents.
+- `bilinectl smoke-host dev --prepare` may open System Settings → Keyboard → Input Sources, but must not click `Allow`, enable the source, or otherwise script the manual enrollment step.
+- Candidate-panel checks use telemetry plus user-provided screenshots across displays when necessary.
+- Formal release packaging is intentionally paused; the release target may remain in project configuration, but it has no supported notarized Make/script workflow. The unsigned tester pkg flow stays on the dev lane.

@@ -99,8 +99,11 @@ make test
 make build-ime
 make build-settings
 make install-ime
+make remove-ime
+make reset-ime
+make prepare-release-env
 make diagnose-ime
-make repair-ime
+make dev-pkg
 make verify
 ```
 
@@ -109,16 +112,39 @@ What matters most day to day:
 - `make test` runs Swift Package tests.
 - `make build-ime` builds the developer input method target.
 - `make build-settings` builds the developer Settings app.
-- `make install-ime` runs the level 1 dev lifecycle reinstall for both dev apps.
+- `make install-ime` runs the intent-first `install` flow for the dev apps.
+- `make remove-ime` removes dev app bundles with user data preserved.
+- `make reset-ime` prints or runs a destructive system-reset plan using the selected `RESET_DEPTH`.
+- `make prepare-release-env` removes dev installs and purges Biline-local data before a future release-style install.
 - `make diagnose-ime` prints the dev lifecycle snapshot.
-- `make repair-ime` prints a dry-run repair plan unless `CONFIRM=1` is set.
+- `make dev-pkg` builds unsigned tester packages: one installer pkg plus safe and deep-clean uninstall pkgs.
 - `make verify` runs package tests plus the dev IME and Settings builds.
 
 Build products are generated under `~/Library/Caches/BilineIME/DerivedData`
 instead of the repo tree. `BilineIME.xcodeproj` is generated from `project.yml`
 and should be regenerated locally, not committed.
 
-## Manual Host Verification
+## Tester Packages
+
+For prerelease distribution to trusted testers, use:
+
+```bash
+make dev-pkg
+```
+
+This writes three unsigned packages to `build/dist`:
+
+- `BilineIMEDev-<version>.pkg` installs `BilineIMEDev.app` into `/Library/Input Methods` and `BilineSettingsDev.app` into `/Applications`.
+- `BilineIMEDev-Uninstall-<version>.pkg` removes the packaged dev apps and preserves Biline-local credentials, defaults, and user data.
+- `BilineIMEDev-DeepClean-<version>.pkg` removes the packaged dev apps and clears Biline-local data to prepare for a clean future release install.
+
+Gatekeeper blocks these packages on first use. Testers can right-click the pkg in
+Finder and choose Open, or clear quarantine and run `sudo installer -pkg ... -target /`.
+
+After install or deep clean, the user logs out and back in, then manually adds or
+re-adds `BilineIME Dev` from System Settings -> Keyboard -> Input Sources.
+
+## Host Smoke Verification
 
 IME behavior is not considered verified by tests or build success alone.
 
@@ -132,14 +158,38 @@ make build-ime
 make install-ime
 ```
 
-Then stop and verify in a real host manually:
+Then stop and verify in a real host. The default flow is manual:
 
 - The user selects `BilineIME Dev`.
 - The user focuses TextEdit.
 - The user types, browses candidates, switches layers, commits, and reports the
   result.
 - Codex and project scripts must not switch input sources, focus TextEdit,
-  inject keys, browse candidates, or commit text.
+  inject keys, browse candidates, or commit text unless the user explicitly asks
+  for `bilinectl smoke-host dev --confirm` / `make smoke-ime-host` in the
+  moment.
+- The local host harness must drive exactly one `TextEdit` session. If a clean
+  host state is needed, it restarts that one session instead of opening
+  multiple TextEdit windows/documents.
+
+Install, manual source enrollment, and source-ready host smoke are three
+separate phases:
+
+```bash
+make install-ime          # phase 1: install bundles only
+make smoke-ime-host-check # phase 2: read input source readiness
+make smoke-ime-host-prepare # phase 2 helper: open System Settings (no auto-clicks)
+make smoke-ime-host SMOKE_SCENARIO=full # phase 3: drive TextEdit (after readiness)
+```
+
+`make smoke-ime-host-prepare` only opens System Settings → Keyboard → Input
+Sources and prints remediation. It does not click `Allow`, does not enable the
+source, and does not switch input sources for you. Apple's onboarding model
+expects this step to be performed by the user once.
+
+The local host harness is for developer smoke only, never CI. It refuses to
+drive TextEdit unless the input source readiness is `ready` or
+`source-not-selected`, and it always uses exactly one `TextEdit` session.
 
 Candidate-panel screenshots must come from user-prepared host state. If the
 panel may be on another display, capture or request screenshots across displays.
@@ -175,7 +225,7 @@ Active stabilization efforts:
 - Stabilizing simplified and traditional schemas with separate user dictionaries.
 - Improving candidate panel layout resilience for long translations and multi-display anchoring.
 - Refining the Settings app for clear credential management and IME lifecycle diagnostics.
-- Keeping release packaging paused until the dev lifecycle and first-use flow are stable.
+- Keeping formal release packaging paused while the dev lane ships unsigned tester packages for trusted prerelease installs.
 
 Done or mostly in place:
 

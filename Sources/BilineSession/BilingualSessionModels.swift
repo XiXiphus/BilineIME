@@ -56,6 +56,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
     public let displayRawInput: String
     public let markedText: String
     public let items: [BilingualCandidateItem]
+    public let showsEnglishCandidates: Bool
     public let pageIndex: Int
     public let activeLayer: ActiveLayer
     public let presentationMode: CandidatePresentationMode
@@ -72,6 +73,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         displayRawInput: String,
         markedText: String,
         items: [BilingualCandidateItem],
+        showsEnglishCandidates: Bool,
         pageIndex: Int,
         activeLayer: ActiveLayer,
         presentationMode: CandidatePresentationMode,
@@ -87,6 +89,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         self.displayRawInput = displayRawInput
         self.markedText = markedText
         self.items = items
+        self.showsEnglishCandidates = showsEnglishCandidates
         self.pageIndex = pageIndex
         self.activeLayer = activeLayer
         self.presentationMode = presentationMode
@@ -104,6 +107,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         displayRawInput: "",
         markedText: "",
         items: [],
+        showsEnglishCandidates: false,
         pageIndex: 0,
         activeLayer: .chinese,
         presentationMode: .compact,
@@ -122,6 +126,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
             displayRawInput: "",
             markedText: "",
             items: [],
+            showsEnglishCandidates: false,
             pageIndex: 0,
             activeLayer: .chinese,
             presentationMode: .compact,
@@ -179,6 +184,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
             && lhs.displayRawInput == rhs.displayRawInput
             && lhs.markedText == rhs.markedText
             && lhs.items == rhs.items
+            && lhs.showsEnglishCandidates == rhs.showsEnglishCandidates
             && lhs.pageIndex == rhs.pageIndex
             && lhs.activeLayer == rhs.activeLayer
             && lhs.presentationMode == rhs.presentationMode

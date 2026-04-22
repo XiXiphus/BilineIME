@@ -179,6 +179,13 @@ extension BilingualInputSession {
     func setActiveLayerOnCurrentThread(_ layer: ActiveLayer) {
         withStateLock {
             guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
+            guard showsEnglishCandidates else {
+                if activeLayer != .chinese {
+                    activeLayer = .chinese
+                    publishSnapshot()
+                }
+                return
+            }
             guard activeLayer != layer else { return }
             activeLayer = layer
             publishSnapshot()
@@ -188,6 +195,13 @@ extension BilingualInputSession {
     func toggleActiveLayerOnCurrentThread() {
         withStateLock {
             guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
+            guard showsEnglishCandidates else {
+                if activeLayer != .chinese {
+                    activeLayer = .chinese
+                    publishSnapshot()
+                }
+                return
+            }
             activeLayer = activeLayer == .chinese ? .english : .chinese
             publishSnapshot()
         }

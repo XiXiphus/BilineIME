@@ -6,22 +6,23 @@ Accepted
 
 ## Decision
 
-The repository now treats input-method installation and local system repair as two separate workflows:
+The repository now treats input-method lifecycle as explicit intent-first workflows:
 
 - `make install-ime`
   - builds `BilineIME Dev`
   - copies it into `~/Library/Input Methods`
   - refreshes local registration state
   - does **not** try to force-select the input source
-- `make uninstall-ime`
+- `make remove-ime`
   - removes the dev IME and dev Settings app bundles
   - unregisters the local dev lane
-  - does **not** try to repair system-wide text-input state
-- `make repair-ime`
+  - may either preserve or purge Biline-local user data
+  - does **not** try to repair system-wide text-input state unless paired with a reset action
+- `make reset-ime`
   - is the explicit recovery path when Biline leaves ghost input sources, raw ids, blank rows, or broken Keyboard settings state
-  - level 1 reinstalls the dev IME and dev Settings app
-  - level 2 clears `IntlDataCache` and requires a reboot
-  - level 3 deletes the Launch Services database and requires a reboot
+  - `RESET_DEPTH=refresh` refreshes local registration state only
+  - `RESET_DEPTH=cache-prune` clears `IntlDataCache` and requires a reboot
+  - `RESET_DEPTH=launch-services-reset` deletes the Launch Services database and requires a reboot
 
 ## Rationale
 
@@ -44,4 +45,5 @@ Separating the workflows keeps ordinary install steps conservative while still d
 
 - automatic input-source selection success is no longer part of install success
 - developers should use the system UI to add or re-select `BilineIME Dev`
-- repair steps with higher blast radius are now explicit and documented instead of being hidden inside install scripts
+- higher-blast-radius reset steps are now explicit and documented instead of being hidden inside install scripts
+- the primary lifecycle mental model is now `install` / `remove` / `reset`

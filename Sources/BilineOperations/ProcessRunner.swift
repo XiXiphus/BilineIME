@@ -56,8 +56,8 @@ public struct ProcessCommandRunner: CommandRunning {
 public enum BilineOperationError: Error, LocalizedError {
     case commandFailed(String, [String], CommandResult)
     case missingBuildProduct(URL)
-    case confirmationRequired(BilineOperationLevel)
     case confirmationRequiredForAction(String)
+    case privilegedActionRequiresRoot(String)
     case unsupportedArguments(String)
 
     public var errorDescription: String? {
@@ -67,10 +67,10 @@ public enum BilineOperationError: Error, LocalizedError {
                 "Command failed: \(([executable] + arguments).joined(separator: " "))\n\(result.errorOutput)"
         case .missingBuildProduct(let url):
             return "Missing build product at \(url.path)"
-        case .confirmationRequired(let level):
-            return "Reinstall level \(level.rawValue) requires --confirm."
         case .confirmationRequiredForAction(let action):
             return "\(action) requires --confirm."
+        case .privilegedActionRequiresRoot(let action):
+            return "\(action) requires root privileges."
         case .unsupportedArguments(let message):
             return message
         }

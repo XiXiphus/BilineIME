@@ -36,6 +36,16 @@ struct SettingsCard<Content: View>: View {
     }
 }
 
+struct SettingsSectionHeading: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.title3.weight(.semibold))
+            .padding(.top, 8)
+    }
+}
+
 struct SettingsRow<Trailing: View>: View {
     let title: String
     let subtitle: String?

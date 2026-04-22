@@ -17,6 +17,8 @@ final class LiveSettingsStoreTests: XCTestCase {
         let store = BilineDefaultsStore(domain: domain)
         let allKeys: [String] = [
             BilineDefaultsKey.previewEnabled,
+            BilineDefaultsKey.bilingualModeEnabled,
+            BilineDefaultsKey.didSeedBilingualModeDefault,
             BilineDefaultsKey.compactColumnCount,
             BilineDefaultsKey.expandedRowCount,
             BilineDefaultsKey.fuzzyPinyinEnabled,
@@ -35,7 +37,8 @@ final class LiveSettingsStoreTests: XCTestCase {
 
     func testInitialSnapshotMatchesShippedDefaultsWhenStorageIsEmpty() {
         let store = LiveSettingsStore(domain: domain)
-        XCTAssertEqual(store.previewEnabled, true)
+        XCTAssertEqual(store.previewEnabled, false)
+        XCTAssertEqual(store.bilingualModeEnabled, false)
         XCTAssertEqual(store.compactColumnCount, 5)
         XCTAssertEqual(store.expandedRowCount, 5)
         XCTAssertEqual(store.fuzzyPinyinEnabled, false)
@@ -107,31 +110,36 @@ final class LiveSettingsStoreTests: XCTestCase {
         XCTAssertEqual(store.snapshot.panelFontScale, 1.4, accuracy: 0.0001)
     }
 
-    func testOfflineModeForcesPreviewDisabledRegardlessOfPreviewToggle() {
-        let writer = BilineDefaultsStore(domain: domain)
-        writer.set(true, forKey: BilineDefaultsKey.previewEnabled)
-        writer.set(true, forKey: BilineDefaultsKey.offlineMode)
-        writer.synchronize()
+    func testFreshInstallSeedsPurePinyinModeOff() {
+        let homeURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        try? FileManager.default.createDirectory(at: homeURL, withIntermediateDirectories: true)
 
-        let store = LiveSettingsStore(domain: domain)
-        XCTAssertTrue(store.snapshot.previewEnabled, "raw toggle is preserved in the snapshot")
-        XCTAssertTrue(store.snapshot.offlineMode, "offline toggle is loaded")
-        XCTAssertFalse(store.previewEnabled, "effective previewEnabled is gated by offline mode")
+        let defaults = BilineDefaultsStore(domain: domain)
+        let snapshot = SettingsSnapshot.load(from: defaults, homeDirectory: homeURL)
+
+        XCTAssertFalse(snapshot.bilingualModeEnabled)
+        XCTAssertFalse(defaults.bool(forKey: BilineDefaultsKey.bilingualModeEnabled) ?? true)
+        XCTAssertTrue(defaults.bool(forKey: BilineDefaultsKey.didSeedBilingualModeDefault) ?? false)
     }
 
-    func testEnglishDefaultBundleIDsRoundTripThroughDefaults() {
-        let writer = BilineDefaultsStore(domain: domain)
-        writer.set(
-            ["com.apple.dt.Xcode", "com.googlecode.iterm2"],
-            forKey: BilineDefaultsKey.englishDefaultBundleIDs
-        )
-        writer.synchronize()
+    func testExistingInstallSignalKeepsBilingualModeEnabled() throws {
+        let homeURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: homeURL) }
+        try FileManager.default.createDirectory(at: homeURL, withIntermediateDirectories: true)
 
-        let store = LiveSettingsStore(domain: domain)
-        XCTAssertEqual(
-            store.snapshot.englishDefaultBundleIDs,
-            ["com.apple.dt.Xcode", "com.googlecode.iterm2"]
+        let defaults = BilineDefaultsStore(domain: domain)
+        let legacyPreferenceURL = BilineAppPath.preferenceFileURL(domain: domain, homeDirectory: homeURL)
+        try FileManager.default.createDirectory(
+            at: legacyPreferenceURL.deletingLastPathComponent(),
+            withIntermediateDirectories: true
         )
+        try Data("legacy".utf8).write(to: legacyPreferenceURL)
+
+        let snapshot = SettingsSnapshot.load(from: defaults, homeDirectory: homeURL)
+
+        XCTAssertTrue(snapshot.bilingualModeEnabled)
+        XCTAssertTrue(defaults.bool(forKey: BilineDefaultsKey.bilingualModeEnabled) ?? false)
     }
 }
 

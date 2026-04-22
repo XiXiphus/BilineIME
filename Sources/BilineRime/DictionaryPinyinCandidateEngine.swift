@@ -14,6 +14,16 @@ public struct BilinePinyinEngineFactory: CandidateEngineFactory, Sendable {
         )
     }
 
+    public static func prewarm(
+        fuzzyPinyinEnabled: Bool,
+        characterForm: CharacterForm
+    ) throws {
+        _ = try RimeCandidateEngineFactory(
+            fuzzyPinyinEnabled: fuzzyPinyinEnabled,
+            characterForm: characterForm
+        )
+    }
+
     public func makeSession(config: EngineConfig) -> any CandidateEngineSession {
         backend.makeSession(config: config)
     }

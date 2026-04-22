@@ -40,8 +40,9 @@ extension BilineCandidatePanelView {
         let height =
             contentInsets.top
             + blockHeight(rowHeight: chineseRowHeight, rowCount: rowCount)
-            + blockSpacing
-            + blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
+            + (snapshot.showsEnglishCandidates
+                ? blockSpacing + blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
+                : 0)
             + contentInsets.bottom
 
         return NSSize(width: ceil(width), height: ceil(height))
@@ -72,7 +73,7 @@ extension BilineCandidatePanelView {
             .max() ?? 0
     }
 
-    func blockRects(columnWidths: [CGFloat]) -> (chinese: NSRect, english: NSRect)? {
+    func blockRects(columnWidths: [CGFloat]) -> (chinese: NSRect, english: NSRect?)? {
         let rowCount = snapshot.visibleRowCount
         guard rowCount > 0 else { return nil }
 
@@ -83,12 +84,15 @@ extension BilineCandidatePanelView {
             width: containerWidth,
             height: blockHeight(rowHeight: chineseRowHeight, rowCount: rowCount)
         )
-        let englishBlockRect = NSRect(
-            x: contentInsets.left,
-            y: chineseBlockRect.maxY + blockSpacing,
-            width: containerWidth,
-            height: blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
-        )
+        let englishBlockRect: NSRect? =
+            snapshot.showsEnglishCandidates
+            ? NSRect(
+                x: contentInsets.left,
+                y: chineseBlockRect.maxY + blockSpacing,
+                width: containerWidth,
+                height: blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
+            )
+            : nil
 
         return (chineseBlockRect, englishBlockRect)
     }
@@ -106,7 +110,9 @@ extension BilineCandidatePanelView {
             for row in 0..<snapshot.visibleRowCount {
                 guard let item = snapshot.item(row: row, column: column) else { continue }
                 let chineseWidth = candidateLineSize(column: column, item: item).width
-                let englishWidth = englishLineSize(column: column, item: item).width
+                let englishWidth = snapshot.showsEnglishCandidates
+                    ? englishLineSize(column: column, item: item).width
+                    : 0
                 let contentWidth = ceil(max(chineseWidth, englishWidth))
                 let fittedWidth =
                     contentWidth

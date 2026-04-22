@@ -4,7 +4,7 @@ import Foundation
 extension BilingualInputSession {
     public func commitSelection() -> String? {
         withStateLock {
-            commitSelection(for: activeLayer).map { applyPostCommitPipeline(to: $0) }
+            commitSelection(for: effectiveActiveLayer).map { applyPostCommitPipeline(to: $0) }
         }
     }
 

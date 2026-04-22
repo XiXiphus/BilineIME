@@ -10,5 +10,9 @@
 	<array>
 		<string>io.github.xixiphus.inputmethod.BilineIME_Connection</string>
 	</array>
+	<key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+	<array>
+		<string>io.github.xixiphus.BilineIME.broker</string>
+	</array>
 </dict>
 </plist>

@@ -22,11 +22,15 @@ extension BilineCandidatePanelView {
         let rowCount = snapshot.visibleRowCount
 
         drawRowContainer(in: chineseBlockRect)
-        drawRowContainer(in: englishBlockRect)
+        if let englishBlockRect {
+            drawRowContainer(in: englishBlockRect)
+        }
 
         for row in 0..<rowCount {
             drawChineseRow(row: row, in: chineseBlockRect, columnWidths: widths)
-            drawEnglishRow(row: row, in: englishBlockRect, columnWidths: widths)
+            if let englishBlockRect {
+                drawEnglishRow(row: row, in: englishBlockRect, columnWidths: widths)
+            }
         }
     }
 

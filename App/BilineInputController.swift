@@ -1,5 +1,6 @@
 import BilineCore
 import BilineHost
+import BilineIPC
 import BilineMocks
 import BilinePreview
 import BilineRime
@@ -38,6 +39,7 @@ final class BilineInputController: IMKInputController {
     private let candidatePanel: BilineCandidatePanelController
     private let textInputBridge = BilineTextInputBridge()
     private let eventRouter: InputControllerEventRouter
+    private let distributedNotificationCenter = DistributedNotificationCenter.default()
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
         category: "input-controller"
@@ -55,8 +57,16 @@ final class BilineInputController: IMKInputController {
     private var lastHandledKeySignature: RoutedKeySignature?
     private var didLogFirstHandledKey = false
     private var didLogFirstComposingSnapshot = false
+    private var pendingSettingsRefresh = false
+    private var brokerNotificationObservers: [NSObjectProtocol] = []
 
     override init!(server: IMKServer!, delegate: Any!, client inputClient: Any!) {
+        let initStartedAt = Date()
+        let initLogger = Logger(
+            subsystem: Bundle.main.bundleIdentifier ?? "io.github.xixiphus.inputmethod.BilineIME",
+            category: "input-controller"
+        )
+        initLogger.info("BilineInputController init started")
         let settingsStore = AppSettingsStore.make()
         self.settingsStore = settingsStore
         self.characterForm = settingsStore.characterForm
@@ -119,11 +129,30 @@ final class BilineInputController: IMKInputController {
             BilineCandidatePanelController()
         }
         super.init(server: server, delegate: delegate, client: inputClient)
+        let initElapsedMs = Int(Date().timeIntervalSince(initStartedAt) * 1000)
+        initLogger.info(
+            "BilineInputController init finished elapsedMs=\(initElapsedMs, privacy: .public) fuzzyPinyinEnabled=\(settingsStore.fuzzyPinyinEnabled, privacy: .public) characterForm=\(settingsStore.characterForm.rawValue, privacy: .public)"
+        )
+        #if DEBUG
+            BilineHostSmokeReporter.shared.record(
+                .inputControllerInitialized,
+                fields: [
+                    "elapsedMs": String(initElapsedMs),
+                    "fuzzyPinyinEnabled": String(settingsStore.fuzzyPinyinEnabled),
+                    "characterForm": settingsStore.characterForm.rawValue,
+                    "punctuationForm": settingsStore.punctuationForm.rawValue,
+                ]
+            )
+        #endif
 
         inputSession.onSnapshotUpdate = { [weak self] snapshot in
             guard let self else {
                 return
             }
+            self.applyPendingSettingsRefreshIfNeeded(
+                currentSnapshot: snapshot,
+                reason: "idle-snapshot"
+            )
             #if DEBUG
                 self.emitSmokeTelemetry(snapshot: snapshot)
             #endif
@@ -134,6 +163,16 @@ final class BilineInputController: IMKInputController {
                 )
             }
             guard let client = self.activeClient as? IMKTextInput else {
+                #if DEBUG
+                    BilineHostSmokeReporter.shared.record(
+                        .renderSkippedNoActiveClient,
+                        fields: [
+                            "rawInput": snapshot.rawInput,
+                            "isComposing": String(snapshot.isComposing),
+                            "candidateCount": String(snapshot.items.count),
+                        ]
+                    )
+                #endif
                 return
             }
             self.render(client: client, snapshot: snapshot)
@@ -151,38 +190,31 @@ final class BilineInputController: IMKInputController {
                 PanelTheme(mode: snapshot.panelThemeMode, fontScale: snapshot.panelFontScale)
             )
             inputSession.postCommitPipeline = PostCommitPipelineBuilder.build(from: snapshot)
-            if let bundleID = inputSession.hostBundleID,
-                snapshot.englishDefaultBundleIDs.contains(bundleID)
-            {
-                inputSession.preferredDefaultLayer = .english
-            } else {
-                inputSession.preferredDefaultLayer = .chinese
-            }
+            inputSession.applyBilingualModeSetting()
+        }
+        installBrokerObservers()
+    }
+
+    deinit {
+        for observer in brokerNotificationObservers {
+            distributedNotificationCenter.removeObserver(observer)
         }
     }
 
     /// Forwards a settings snapshot into the components that need it. Engine-
     /// affecting fields (`pageSize`, `compactColumnCount`, `expandedRowCount`,
-    /// `fuzzyPinyinEnabled`) are deliberately NOT pushed here: changing them
-    /// mid-composition would invalidate the live engine session, so they take
-    /// effect on the next IME launch (or, in a future milestone, on the next
-    /// idle composition boundary).
+    /// `fuzzyPinyinEnabled`) plus translation-provider credential changes are
+    /// deliberately NOT pushed here: changing them mid-composition would
+    /// invalidate the live engine or preview stack, so they only take effect
+    /// after a safe boundary (`activateServer`, `commitComposition`, or an idle
+    /// snapshot after the broker marked settings dirty).
     private func applyLiveSettings(_ snapshot: SettingsSnapshot) {
         eventRouter.keyBindings = snapshot.keyBindings
         candidatePanel.applyTheme(
             PanelTheme(mode: snapshot.panelThemeMode, fontScale: snapshot.panelFontScale)
         )
         inputSession.postCommitPipeline = PostCommitPipelineBuilder.build(from: snapshot)
-        // Refresh the per-host preferred layer for the currently-focused
-        // client so toggling the override list in Settings takes effect
-        // without requiring a client refocus.
-        if let bundleID = inputSession.hostBundleID,
-            snapshot.englishDefaultBundleIDs.contains(bundleID)
-        {
-            inputSession.preferredDefaultLayer = .english
-        } else {
-            inputSession.preferredDefaultLayer = .chinese
-        }
+        inputSession.applyBilingualModeSetting()
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
@@ -295,11 +327,12 @@ final class BilineInputController: IMKInputController {
         // IME was in another client. The refresh is cheap (one CFPreferences
         // synchronize plus a struct comparison) and stays off the keystroke
         // hot path.
+        pendingSettingsRefresh = false
         settingsStore.refresh()
     }
 
     override func deactivateServer(_ sender: Any!) {
-        textInputBridge.hide(candidatePanel: candidatePanel)
+        textInputBridge.hide(candidatePanel: candidatePanel, reason: "deactivate-server")
         if let client = activeClient as? IMKTextInput {
             textInputBridge.clearComposition(in: client)
         }
@@ -310,6 +343,10 @@ final class BilineInputController: IMKInputController {
         didLogFirstHandledKey = false
         didLogFirstComposingSnapshot = false
         activeClient = nil
+        applyPendingSettingsRefreshIfNeeded(
+            currentSnapshot: inputSession.snapshot,
+            reason: "deactivate-server"
+        )
         super.deactivateServer(sender)
     }
 
@@ -319,8 +356,63 @@ final class BilineInputController: IMKInputController {
         } else {
             inputSession.cancel()
             textInputBridge.clearAnchorCache()
-            textInputBridge.hide(candidatePanel: candidatePanel)
+            textInputBridge.hide(candidatePanel: candidatePanel, reason: "commit-without-active-client")
         }
+        pendingSettingsRefresh = false
+        settingsStore.refresh()
+    }
+
+    private func installBrokerObservers() {
+        let names = [
+            BilineBrokerNotification.settingsDidChange,
+            BilineBrokerNotification.credentialsDidChange,
+        ]
+        brokerNotificationObservers = names.map { name in
+            distributedNotificationCenter.addObserver(
+                forName: name,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                self?.handleBrokerInvalidation(name)
+            }
+        }
+    }
+
+    private func handleBrokerInvalidation(_ name: Notification.Name) {
+        pendingSettingsRefresh = true
+        logger.info("Queued broker invalidation name=\(name.rawValue, privacy: .public)")
+        #if DEBUG
+            BilineHostSmokeReporter.shared.record(
+                .settingsRefreshQueued,
+                fields: [
+                    "name": name.rawValue,
+                    "isComposing": String(inputSession.snapshot.isComposing),
+                ]
+            )
+        #endif
+        applyPendingSettingsRefreshIfNeeded(
+            currentSnapshot: inputSession.snapshot,
+            reason: "broker-notification"
+        )
+    }
+
+    private func applyPendingSettingsRefreshIfNeeded(
+        currentSnapshot: BilingualCompositionSnapshot,
+        reason: StaticString
+    ) {
+        guard pendingSettingsRefresh else { return }
+        guard !currentSnapshot.isComposing else { return }
+        pendingSettingsRefresh = false
+        logger.info("Applying pending settings refresh at safe boundary reason=\(reason)")
+        #if DEBUG
+            BilineHostSmokeReporter.shared.record(
+                .settingsRefreshApplied,
+                fields: [
+                    "reason": String(describing: reason),
+                    "rawInput": currentSnapshot.rawInput,
+                ]
+            )
+        #endif
         settingsStore.refresh()
     }
 
@@ -339,6 +431,15 @@ final class BilineInputController: IMKInputController {
             smokeLogger.notice(
                 "SMOKE_COMMIT committedText=\(self.smokeValue(committedText), privacy: .public) postCommitRawInput=\(self.smokeValue(postSnapshot.rawInput), privacy: .public) isComposing=\(postSnapshot.isComposing, privacy: .public)"
             )
+            BilineHostSmokeReporter.shared.record(
+                .commit,
+                fields: [
+                    "committedText": committedText,
+                    "postCommitRawInput": postSnapshot.rawInput,
+                    "isComposing": String(postSnapshot.isComposing),
+                    "commitKind": "candidate"
+                ]
+            )
         #endif
         render(client: client, snapshot: postSnapshot)
         return true
@@ -349,6 +450,9 @@ final class BilineInputController: IMKInputController {
         snapshot: BilingualCompositionSnapshot? = nil
     ) {
         let snapshot = snapshot ?? inputSession.snapshot
+        #if DEBUG
+            emitSmokeTelemetry(snapshot: snapshot)
+        #endif
         textInputBridge.render(
             snapshot: snapshot,
             client: client,
@@ -456,7 +560,12 @@ final class BilineInputController: IMKInputController {
             render(client: client)
             return true
         case .toggleLayer:
-            inputSession.toggleActiveLayer()
+            if settingsStore.bilingualModeEnabled {
+                inputSession.toggleActiveLayer()
+            } else {
+                render(client: client)
+                return true
+            }
         case .commitChineseAndInsert(let text):
             let committedText = inputSession.commitChineseSelection()
             if let committedText, !committedText.isEmpty {
@@ -513,6 +622,17 @@ final class BilineInputController: IMKInputController {
         if !postSnapshot.isComposing {
             textInputBridge.clearAnchorCache()
         }
+        #if DEBUG
+            BilineHostSmokeReporter.shared.record(
+                .commit,
+                fields: [
+                    "committedText": committedText,
+                    "postCommitRawInput": postSnapshot.rawInput,
+                    "isComposing": String(postSnapshot.isComposing),
+                    "commitKind": "raw-input"
+                ]
+            )
+        #endif
         render(client: client, snapshot: postSnapshot)
         return true
     }
@@ -536,7 +656,7 @@ final class BilineInputController: IMKInputController {
     }
 
     private func switchActiveClient(to clientObject: AnyObject) {
-        textInputBridge.hide(candidatePanel: candidatePanel)
+        textInputBridge.hide(candidatePanel: candidatePanel, reason: "active-client-switched")
         if let previousClient = activeClient as? IMKTextInput {
             textInputBridge.clearComposition(in: previousClient)
         }
@@ -552,19 +672,15 @@ final class BilineInputController: IMKInputController {
         // hence the conditional cast.
         let bundleID = (clientObject as? IMKTextInput)?.bundleIdentifier()
         inputSession.hostBundleID = bundleID
-
-        // Phase 3: per-app default English layer. We resolve the preferred
-        // layer once on switch instead of querying settings on every
-        // resetCompositionState, so the session's hot path stays
-        // settings-store-free.
-        let snapshot = settingsStore.snapshot
-        if let bundleID,
-            snapshot.englishDefaultBundleIDs.contains(bundleID)
-        {
-            inputSession.preferredDefaultLayer = .english
-        } else {
-            inputSession.preferredDefaultLayer = .chinese
-        }
+        #if DEBUG
+            BilineHostSmokeReporter.shared.record(
+                .activeClientChanged,
+                fields: [
+                    "bundleID": bundleID,
+                    "clientType": String(describing: type(of: clientObject)),
+                ]
+            )
+        #endif
     }
 
     #if DEBUG
@@ -585,6 +701,37 @@ final class BilineInputController: IMKInputController {
                 characterForm: characterForm.rawValue)
             smokeLogger.notice(
                 "SMOKE compositionMode=\(self.inputSession.compositionMode.rawValue, privacy: .public) presentationMode=\(snapshot.presentationMode.rawValue, privacy: .public) pageIndex=\(snapshot.pageIndex) selectedRow=\(snapshot.selectedRow) selectedColumn=\(snapshot.selectedColumn) activeLayer=\(snapshot.activeLayer.rawValue, privacy: .public) rawInput=\(self.smokeValue(snapshot.rawInput), privacy: .public) remainingRawInput=\(self.smokeValue(snapshot.remainingRawInput), privacy: .public) displayRawInput=\(self.smokeValue(snapshot.displayRawInput), privacy: .public) candidateCount=\(snapshot.items.count) selectedCandidate=\(self.smokeValue(selectedCandidate), privacy: .public) selectedCandidateReading=\(self.smokeValue(selectedCandidateReading), privacy: .public) selectedConsumedTokenCount=\(selectedConsumedTokenCount) selectedPreviewState=\(selectedPreviewState, privacy: .public) selectedEnglishText=\(self.smokeValue(selectedEnglishText), privacy: .public) characterForm=\(self.characterForm.rawValue, privacy: .public) punctuationForm=\(self.punctuationForm.rawValue, privacy: .public) schemaID=\(schemaID, privacy: .public) userDict=\(userDictionaryName, privacy: .public) hasEverExpanded=\(self.inputSession.hasEverExpandedInCurrentComposition, privacy: .public) isComposing=\(snapshot.isComposing, privacy: .public) hasCandidates=\(!snapshot.items.isEmpty, privacy: .public) visibleCandidates=\(visibleCandidates, privacy: .public)"
+            )
+            BilineHostSmokeReporter.shared.record(
+                .snapshot,
+                fields: [
+                    "compositionMode": self.inputSession.compositionMode.rawValue,
+                    "presentationMode": snapshot.presentationMode.rawValue,
+                    "pageIndex": String(snapshot.pageIndex),
+                    "selectedRow": String(snapshot.selectedRow),
+                    "selectedColumn": String(snapshot.selectedColumn),
+                    "activeLayer": snapshot.activeLayer.rawValue,
+                    "rawInput": snapshot.rawInput,
+                    "remainingRawInput": snapshot.remainingRawInput,
+                    "displayRawInput": snapshot.displayRawInput,
+                    "candidateCount": String(snapshot.items.count),
+                    "selectedCandidate": selectedCandidate,
+                    "selectedCandidateReading": selectedCandidateReading,
+                    "selectedConsumedTokenCount": String(selectedConsumedTokenCount),
+                    "selectedPreviewState": selectedPreviewState,
+                    "selectedEnglishText": selectedEnglishText,
+                    "characterForm": self.characterForm.rawValue,
+                    "punctuationForm": self.punctuationForm.rawValue,
+                    "schemaID": schemaID,
+                    "userDict": userDictionaryName,
+                    "hasEverExpanded": String(self.inputSession.hasEverExpandedInCurrentComposition),
+                    "isComposing": String(snapshot.isComposing),
+                    "hasCandidates": String(!snapshot.items.isEmpty),
+                    "visibleCandidates": visibleCandidates,
+                    "compactColumnCount": String(snapshot.compactColumnCount),
+                    "expandedRowCount": String(snapshot.expandedRowCount),
+                    "showsEnglishCandidates": String(snapshot.showsEnglishCandidates),
+                ]
             )
         }
 

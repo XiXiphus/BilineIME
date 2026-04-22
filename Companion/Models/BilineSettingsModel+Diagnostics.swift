@@ -4,9 +4,9 @@ import BilineSettings
 
 extension BilineSettingsModel {
     func refresh() {
-        let lifecycleSnapshot = DevEnvironmentDiagnostics().snapshot()
+        let lifecycleSnapshot = communicationHub.diagnosticsSnapshot()
         loadDefaults()
-        credentialFileStatus = credentialFileStore.status()
+        credentialFileStatus = communicationHub.credentialStatus()
         settingsAppPath = Bundle.main.bundleURL.path
         settingsRegisteredPaths = NSWorkspace.shared
             .urlsForApplications(withBundleIdentifier: BilineAppIdentifier.devSettingsBundle)
@@ -17,8 +17,18 @@ extension BilineSettingsModel {
         settingsInstalledAtStablePath = lifecycleSnapshot.settingsInstalledAtStablePath
         defaultSettingsAtStablePath = lifecycleSnapshot.defaultSettingsAtStablePath
         imeInstalledAtStablePath = lifecycleSnapshot.imeInstalledAtStablePath
-        lifecycleRecommendation = lifecycleSnapshot.recommendedRepairText
-        lifecyclePlanText = DevReinstallPlanner().plan(level: .level1).rendered
+        brokerInstallPath = lifecycleSnapshot.brokerInstallPath
+        brokerInstalled = lifecycleSnapshot.brokerInstalled
+        brokerRunning = lifecycleSnapshot.brokerRunning
+        brokerLaunchAgentPath = lifecycleSnapshot.brokerLaunchAgentPath
+        brokerLaunchAgentInstalled = lifecycleSnapshot.brokerLaunchAgentInstalled
+        lifecycleRecommendation = lifecycleSnapshot.recommendedActionText
+        lifecycleRecommendationReason = lifecycleSnapshot.recommendedActionReason
+        if let action = lifecycleSnapshot.recommendedAction {
+            lifecyclePlanText = LifecycleOperationPlanner().plan(action).rendered
+        } else {
+            lifecyclePlanText = ""
+        }
         characterFormDefaultsRawValue = lifecycleSnapshot.characterFormDefaultsRawValue
         punctuationFormDefaultsRawValue = lifecycleSnapshot.punctuationFormDefaultsRawValue
         imeInstallPath = lifecycleSnapshot.imeInstallPath

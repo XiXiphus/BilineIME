@@ -24,6 +24,7 @@ public protocol BatchTranslationProvider: TranslationProvider {
 public protocol SettingsStore: Sendable {
     var targetLanguage: TargetLanguage { get }
     var previewEnabled: Bool { get }
+    var bilingualModeEnabled: Bool { get }
     var compactColumnCount: Int { get }
     var expandedRowCount: Int { get }
     var fuzzyPinyinEnabled: Bool { get }
@@ -37,4 +38,5 @@ extension SettingsStore {
     /// Default policy keeps existing behavior for stores that have not
     /// adopted user-configurable bindings yet (test stubs, demo fixtures).
     public var keyBindings: KeyBindingPolicy { .default }
+    public var bilingualModeEnabled: Bool { true }
 }

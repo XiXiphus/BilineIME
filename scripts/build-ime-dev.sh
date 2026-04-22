@@ -54,7 +54,16 @@ BUILD_ARGS=(
   -destination "platform=macOS"
 )
 
-if [[ -n "$TEAM_ID" ]]; then
+if [[ "${BILINE_AD_HOC_SIGN:-0}" == "1" ]]; then
+  echo "BILINE_AD_HOC_SIGN=1 -> building with ad-hoc signing (no provisioning)."
+  BUILD_ARGS+=(
+    CODE_SIGN_STYLE=Manual
+    CODE_SIGN_IDENTITY=-
+    CODE_SIGNING_REQUIRED=NO
+    CODE_SIGNING_ALLOWED=YES
+    DEVELOPMENT_TEAM=
+  )
+elif [[ -n "$TEAM_ID" ]]; then
   echo "Using Xcode development team: $TEAM_ID"
   BUILD_ARGS+=(
     -allowProvisioningUpdates

@@ -1,6 +1,14 @@
 import BilineCore
 
 extension BilingualInputSession {
+    var showsEnglishCandidates: Bool {
+        settingsStore.bilingualModeEnabled
+    }
+
+    var effectiveActiveLayer: ActiveLayer {
+        showsEnglishCandidates ? activeLayer : .chinese
+    }
+
     var compactColumnCount: Int {
         max(1, settingsStore.compactColumnCount)
     }
@@ -54,8 +62,9 @@ extension BilingualInputSession {
                 displayRawInput: renderedRawInput,
                 markedText: renderedRawInput,
                 items: [],
+                showsEnglishCandidates: false,
                 pageIndex: 0,
-                activeLayer: activeLayer,
+                activeLayer: effectiveActiveLayer,
                 presentationMode: .compact,
                 selectedRow: 0,
                 selectedColumn: 0,
@@ -68,7 +77,9 @@ extension BilingualInputSession {
         let items = engineSnapshot.candidates.map { candidate in
             BilingualCandidateItem(
                 candidate: candidate,
-                previewState: previewStates[candidate.id] ?? fallbackPreviewState()
+                previewState: showsEnglishCandidates
+                    ? (previewStates[candidate.id] ?? fallbackPreviewState())
+                    : .unavailable
             )
         }
 
@@ -79,8 +90,9 @@ extension BilingualInputSession {
             displayRawInput: renderedRawInput,
             markedText: renderedRawInput,
             items: items,
+            showsEnglishCandidates: showsEnglishCandidates,
             pageIndex: engineSnapshot.pageIndex,
-            activeLayer: activeLayer,
+            activeLayer: effectiveActiveLayer,
             presentationMode: presentationMode,
             selectedRow: currentSelectedRowForSelection,
             selectedColumn: currentSelectedColumn,

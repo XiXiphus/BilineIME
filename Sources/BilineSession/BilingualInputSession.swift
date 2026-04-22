@@ -18,17 +18,12 @@ public final class BilingualInputSession: @unchecked Sendable {
 
     /// Bundle identifier of the host app that owns the active client. Set
     /// by the controller on client switch; consumed by the post-commit
-    /// pipeline so transforms can branch on host (e.g., per-app overrides).
+    /// pipeline so transforms can branch on host when needed.
     public var hostBundleID: String?
     /// Pipeline applied to every committed text just before it leaves the
     /// session. Defaults to empty so behavior is unchanged for callers that
     /// do not opt in.
     public var postCommitPipeline: PostCommitPipeline = .empty
-    /// Layer the session falls back to whenever composition resets (cancel,
-    /// commit, deactivate). The controller flips this to `.english` when
-    /// the focused host app is in the per-app overrides list, so subsequent
-    /// compositions in that host start in English.
-    public var preferredDefaultLayer: ActiveLayer = .chinese
 
     let stateLock = NSRecursiveLock()
     let settingsStore: any SettingsStore

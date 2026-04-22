@@ -1,4 +1,5 @@
 import BilineCore
+import BilineIPC
 import BilineSettings
 import Combine
 import Foundation
@@ -9,11 +10,12 @@ final class BilineSettingsModel: ObservableObject {
 
     let defaultsDomain = BilineAppIdentifier.devInputMethodBundle
     let imeBundleID = BilineAppIdentifier.devInputMethodBundle
+    lazy var communicationHub = BilineCommunicationHub(inputMethodBundleIdentifier: imeBundleID)
     var defaultsStore: BilineDefaultsStore {
-        BilineDefaultsStore(domain: defaultsDomain)
+        communicationHub.configurationStore.defaultsStore
     }
-    var credentialFileStore: BilineCredentialFileStore {
-        BilineCredentialFileStore(inputMethodBundleIdentifier: imeBundleID)
+    var credentialStore: BilineCredentialVault {
+        communicationHub.credentialVault
     }
 
     @Published var provider: TranslationProviderChoice = .off
@@ -25,6 +27,7 @@ final class BilineSettingsModel: ObservableObject {
     @Published var characterForm: CharacterForm = .simplified
     @Published var punctuationForm: PunctuationForm = .fullwidth
     @Published var previewEnabled = true
+    @Published var bilingualModeEnabled = true
 
     // Phase 0: key bindings + appearance.
     @Published var keyBindings: KeyBindingPolicy = .default
@@ -40,11 +43,6 @@ final class BilineSettingsModel: ObservableObject {
     @Published var normalizeNumericColon = false
     @Published var composingHelpersSaveStatus = ""
 
-    // Phase 3: per-context.
-    @Published var offlineMode = false
-    @Published var englishDefaultBundleIDs: [String] = []
-    @Published var perAppSaveStatus = ""
-
     // Phase 4: engine-side toggles. Persisted now; behavior change is a
     // separate milestone (Rime schema work for smart spelling, emoji
     // lexicon for the candidate source).
@@ -53,9 +51,14 @@ final class BilineSettingsModel: ObservableObject {
     @Published var engineExtrasSaveStatus = ""
     @Published var imeInstalled = false
     @Published var imeRunning = false
+    @Published var brokerInstalled = false
+    @Published var brokerRunning = false
+    @Published var brokerLaunchAgentInstalled = false
     @Published var rimeUserDictionaryExists = false
     @Published var currentInputSource = ""
     @Published var settingsAppPath = ""
+    @Published var brokerInstallPath = BilineAppPath.devBrokerInstallURL(surface: .user).path
+    @Published var brokerLaunchAgentPath = BilineAppPath.devBrokerLaunchAgentURL(surface: .user).path
     @Published var settingsRegisteredPaths: [String] = []
     @Published var settingsLaunchServicesPathCount = 0
     @Published var defaultSettingsApplicationPath = ""
@@ -63,13 +66,16 @@ final class BilineSettingsModel: ObservableObject {
     @Published var defaultSettingsAtStablePath = false
     @Published var imeInstalledAtStablePath = false
     @Published var lifecycleRecommendation = "未知"
+    @Published var lifecycleRecommendationReason = ""
     @Published var lifecyclePlanText = ""
     @Published var characterFormDefaultsRawValue = ""
     @Published var punctuationFormDefaultsRawValue = ""
     @Published var imeInstallPath = BilineAppPath.devInputMethodInstallURL.path
     @Published var credentialFileStatus = BilineCredentialFileStatus(
-        fileURL: BilineAppPath.credentialFileURL(
-            inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle),
+        fileURL: URL(
+            string:
+                "keychain://\(BilineSharedIdentifier.keychainService(for: BilineAppIdentifier.devInputMethodBundle))/\(BilineAppIdentifier.devInputMethodBundle)"
+        )!,
         accessKeyIdLength: nil,
         accessKeySecretLength: nil,
         loadError: .missing
@@ -92,7 +98,7 @@ final class BilineSettingsModel: ObservableObject {
     }
 
     var credentialFileURL: URL {
-        credentialFileStore.fileURL
+        credentialStore.status().fileURL
     }
 
     var accessKeyIDStatus: String {
@@ -112,10 +118,10 @@ final class BilineSettingsModel: ObservableObject {
     var translationStatusText: String {
         if provider == .aliyun {
             if credentialFileStatus.isComplete {
-                return "已保存到本机输入法容器"
+                return "已保存到共享凭证存储，并通过 broker 协调"
             }
             if let error = credentialFileStatus.loadError, error != .missing {
-                return "凭据文件不可读"
+                return "共享凭据不可读"
             }
             return "需要保存 AccessKey"
         } else {

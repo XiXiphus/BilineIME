@@ -11,7 +11,7 @@ extension BilineSettingsModel {
 
         if !trimmedAccessKeyId.isEmpty && !trimmedAccessKeySecret.isEmpty {
             do {
-                try credentialFileStore.save(
+                try communicationHub.saveCredentialRecord(
                     BilineAlibabaCredentialRecord(
                         accessKeyId: trimmedAccessKeyId,
                         accessKeySecret: trimmedAccessKeySecret,
@@ -42,7 +42,7 @@ extension BilineSettingsModel {
         Task {
             defer { Task { @MainActor in self.isTestingConnection = false } }
             do {
-                let record = try credentialFileStore.load()
+                let record = try communicationHub.loadCredentialRecord()
                 guard let endpointURL = URL(string: endpoint) else {
                     await setConnectionResult("Endpoint 无效", success: false)
                     return

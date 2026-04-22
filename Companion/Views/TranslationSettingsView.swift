@@ -6,7 +6,7 @@ struct TranslationSettingsView: View {
     @State private var accessKeySecret = ""
 
     var body: some View {
-        SettingsPage(title: "翻译") {
+        SettingsPage(title: "翻译配置") {
             SettingsCard {
                 SettingsRow(title: "翻译服务", subtitle: "使用你自己的阿里云账号启用英文预览。") {
                     Picker("", selection: $model.provider) {

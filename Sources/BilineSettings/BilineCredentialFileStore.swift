@@ -19,13 +19,13 @@ public struct BilineAlibabaCredentialRecord: Codable, Equatable, Sendable {
     }
 }
 
-public enum BilineCredentialFileLoadError: Error, Equatable, Sendable {
+public enum BilineCredentialFileLoadError: Error, Equatable, Sendable, Codable {
     case missing
     case unreadable
     case decodingFailed
 }
 
-public struct BilineCredentialFileStatus: Equatable, Sendable {
+public struct BilineCredentialFileStatus: Equatable, Sendable, Codable {
     public let fileURL: URL
     public let accessKeyIdLength: Int?
     public let accessKeySecretLength: Int?

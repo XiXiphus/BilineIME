@@ -62,3 +62,43 @@ public final class CandidateAnchorTracker: @unchecked Sendable {
         lastContext = nil
     }
 }
+
+public struct CandidateAnchorAttributeQuery: Sendable, Equatable {
+    public let index: Int
+    public let source: String
+
+    public init(index: Int, source: String) {
+        self.index = max(0, index)
+        self.source = source
+    }
+}
+
+public enum CandidateAnchorQueryPlanner {
+    public static func attributeQueries(
+        anchorIndex: Int,
+        afterInvalidation: Bool = false
+    ) -> [CandidateAnchorAttributeQuery] {
+        let anchorIndex = max(0, anchorIndex)
+        var indices = [anchorIndex]
+        if anchorIndex > 1 {
+            indices.append(contentsOf: stride(from: anchorIndex - 1, through: 1, by: -1))
+        }
+        if anchorIndex != 0 {
+            indices.append(0)
+        }
+
+        return indices.enumerated().map { offset, index in
+            let source: String
+            if afterInvalidation {
+                source = "attributes-after-invalidate"
+            } else if offset == 0 {
+                source = "attributes-cursor"
+            } else if index == 0 {
+                source = "attributes-zero"
+            } else {
+                source = "attributes-scan"
+            }
+            return CandidateAnchorAttributeQuery(index: index, source: source)
+        }
+    }
+}

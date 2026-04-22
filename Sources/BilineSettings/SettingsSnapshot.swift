@@ -5,8 +5,9 @@ import Foundation
 /// rebuilds this whenever `refresh()` is called, then publishes it to
 /// subscribers. Per-keystroke reads are constant-time field accesses on this
 /// struct, so live-reloading settings does not put any cost on the hot path.
-public struct SettingsSnapshot: Sendable, Equatable {
+public struct SettingsSnapshot: Sendable, Equatable, Codable {
     public var previewEnabled: Bool
+    public var bilingualModeEnabled: Bool
     public var compactColumnCount: Int
     public var expandedRowCount: Int
     public var fuzzyPinyinEnabled: Bool
@@ -19,13 +20,12 @@ public struct SettingsSnapshot: Sendable, Equatable {
     public var slashAsChineseEnumeration: Bool
     public var autoSpaceBetweenChineseAndAscii: Bool
     public var normalizeNumericColon: Bool
-    public var offlineMode: Bool
-    public var englishDefaultBundleIDs: [String]
     public var smartSpellingEnabled: Bool
     public var emojiCandidatesEnabled: Bool
 
     public init(
         previewEnabled: Bool = true,
+        bilingualModeEnabled: Bool = true,
         compactColumnCount: Int = 5,
         expandedRowCount: Int = 5,
         fuzzyPinyinEnabled: Bool = false,
@@ -38,12 +38,11 @@ public struct SettingsSnapshot: Sendable, Equatable {
         slashAsChineseEnumeration: Bool = false,
         autoSpaceBetweenChineseAndAscii: Bool = false,
         normalizeNumericColon: Bool = false,
-        offlineMode: Bool = false,
-        englishDefaultBundleIDs: [String] = [],
         smartSpellingEnabled: Bool = false,
         emojiCandidatesEnabled: Bool = false
     ) {
         self.previewEnabled = previewEnabled
+        self.bilingualModeEnabled = bilingualModeEnabled
         self.compactColumnCount = compactColumnCount
         self.expandedRowCount = expandedRowCount
         self.fuzzyPinyinEnabled = fuzzyPinyinEnabled
@@ -56,8 +55,6 @@ public struct SettingsSnapshot: Sendable, Equatable {
         self.slashAsChineseEnumeration = slashAsChineseEnumeration
         self.autoSpaceBetweenChineseAndAscii = autoSpaceBetweenChineseAndAscii
         self.normalizeNumericColon = normalizeNumericColon
-        self.offlineMode = offlineMode
-        self.englishDefaultBundleIDs = englishDefaultBundleIDs
         self.smartSpellingEnabled = smartSpellingEnabled
         self.emojiCandidatesEnabled = emojiCandidatesEnabled
     }
@@ -67,10 +64,19 @@ public struct SettingsSnapshot: Sendable, Equatable {
     /// Loads a fresh snapshot from the supplied defaults domain. Falls back
     /// to safe defaults for any missing/invalid value so the store can never
     /// hand the IME runtime an incoherent configuration.
-    public static func load(from defaults: BilineDefaultsStore) -> SettingsSnapshot {
+    public static func load(
+        from defaults: BilineDefaultsStore,
+        homeDirectory: URL = FileManager.default.homeDirectoryForCurrentUser,
+        fileManager: FileManager = .default
+    ) -> SettingsSnapshot {
         var snapshot = SettingsSnapshot()
         snapshot.previewEnabled =
             defaults.bool(forKey: BilineDefaultsKey.previewEnabled) ?? snapshot.previewEnabled
+        snapshot.bilingualModeEnabled = BilineBilingualModeDefaults.resolvedValue(
+            from: defaults,
+            homeDirectory: homeDirectory,
+            fileManager: fileManager
+        )
         if let value = defaults.integer(forKey: BilineDefaultsKey.compactColumnCount), value > 0 {
             snapshot.compactColumnCount = value
         }
@@ -113,14 +119,6 @@ public struct SettingsSnapshot: Sendable, Equatable {
         snapshot.normalizeNumericColon =
             defaults.bool(forKey: BilineDefaultsKey.normalizeNumericColon)
             ?? snapshot.normalizeNumericColon
-        snapshot.offlineMode =
-            defaults.bool(forKey: BilineDefaultsKey.offlineMode) ?? snapshot.offlineMode
-        if let raw = defaults.stringArray(forKey: BilineDefaultsKey.englishDefaultBundleIDs) {
-            snapshot.englishDefaultBundleIDs =
-                raw
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-        }
         snapshot.smartSpellingEnabled =
             defaults.bool(forKey: BilineDefaultsKey.smartSpellingEnabled)
             ?? snapshot.smartSpellingEnabled

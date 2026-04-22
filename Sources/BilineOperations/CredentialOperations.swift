@@ -6,7 +6,7 @@ public struct AlibabaCredentialOperations {
     public static let defaultEndpoint = "https://mt.cn-hangzhou.aliyuncs.com"
 
     public let domain: String
-    public let store: BilineCredentialFileStore
+    public let store: BilineCredentialVault
     public let defaultsStore: BilineDefaultsStore
     public let runner: any CommandRunning
     private let fileManager: FileManager
@@ -18,11 +18,16 @@ public struct AlibabaCredentialOperations {
         fileManager: FileManager = .default
     ) {
         self.domain = domain
-        self.store = BilineCredentialFileStore(
-            fileURL: fileURL
-                ?? BilineAppPath.credentialFileURL(
-                    inputMethodBundleIdentifier: domain))
-        self.defaultsStore = BilineDefaultsStore(domain: domain)
+        self.store =
+            fileURL.map {
+                BilineCredentialVault(
+                    keychainStore: nil,
+                    legacyFileStore: BilineCredentialFileStore(fileURL: $0),
+                    preferLegacyOnly: true
+                )
+            }
+            ?? BilineCredentialVault(inputMethodBundleIdentifier: domain)
+        self.defaultsStore = BilineDefaultsStore.shared(for: domain)
         self.runner = runner
         self.fileManager = fileManager
     }
@@ -42,7 +47,7 @@ public struct AlibabaCredentialOperations {
 
         switch status.loadError {
         case nil:
-            lines.append("credential_file=\(status.fileURL.path)")
+            lines.append("credential_file=\(credentialLocation(status.fileURL))")
             lines.append(
                 "credential_file_accessKeyId=\(status.accessKeyIdLength.map(String.init) ?? "missing")"
             )
@@ -78,7 +83,7 @@ public struct AlibabaCredentialOperations {
     }
 
     public func clear() -> String {
-        try? fileManager.removeItem(at: store.fileURL)
+        store.clear()
         defaultsStore.removeValue(forKey: BilineDefaultsKey.translationProvider)
         defaultsStore.removeValue(forKey: BilineDefaultsKey.alibabaRegionId)
         defaultsStore.removeValue(forKey: BilineDefaultsKey.alibabaEndpoint)
@@ -89,5 +94,9 @@ public struct AlibabaCredentialOperations {
 
     private func refreshDefaults() {
         _ = try? runner.run("/usr/bin/killall", ["cfprefsd"], allowFailure: true)
+    }
+
+    private func credentialLocation(_ url: URL) -> String {
+        url.isFileURL ? url.path : url.absoluteString
     }
 }

@@ -131,20 +131,24 @@ Developer installation is the active workflow:
 
 - `BilineIME Dev` installs into `~/Library/Input Methods`.
 - `BilineSettingsDev.app` installs into `~/Applications`.
+- Trusted tester packages may install the same dev apps into `/Library/Input Methods`
+  and `/Applications`.
 - `BilineIME` remains as a reserved release target in project configuration,
   but release packaging is paused.
 
 `bilinectl` is the source of truth for dev lifecycle operations. Make targets
 are thin wrappers.
 
-Repair is separate from install:
+Lifecycle operations are intent-first:
 
-- Level 1 reinstalls both dev apps and refreshes Launch Services and text-input
-  agents.
-- Level 2 removes dev app bundles and local input-method state, clears
-  text-input caches, and requires reboot before reinstall.
-- Level 3 performs Level 2 plus Launch Services database reset, and is a last
-  resort.
+- `install` builds and installs the dev apps, then refreshes Launch Services and
+  text-input agents.
+- `remove` removes installed bundles and can either preserve or purge Biline-local
+  data.
+- `reset` prunes HIToolbox state and can additionally clear `IntlDataCache` or
+  reset the Launch Services database, depending on reset depth.
+- `prepare-release` removes dev installs and purges Biline-local data to leave a
+  clean release-style environment.
 
 Installation success does not require automatic input-source selection. The user
 must manually select the input source and verify in a real host.
@@ -183,12 +187,34 @@ For host-facing IME changes, verification is layered:
 1. Focused package tests for the touched behavior.
 2. `make build-ime`.
 3. `make install-ime`.
-4. Manual TextEdit smoke test by the user.
+4. Manual source enrollment by the user (one-time, in System Settings → Keyboard
+   → Input Sources).
+5. Real-host TextEdit smoke.
 
-Codex and project scripts must not switch input sources, focus host apps,
-inject keys, browse candidates, or commit text. Candidate-panel visibility is
-verified through user-prepared screenshots or manual observation across active
-displays.
+Steps 3 and 4 are separate phases. `make install-ime` only installs the bundle.
+Apple's published model for first-time input method onboarding requires the user
+to add and enable the source manually, including any "Allow" prompt. The
+toolchain does not script that step.
+
+The real-host layer has two modes. The default mode is user-driven: the user
+selects `BilineIME Dev`, focuses TextEdit, types, browses, commits, and reports
+the result. The explicit local harness mode is `bilinectl smoke-host dev
+--confirm` / `make smoke-ime-host`; it may switch input sources and drive
+TextEdit only when the user asks for that exact automated action. It is never a
+CI gate.
+
+The harness classifies pre-run state as one of `bundle-missing`,
+`source-missing`, `source-disabled`, `source-not-selectable`,
+`source-not-selected`, or `ready`. It refuses to drive TextEdit unless the state
+is `ready` or `source-not-selected`. Use `bilinectl smoke-host dev --check` to
+print the report, and `bilinectl smoke-host dev --prepare` to open System
+Settings → Keyboard → Input Sources without clicking through any prompts.
+
+Host-smoke telemetry records composition snapshots, anchor resolution, panel
+render/show/hide events, browsing state, commits, and settings refresh
+boundaries. Candidate-panel visibility is verified through telemetry plus
+user-prepared screenshots or manual observation across active displays when
+needed.
 
 ## Current Engineering Priorities
 

@@ -22,6 +22,7 @@ func makeSessionWithEngine(
 private struct StubSettingsStore: SettingsStore {
     let targetLanguage: TargetLanguage = .english
     let previewEnabled: Bool = true
+    let bilingualModeEnabled: Bool = true
     let compactColumnCount: Int = 5
     let expandedRowCount: Int = 5
     let fuzzyPinyinEnabled: Bool = false

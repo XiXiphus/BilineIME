@@ -44,8 +44,29 @@ public struct DevEnvironmentDiagnostics {
             withBundleIdentifier: BilineAppIdentifier.devSettingsBundle)
         let imeURLs = workspace.urlsForApplications(
             withBundleIdentifier: BilineAppIdentifier.devInputMethodBundle)
+        let resolvedSettingsURL = resolvedInstalledURL(
+            registeredURLs: settingsURLs,
+            directCandidates: paths.devSettingsInstallURLs(for: .all),
+            preferredURL: paths.devSettingsInstallURL
+        )
+        let resolvedInputMethodURL = resolvedInstalledURL(
+            registeredURLs: imeURLs,
+            directCandidates: paths.devInputMethodInstallURLs(for: .all),
+            preferredURL: paths.devInputMethodInstallURL
+        )
+        let resolvedBrokerURL = resolvedDirectInstalledURL(
+            candidates: paths.devBrokerInstallURLs(for: .all),
+            preferredURL: paths.devBrokerInstallURL
+        )
+        let resolvedBrokerLaunchAgentURL = resolvedDirectInstalledURL(
+            candidates: paths.devBrokerLaunchAgentURLs(for: .all),
+            preferredURL: BilineAppPath.devBrokerLaunchAgentURL(
+                surface: .user,
+                homeDirectory: paths.homeDirectory
+            )
+        )
         let hitoolbox = readHitoolboxState()
-        let credentialStatus = BilineCredentialFileStore(
+        let credentialStatus = BilineCredentialVault(
             inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle
         ).status()
         let currentSource =
@@ -61,12 +82,11 @@ public struct DevEnvironmentDiagnostics {
             !fileManager.fileExists(atPath: $0.path)
         }
         let hasHitoolbox = hitoolbox.contains("io.github.xixiphus.inputmethod.BilineIME")
+        let sharedDefaults = BilineDefaultsStore.shared(for: BilineAppIdentifier.devInputMethodBundle)
         let characterFormRaw =
-            BilineDefaultsStore(domain: BilineAppIdentifier.devInputMethodBundle)
-            .string(forKey: BilineDefaultsKey.characterForm) ?? ""
+            sharedDefaults.string(forKey: BilineDefaultsKey.characterForm) ?? ""
         let punctuationFormRaw =
-            BilineDefaultsStore(domain: BilineAppIdentifier.devInputMethodBundle)
-            .string(forKey: BilineDefaultsKey.punctuationForm) ?? ""
+            sharedDefaults.string(forKey: BilineDefaultsKey.punctuationForm) ?? ""
         let resolvedCharacterForm = characterFormRaw.isEmpty ? "simplified" : characterFormRaw
         let schemaID = BilineAppPath.rimeSchemaID(characterForm: resolvedCharacterForm)
         let userDictionaryName = BilineAppPath.rimeUserDictionaryName(
@@ -75,23 +95,53 @@ public struct DevEnvironmentDiagnostics {
             inputMethodBundleIdentifier: BilineAppIdentifier.devInputMethodBundle,
             characterForm: resolvedCharacterForm
         )
-        let runtimeResourceURL = paths.devInputMethodInstallURL
+        let runtimeResourceURL = (resolvedInputMethodURL ?? paths.devInputMethodInstallURL)
             .appendingPathComponent("Contents/Resources/RimeRuntime/rime-data", isDirectory: true)
+        let imeInstalled = resolvedInputMethodURL != nil
+        let settingsInstalled = resolvedSettingsURL != nil
+        let brokerInstalled = resolvedBrokerURL != nil
+        let brokerLaunchAgentInstalled = resolvedBrokerLaunchAgentURL != nil
+        let readiness = BilineInputSourceReadinessChecker().evaluate(
+            bundleInstalled: imeInstalled
+        )
+        let recommendation = recommendedAction(
+            resolvedSettingsURL: resolvedSettingsURL,
+            resolvedInputMethodURL: resolvedInputMethodURL,
+            settingsPathCount: settingsPathCount,
+            defaultSettingsAtStablePath: defaultSettingsURL?.path.hasSuffix(
+                "/Applications/BilineSettingsDev.app") == true,
+            imePathCount: imePathCount,
+            staleLS: staleLS,
+            hasHitoolbox: hasHitoolbox,
+            imeInstalled: imeInstalled,
+            settingsInstalled: settingsInstalled,
+            brokerInstalled: brokerInstalled,
+            brokerLaunchAgentInstalled: brokerLaunchAgentInstalled
+        )
 
         return DevEnvironmentSnapshot(
-            imeInstallPath: paths.devInputMethodInstallURL.path,
-            imeInstalled: fileManager.fileExists(atPath: paths.devInputMethodInstallURL.path),
+            imeInstallPath: resolvedInputMethodURL?.path ?? paths.devInputMethodInstallURL.path,
+            imeInstalled: imeInstalled,
             imeRunning: isProcessRunning(BilineAppProcessName.devInputMethod),
-            settingsInstallPath: paths.devSettingsInstallURL.path,
-            settingsInstalled: fileManager.fileExists(atPath: paths.devSettingsInstallURL.path),
+            settingsInstallPath: resolvedSettingsURL?.path ?? paths.devSettingsInstallURL.path,
+            settingsInstalled: settingsInstalled,
             settingsRunning: isProcessRunning(BilineAppProcessName.devSettings),
+            brokerInstallPath: resolvedBrokerURL?.path ?? paths.devBrokerInstallURL.path,
+            brokerInstalled: brokerInstalled,
+            brokerRunning: isProcessRunning(BilineAppProcessName.devBroker),
+            brokerLaunchAgentPath: resolvedBrokerLaunchAgentURL?.path
+                ?? BilineAppPath.devBrokerLaunchAgentURL(
+                    surface: .user,
+                    homeDirectory: paths.homeDirectory
+                ).path,
+            brokerLaunchAgentInstalled: brokerLaunchAgentInstalled,
             settingsLaunchServicesPathCount: settingsPathCount,
             defaultSettingsApplicationPath: defaultSettingsURL?.path,
             imeLaunchServicesPathCount: imePathCount,
             hasStaleLaunchServicesEntry: staleLS,
             hasBilineHitoolboxState: hasHitoolbox,
             currentInputSource: currentSource,
-            credentialFilePath: credentialStatus.fileURL.path,
+            credentialFilePath: credentialLocation(credentialStatus.fileURL),
             credentialFileComplete: credentialStatus.isComplete,
             rimeUserDictionaryPath: activeRimeUserDB.path,
             rimeUserDictionaryExists: fileManager.fileExists(atPath: activeRimeUserDB.path),
@@ -100,16 +150,9 @@ public struct DevEnvironmentDiagnostics {
             rimeSchemaID: schemaID,
             rimeUserDictionaryName: userDictionaryName,
             rimeRuntimeResourceCount: resourceCount(at: runtimeResourceURL),
-            recommendedRepairLevel: recommendedRepairLevel(
-                settingsPathCount: settingsPathCount,
-                defaultSettingsAtStablePath: defaultSettingsURL?.path.hasSuffix(
-                    "/Applications/BilineSettingsDev.app") == true,
-                imePathCount: imePathCount,
-                staleLS: staleLS,
-                hasHitoolbox: hasHitoolbox,
-                imeInstalled: fileManager.fileExists(atPath: paths.devInputMethodInstallURL.path),
-                settingsInstalled: fileManager.fileExists(atPath: paths.devSettingsInstallURL.path)
-            )
+            recommendedAction: recommendation.spec,
+            recommendedActionReason: recommendation.reason,
+            inputSourceReadiness: readiness
         )
     }
 
@@ -123,6 +166,11 @@ public struct DevEnvironmentDiagnostics {
             "settings_install=\(snapshot.settingsInstallPath)",
             "settings_installed=\(snapshot.settingsInstalled)",
             "settings_running=\(snapshot.settingsRunning)",
+            "broker_install=\(snapshot.brokerInstallPath)",
+            "broker_installed=\(snapshot.brokerInstalled)",
+            "broker_running=\(snapshot.brokerRunning)",
+            "broker_launch_agent=\(snapshot.brokerLaunchAgentPath)",
+            "broker_launch_agent_installed=\(snapshot.brokerLaunchAgentInstalled)",
             "settings_launchservices_path_count=\(snapshot.settingsLaunchServicesPathCount)",
             "settings_launchservices_default_path=\(snapshot.defaultSettingsApplicationPath ?? "<none>")",
             "settings_launchservices_default_stable=\(snapshot.defaultSettingsAtStablePath)",
@@ -141,7 +189,13 @@ public struct DevEnvironmentDiagnostics {
             "rime_schema_id=\(snapshot.rimeSchemaID)",
             "rime_userdb_name=\(snapshot.rimeUserDictionaryName)",
             "rime_runtime_resource_count=\(snapshot.rimeRuntimeResourceCount)",
-            "recommended_repair=\(snapshot.recommendedRepairText)",
+            "recommended_action=\(snapshot.recommendedAction?.actionText ?? "none")",
+            "recommended_reason=\(snapshot.recommendedActionReason.isEmpty ? "none" : snapshot.recommendedActionReason)",
+            "input_source_id=\(snapshot.inputSourceReadiness.inputSourceID)",
+            "input_source_state=\(snapshot.inputSourceReadiness.state.shortDescription)",
+            "input_source_ready=\(snapshot.inputSourceReadiness.isReady)",
+            "input_source_summary=\(snapshot.inputSourceReadiness.summary)",
+            "input_source_remediation=\(snapshot.inputSourceReadiness.remediation.isEmpty ? "none" : snapshot.inputSourceReadiness.remediation.joined(separator: " | "))",
             "manual_host_gate=required",
         ].joined(separator: "\n")
     }
@@ -153,6 +207,10 @@ public struct DevEnvironmentDiagnostics {
             defaults read com.apple.HIToolbox AppleInputSourceHistory 2>/dev/null || true
             """
         return (try? runner.runShell(command, allowFailure: true).output) ?? ""
+    }
+
+    private func credentialLocation(_ url: URL) -> String {
+        url.isFileURL ? url.path : url.absoluteString
     }
 
     private func isProcessRunning(_ processName: String) -> Bool {
@@ -181,22 +239,96 @@ public struct DevEnvironmentDiagnostics {
         return count
     }
 
-    private func recommendedRepairLevel(
+    private func resolvedInstalledURL(
+        registeredURLs: [URL],
+        directCandidates: [URL],
+        preferredURL: URL
+    ) -> URL? {
+        let existingURLs = uniqueURLs((registeredURLs + directCandidates).filter {
+            fileManager.fileExists(atPath: $0.path)
+        })
+        for candidate in directCandidates where existingURLs.contains(candidate) {
+            return candidate
+        }
+        if let firstRegistered = existingURLs.first {
+            return firstRegistered
+        }
+        return fileManager.fileExists(atPath: preferredURL.path) ? preferredURL : nil
+    }
+
+    private func resolvedDirectInstalledURL(
+        candidates: [URL],
+        preferredURL: URL
+    ) -> URL? {
+        let existingURLs = uniqueURLs(candidates.filter {
+            fileManager.fileExists(atPath: $0.path)
+        })
+        if let first = existingURLs.first {
+            return first
+        }
+        return fileManager.fileExists(atPath: preferredURL.path) ? preferredURL : nil
+    }
+
+    private func uniqueURLs(_ urls: [URL]) -> [URL] {
+        var seen = Set<String>()
+        var result: [URL] = []
+        for url in urls {
+            if seen.insert(url.path).inserted {
+                result.append(url)
+            }
+        }
+        return result
+    }
+
+    private func recommendedAction(
+        resolvedSettingsURL: URL?,
+        resolvedInputMethodURL: URL?,
         settingsPathCount: Int,
         defaultSettingsAtStablePath: Bool,
         imePathCount: Int,
         staleLS: Bool,
         hasHitoolbox: Bool,
         imeInstalled: Bool,
-        settingsInstalled: Bool
-    ) -> Int {
-        if staleLS { return 3 }
-        if imePathCount > 1 { return 2 }
-        if settingsPathCount > 1 && !defaultSettingsAtStablePath { return 2 }
-        if hasHitoolbox && !imeInstalled { return 2 }
-        if settingsPathCount == 0 || imePathCount == 0 || !imeInstalled || !settingsInstalled {
-            return 1
+        settingsInstalled: Bool,
+        brokerInstalled: Bool,
+        brokerLaunchAgentInstalled: Bool
+    ) -> (spec: LifecycleOperationSpec?, reason: String) {
+        if staleLS {
+            return (.reset(scope: .all, depth: .launchServicesReset), "LaunchServices still references stale Biline paths.")
         }
-        return 0
+        if imePathCount > 1 {
+            return (.reset(scope: .all, depth: .cachePrune), "Multiple Biline IME LaunchServices paths were found.")
+        }
+        if settingsPathCount > 1 && !defaultSettingsAtStablePath {
+            return (.reset(scope: .all, depth: .cachePrune), "Settings App default LaunchServices path is not stable.")
+        }
+        if hasHitoolbox && !imeInstalled {
+            return (.reset(scope: .all, depth: .cachePrune), "HIToolbox still references Biline after the app bundle disappeared.")
+        }
+        if !brokerInstalled || !brokerLaunchAgentInstalled {
+            return (.install(scope: preferredInstallScope(
+                resolvedSettingsURL: resolvedSettingsURL,
+                resolvedInputMethodURL: resolvedInputMethodURL
+            )), "Broker executable or LaunchAgent is missing.")
+        }
+        if !imeInstalled || !settingsInstalled {
+            return (.install(scope: preferredInstallScope(
+                resolvedSettingsURL: resolvedSettingsURL,
+                resolvedInputMethodURL: resolvedInputMethodURL
+            )), "One or more Biline dev app bundles are missing.")
+        }
+        return (nil, "")
+    }
+
+    private func preferredInstallScope(
+        resolvedSettingsURL: URL?,
+        resolvedInputMethodURL: URL?
+    ) -> LifecycleScope {
+        if resolvedInputMethodURL?.path.hasPrefix("/Library/") == true
+            || resolvedSettingsURL?.path.hasPrefix("/Applications/") == true
+        {
+            return .system
+        }
+        return .user
     }
 }

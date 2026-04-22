@@ -16,12 +16,21 @@ Always run this sequence:
 3. `make install-ime`
 4. Stop and ask the user to run the real-host typing step manually.
 
-Real-host verification is manual-only:
+Real-host verification is layered, and the layers are separate phases:
+
+1. Install the bundle. `make install-ime` / `bilinectl install dev --confirm` only installs the IME, Settings, and broker bundles; it does not enable the input source.
+2. Manual source enrollment. The user opens System Settings → Keyboard → Input Sources, adds `BilineIME Dev`, and clicks any macOS `Allow` prompt by hand. Apple expects this onboarding step to be human-driven, so Codex and scripts must not try to automate it.
+3. Source-ready host smoke. Only after the source is `enabled + selectable` may the automated harness drive TextEdit. Use `bilinectl smoke-host dev --check` to inspect readiness; the harness fails fast with remediation hints when readiness is not satisfied.
+
+Inside that third phase the rules are:
 
 - use `TextEdit` as the first host
-- the user manually selects `BilineIME Dev`, focuses the host, types, browses, commits, and reports the result
-- Codex must not switch input sources, focus the host, inject keys, or run scripts that do those actions
-- `./scripts/select-input-source.sh current` is read-only and may be used only to report the current source
+- default to user-driven real-host validation: the user manually selects `BilineIME Dev`, focuses the host, types, browses, commits, and reports the result
+- Codex must not switch input sources, focus the host, inject keys, or run scripts that do those actions unless the user explicitly asks for that exact automated host-smoke action in the moment
+- the only supported automated real-host entrypoint is `bilinectl smoke-host dev --confirm` / `make smoke-ime-host`; it is local-only, never a CI step, and must export telemetry/artifacts
+- the automated host harness must drive exactly one `TextEdit` session; reuse or restart that single session instead of opening multiple `TextEdit` windows/documents
+- `bilinectl smoke-host dev --check` and `--prepare` are read-only / non-destructive helpers; `--prepare` only opens System Settings and prints remediation, it never clicks `Allow` or enables the source
+- `./scripts/select-input-source.sh current` and `./scripts/select-input-source.sh readiness` are read-only and may be used only to report state
 - if candidate UI may render on another monitor, ask the user for screenshots across displays instead of driving the host
 - dev lifecycle install/repair/diagnose flows go through `bilinectl`; Make targets and shell scripts should remain thin wrappers
 

@@ -1,44 +1,35 @@
 import SwiftUI
 
 private enum SettingsSection: String, CaseIterable, Identifiable {
-    case status
     case translation
-    case inputEngine
-    case keyBindings
+    case inputSettings
     case appearance
-    case composingHelpers
-    case perApp
+    case status
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .status: "状态"
-        case .translation: "翻译"
-        case .inputEngine: "输入引擎"
-        case .keyBindings: "按键"
+        case .translation: "翻译配置"
+        case .inputSettings: "输入设置"
         case .appearance: "外观"
-        case .composingHelpers: "输入辅助"
-        case .perApp: "应用与单机模式"
+        case .status: "状态"
         }
     }
 
     var symbolName: String {
         switch self {
-        case .status: "checkmark.circle"
         case .translation: "globe"
-        case .inputEngine: "keyboard"
-        case .keyBindings: "command"
+        case .inputSettings: "slider.horizontal.3"
         case .appearance: "paintpalette"
-        case .composingHelpers: "wand.and.stars"
-        case .perApp: "macwindow"
+        case .status: "checkmark.circle"
         }
     }
 }
 
 struct SettingsRootView: View {
     @StateObject private var model = BilineSettingsModel()
-    @State private var selection: SettingsSection? = .status
+    @State private var selection: SettingsSection? = .translation
 
     var body: some View {
         NavigationSplitView {
@@ -59,21 +50,15 @@ struct SettingsRootView: View {
 
     @ViewBuilder
     private var detailView: some View {
-        switch selection ?? .status {
-        case .status:
-            StatusView(model: model)
+        switch selection ?? .translation {
         case .translation:
             TranslationSettingsView(model: model)
-        case .inputEngine:
-            InputEngineSettingsView(model: model)
-        case .keyBindings:
-            KeyBindingSettingsView(model: model)
+        case .inputSettings:
+            InputSettingsView(model: model)
         case .appearance:
             AppearanceSettingsView(model: model)
-        case .composingHelpers:
-            ComposingHelpersSettingsView(model: model)
-        case .perApp:
-            PerAppSettingsView(model: model)
+        case .status:
+            StatusView(model: model)
         }
     }
 }

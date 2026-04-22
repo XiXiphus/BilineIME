@@ -1,4 +1,5 @@
 import BilineCore
+import BilineIPC
 import BilinePreview
 import BilineSettings
 import Foundation
@@ -9,9 +10,12 @@ import Foundation
 /// package where it can be unit tested without booting AppKit/IMK.
 enum AppSettingsStore {
     static func make() -> LiveSettingsStore {
-        let domain =
+        let bundleIdentifier =
             Bundle.main.bundleIdentifier
             ?? BilineAppIdentifier.devInputMethodBundle
-        return LiveSettingsStore(domain: domain)
+        let communicationHub = BilineCommunicationHub(inputMethodBundleIdentifier: bundleIdentifier)
+        return LiveSettingsStore {
+            communicationHub.loadConfiguration().settings
+        }
     }
 }

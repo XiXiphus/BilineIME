@@ -468,6 +468,27 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.activeLayer, .english)
     }
 
+    func testPurePinyinModeHidesEnglishCandidatesAndSkipsPreview() {
+        let session = DemoFixtures.makeBilingualSession(bilingualModeEnabled: false)
+
+        session.append(text: "shi")
+
+        XCTAssertFalse(session.snapshot.showsEnglishCandidates)
+        XCTAssertEqual(session.snapshot.activeLayer, .chinese)
+        XCTAssertTrue(session.snapshot.items.allSatisfy { $0.previewState == .unavailable })
+    }
+
+    func testPurePinyinModeIgnoresEnglishLayerAndCommitsChinese() {
+        let session = DemoFixtures.makeBilingualSession(bilingualModeEnabled: false)
+
+        session.append(text: "nihao")
+        session.setActiveLayer(.english)
+
+        XCTAssertEqual(session.snapshot.activeLayer, .chinese)
+        XCTAssertEqual(session.commitSelection(), "你好")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
     func testPhraseCandidateRanksAheadOfShortPrefixCandidates() {
         let session = DemoFixtures.makeBilingualSession()
 

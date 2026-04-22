@@ -1,16 +1,23 @@
+import BilineIPC
 import BilineSettings
 import BilinePreview
 import Foundation
 import OSLog
 
 enum TranslationProviderFactory {
+    fileprivate static var communicationHub: BilineCommunicationHub {
+        BilineCommunicationHub(
+            inputMethodBundleIdentifier: Bundle.main.bundleIdentifier ?? BilineAppIdentifier.devInputMethodBundle
+        )
+    }
+
     static func configuredProvider() -> (any TranslationProvider)? {
         guard selectedProvider == "aliyun" else { return nil }
         return FileBackedAlibabaTranslationProvider()
     }
 
     static var selectedProvider: String? {
-        defaultsStore.string(forKey: BilineDefaultsKey.translationProvider)?
+        communicationHub.loadConfiguration().translationProvider.rawValue
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
     }
@@ -32,10 +39,11 @@ enum TranslationProviderFactory {
             return nil
         }
 
-        let regionId = normalized(defaultsStore.string(forKey: BilineDefaultsKey.alibabaRegionId))
+        let configuration = communicationHub.loadConfiguration()
+        let regionId = normalized(configuration.region)
             ?? normalized(localRecord.regionId)
             ?? "cn-hangzhou"
-        let endpointString = normalized(defaultsStore.string(forKey: BilineDefaultsKey.alibabaEndpoint))
+        let endpointString = normalized(configuration.endpoint)
             ?? normalized(localRecord.endpoint)
         let endpoint = endpointString
             .flatMap(URL.init(string:))
@@ -59,11 +67,6 @@ enum TranslationProviderFactory {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private static var defaultsStore: BilineDefaultsStore {
-        BilineDefaultsStore(
-            domain: Bundle.main.bundleIdentifier ?? BilineAppIdentifier.devInputMethodBundle
-        )
-    }
 }
 
 struct FileBackedAlibabaTranslationProvider: BatchTranslationProvider {
@@ -101,9 +104,7 @@ struct FileBackedAlibabaTranslationProvider: BatchTranslationProvider {
 
 enum AlibabaCredentialResolver {
     static func localCredentialRecord() -> BilineAlibabaCredentialRecord? {
-        BilineCredentialFileStore(
-            fileURL: BilineAppPath.inputMethodRuntimeCredentialFileURL()
-        ).loadIfAvailable()
+        try? TranslationProviderFactory.communicationHub.loadCredentialRecord()
     }
 }
 

@@ -23,6 +23,7 @@ extension BilingualInputSession {
             for candidate in visibleCandidates {
                 previewStates[candidate.id] = .unavailable
             }
+            cancelUnselectedPreviewTasks(selectedID: nil)
             publishSnapshot()
             return
         }
@@ -31,7 +32,10 @@ extension BilingualInputSession {
     }
 
     func prepareSelectedPreview() {
-        guard settingsStore.previewEnabled, engineSnapshot.isComposing else { return }
+        guard settingsStore.previewEnabled, engineSnapshot.isComposing else {
+            cancelUnselectedPreviewTasks(selectedID: nil)
+            return
+        }
         guard let selectedID = currentSelectedCandidateID,
             let selectedCandidate = engineSnapshot.candidates.first(where: { $0.id == selectedID })
         else {
@@ -179,5 +183,16 @@ extension BilingualInputSession {
 
     func fallbackPreviewState() -> BilingualPreviewState {
         .unavailable
+    }
+
+    public func applyBilingualModeSetting() {
+        withStateLock {
+            if !showsEnglishCandidates {
+                activeLayer = .chinese
+                clearPreviews()
+            }
+            guard engineSnapshot.isComposing else { return }
+            publishSnapshot()
+        }
     }
 }

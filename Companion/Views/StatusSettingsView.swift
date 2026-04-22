@@ -25,6 +25,24 @@ struct StatusView: View {
                     StatusBadge(
                         text: model.imeRunning ? "运行中" : "未运行", isPositive: model.imeRunning)
                 }
+                SettingsRow(title: "Broker 路径", subtitle: model.brokerInstallPath) {
+                    StatusBadge(
+                        text: model.brokerInstalled ? "已安装" : "缺失",
+                        isPositive: model.brokerInstalled
+                    )
+                }
+                SettingsRow(title: "Broker 进程") {
+                    StatusBadge(
+                        text: model.brokerRunning ? "运行中" : "未运行",
+                        isPositive: model.brokerRunning
+                    )
+                }
+                SettingsRow(title: "Broker LaunchAgent", subtitle: model.brokerLaunchAgentPath) {
+                    StatusBadge(
+                        text: model.brokerLaunchAgentInstalled ? "已注册" : "缺失",
+                        isPositive: model.brokerLaunchAgentInstalled
+                    )
+                }
                 SettingsRow(title: "字形输出") {
                     StatusBadge(text: model.characterFormTitle, isPositive: true)
                 }
@@ -55,10 +73,13 @@ struct StatusView: View {
                             ? "无重复注册" : "\(model.settingsLaunchServicesPathCount) 个路径",
                         isPositive: model.settingsLaunchServicesPathCount <= 1)
                 }
-                SettingsRow(title: "生命周期建议") {
+                SettingsRow(
+                    title: "生命周期建议",
+                    subtitle: model.lifecycleRecommendationReason
+                ) {
                     StatusBadge(
                         text: model.lifecycleRecommendation,
-                        isPositive: model.lifecycleRecommendation == "无需修复")
+                        isPositive: model.lifecycleRecommendation == "无需操作")
                 }
                 SettingsRow(title: "翻译服务", subtitle: model.translationStatusText) {
                     StatusBadge(

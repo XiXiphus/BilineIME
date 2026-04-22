@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "BilineRime", targets: ["BilineRime"]),
         .library(name: "BilineSettings", targets: ["BilineSettings"]),
         .library(name: "BilineOperations", targets: ["BilineOperations"]),
+        .library(name: "BilineIPC", targets: ["BilineIPC"]),
         .library(name: "BilineSession", targets: ["BilineSession"]),
         .library(name: "BilineMocks", targets: ["BilineMocks"]),
         .library(name: "BilineTestSupport", targets: ["BilineTestSupport"]),
@@ -58,9 +59,13 @@ let package = Package(
             name: "BilineOperations",
             dependencies: ["BilineSettings"]
         ),
+        .target(
+            name: "BilineIPC",
+            dependencies: ["BilineSettings", "BilineOperations"]
+        ),
         .executableTarget(
             name: "bilinectl",
-            dependencies: ["BilineOperations"]
+            dependencies: ["BilineOperations", "BilineSettings", "BilineIPC"]
         ),
         .target(
             name: "BilineMocks",

@@ -15,6 +15,12 @@
 - `BilineTestSupport` owns reusable test fixtures and test helpers.
 - `App/` adapts platform events to package APIs and renders current state into `IMKInputController` plus the custom AppKit candidate panel.
 
+## Dev-only assets
+
+- `BilineMocks`, `BilineTestSupport`, demo fixtures, and mock translation providers are developer/test assets, not dead runtime code.
+- `.env.example` exists only as a template for opt-in live API tests. The Settings app and IME runtime do not read `.env`.
+- Live Alibaba translation tests are explicit opt-in; do not treat their environment-variable path as the product credential path.
+
 ## Naming
 
 - Use nouns for long-lived types and verbs for side-effectful methods.
@@ -37,15 +43,19 @@
   - `make build-ime`
   - `make install-ime`
 - stop and ask the user to manually select the input source, focus the host, type, browse, commit, and report the result
-- Automated real-host operation is prohibited. Codex and scripts must not switch input sources, focus TextEdit, inject keys, or drive candidate browsing.
-- `scripts/select-input-source.sh current` is read-only and may be used only to report the current source.
+- Treat install, manual source enrollment, and source-ready host smoke as three separate phases. Bundle install does not imply source enrollment; source enrollment is a one-time manual step in System Settings.
+- Automated real-host operation is allowed only through the explicit local harness (`bilinectl smoke-host dev --confirm` / `make smoke-ime-host`) and only when the user asks for that exact action in the moment.
+- The harness must refuse to start (fail fast with a remediation message) when readiness is not `ready`/`source-not-selected`. Use `bilinectl smoke-host dev --check` to inspect readiness, and `bilinectl smoke-host dev --prepare` to open System Settings without clicking `Allow` for the user.
+- Outside that explicit request, Codex and scripts must not switch input sources, focus TextEdit, inject keys, or drive candidate browsing.
+- The local host harness must use exactly one `TextEdit` session. If host state is dirty, restart that one session instead of opening multiple windows/documents.
+- `scripts/select-input-source.sh current` and `scripts/select-input-source.sh readiness` are read-only and may be used only to report state.
 - The baseline smoke-test host is `TextEdit`.
 - When validating candidate UI, ask for user-provided screenshots across all active displays when needed.
 - `Computer Use` must not operate the input method unless the user explicitly asks for that specific action in the moment.
 
 ### IME Smoke Baseline
 
-Manual host verification should cover, at minimum:
+CI-safe tests should cover router/session/anchor ordering for the same critical paths. Real-host smoke, manual or harness-driven, should cover at minimum:
 
 - candidate browsing:
   - `shi`

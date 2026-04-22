@@ -278,6 +278,21 @@ final class BilineInputController: IMKInputController {
             return false
         }
 
+        // #region agent log
+        AgentDebugLogger.write(
+            hypothesisId: "H3",
+            location: "App/BilineInputController.swift:276",
+            message: "input controller received NSEvent",
+            data: [
+                "eventType": String(event.type.rawValue),
+                "keyCode": String(event.keyCode),
+                "characters": event.characters ?? "<nil>",
+                "charactersIgnoringModifiers": event.charactersIgnoringModifiers ?? "<nil>",
+                "bundleIdentifier": Bundle.main.bundleIdentifier ?? "<missing>",
+            ]
+        )
+        // #endregion
+
         let clientObject = client as AnyObject
         if activeClient !== clientObject {
             switchActiveClient(to: clientObject)
@@ -402,18 +417,27 @@ final class BilineInputController: IMKInputController {
     ) {
         guard pendingSettingsRefresh else { return }
         guard !currentSnapshot.isComposing else { return }
+        let compactColumnCountBeforeRefresh = settingsStore.compactColumnCount
+        let expandedRowCountBeforeRefresh = settingsStore.expandedRowCount
         pendingSettingsRefresh = false
         logger.info("Applying pending settings refresh at safe boundary reason=\(reason)")
+        let didChange = settingsStore.refresh()
+        let compactColumnCountAfterRefresh = settingsStore.compactColumnCount
+        let expandedRowCountAfterRefresh = settingsStore.expandedRowCount
         #if DEBUG
             BilineHostSmokeReporter.shared.record(
                 .settingsRefreshApplied,
                 fields: [
                     "reason": String(describing: reason),
                     "rawInput": currentSnapshot.rawInput,
+                    "changed": String(didChange),
+                    "compactColumnCountBeforeRefresh": String(compactColumnCountBeforeRefresh),
+                    "compactColumnCountAfterRefresh": String(compactColumnCountAfterRefresh),
+                    "expandedRowCountBeforeRefresh": String(expandedRowCountBeforeRefresh),
+                    "expandedRowCountAfterRefresh": String(expandedRowCountAfterRefresh),
                 ]
             )
         #endif
-        settingsStore.refresh()
     }
 
     private func commitSelection(using client: IMKTextInput) -> Bool {
@@ -425,6 +449,10 @@ final class BilineInputController: IMKInputController {
         textInputBridge.insertCommittedText(committedText, into: client)
         let postSnapshot = inputSession.snapshot
         if !postSnapshot.isComposing {
+            applyPendingSettingsRefreshIfNeeded(
+                currentSnapshot: postSnapshot,
+                reason: "candidate-commit"
+            )
             textInputBridge.clearAnchorCache()
         }
         #if DEBUG
@@ -620,6 +648,10 @@ final class BilineInputController: IMKInputController {
         textInputBridge.insertCommittedText(committedText, into: client)
         let postSnapshot = inputSession.snapshot
         if !postSnapshot.isComposing {
+            applyPendingSettingsRefreshIfNeeded(
+                currentSnapshot: postSnapshot,
+                reason: "raw-input-commit"
+            )
             textInputBridge.clearAnchorCache()
         }
         #if DEBUG

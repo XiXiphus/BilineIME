@@ -11,9 +11,14 @@
 - `BilineCore` owns composition state, candidates, paging, commit behavior, and engine protocols.
 - `BilinePreview` owns translation provider contracts, cache behavior, and stale-result suppression.
 - `BilineSession` owns bilingual composition snapshots, active-layer state, and visible-page preview orchestration.
+- `BilineSettings` owns settings snapshots, defaults wrappers, shared configuration stores, and credential-store abstractions.
+- `BilineOperations` owns lifecycle planning, install/remove/reset execution support, diagnostics, and readiness state.
+- `BilineIPC` owns broker models, XPC contracts, client transport, and the communication hub.
 - `BilineMocks` owns fixture-driven demo implementations and demo resources.
 - `BilineTestSupport` owns reusable test fixtures and test helpers.
 - `App/` adapts platform events to package APIs and renders current state into `IMKInputController` plus the custom AppKit candidate panel.
+- `Sources/bilinectl/` owns local developer tooling, including lifecycle commands and real-host smoke harness code.
+- `Tests/` owns CI-safe Swift Package tests only. Real-host automation must not be moved into `Tests/`.
 
 ## Dev-only assets
 
@@ -52,6 +57,7 @@
 - The baseline smoke-test host is `TextEdit`.
 - When validating candidate UI, ask for user-provided screenshots across all active displays when needed.
 - `Computer Use` must not operate the input method unless the user explicitly asks for that specific action in the moment.
+- Keep the host smoke harness structurally split (support / host driver / harness / CLI) rather than letting one file regrow into a monolith.
 
 ### IME Smoke Baseline
 
@@ -83,6 +89,35 @@ CI-safe tests should cover router/session/anchor ordering for the same critical 
   - `haopingguo` defaults to phrase candidate `好苹果`
   - confirming the phrase in English commits `good apple`
   - selecting the later short-prefix candidate `好` commits `good` and keeps `pingguo` as the new tail composition
+
+### Host Smoke Stress Set
+
+These are not all part of today's automated baseline, but they are the next
+high-value stress cases and should guide future harness expansion or manual
+verification:
+
+- ambiguous syllable boundaries:
+  - `xi'an`
+  - `lv`
+- mixed full/abbreviated pinyin:
+  - `pingguogs`
+- punctuation and raw-buffer stress:
+  - `shi_`
+  - `shi%`
+  - `shi()`
+  - `shi,`
+  - `ni----====+`
+- editing and confirmation:
+  - `Backspace`
+  - `Space`
+  - `Return`
+  - `Esc`
+- active-layer persistence:
+  - `Shift+Tab`
+  - continue typing after layer switch
+  - continue browsing after layer switch
+- mixed Chinese / Latin:
+  - inline Latin input such as `ipad`
 
 ## Dependency policy
 

@@ -82,3 +82,5 @@ Vendor/librime/dist/
 *.swo
 *~
 .vscode/
+.cursor/
+.swiftpm/

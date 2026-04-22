@@ -6,15 +6,14 @@ Accepted.
 
 ## Context
 
-BilineIME now has two dev apps:
+BilineIME now has three dev-lane runtime components:
 
 - `BilineIMEDev.app` in `~/Library/Input Methods`
 - `BilineSettingsDev.app` in `~/Applications`
+- `BilineBrokerDev` plus its LaunchAgent in the user Library
 
-Trusted tester packaging may also place those same dev apps at system paths:
-
-- `BilineIMEDev.app` in `/Library/Input Methods`
-- `BilineSettingsDev.app` in `/Applications`
+Trusted tester packaging may also place those same dev-lane components at system
+paths.
 
 The old lifecycle was split across IME install scripts, Settings install
 scripts, diagnose scripts, reset scripts, and repair scripts. That made it too
@@ -25,8 +24,9 @@ path or a DerivedData Launch Services record.
 
 `bilinectl` is the source of truth for dev lifecycle operations.
 
-- `install` builds and installs both dev apps, refreshes Launch Services and
-  text-input agents, and preserves credentials, Rime userdb, and defaults.
+- `install` builds and installs the dev IME, dev Settings app, broker, and
+  LaunchAgent, refreshes Launch Services and text-input agents, and preserves
+  credentials, Rime userdb, and defaults.
 - `remove` removes dev app bundles and can either preserve or purge Biline-local
   data.
 - `reset` handles system-side recovery depth, from local refresh through
@@ -40,14 +40,16 @@ for low-level build, runtime embedding, and read-only diagnostics.
 Real-host validation is layered. The default flow is manual TextEdit smoke. The
 only automated host path is the explicit local harness
 `bilinectl smoke-host dev --confirm` / `make smoke-ime-host`; it is local-only,
-must export telemetry/artifacts, and must not become a CI gate.
+must export telemetry/artifacts, classify source readiness first, and must not
+become a CI gate.
 
 ## Consequences
 
-- `make install-ime` runs the intent-first install flow for both dev apps.
+- `make install-ime` runs the intent-first install flow for the dev IME, dev
+  Settings app, broker, and LaunchAgent.
 - `make reset-ime` prints a dry-run reset plan unless `CONFIRM=1` is provided.
 - Settings App reads the same lifecycle snapshot used by the CLI and shows
-  stable-path and action recommendation state.
+  stable-path, broker, and action recommendation state.
 - `make dev-pkg` emits unsigned tester packages for install, safe uninstall, and
   deep clean on the dev lane.
 - Release packaging is paused and has no supported notarized Make or script

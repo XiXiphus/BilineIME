@@ -19,3 +19,9 @@ Mode 1 now requires:
 - committing either layer for the selected candidate
 
 Those interaction requirements exceed what stock annotation can express cleanly, so the annotation-first path is retained only as historical context.
+
+## Current Status Note
+
+This ADR remains superseded. The current dev lane and local host smoke baseline
+assume the custom candidate panel is the active UI path; stock annotation is no
+longer part of the supported product direction.

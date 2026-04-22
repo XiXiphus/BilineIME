@@ -1,104 +1,88 @@
-<div align="center">
-  <br />
-  <img width="112" alt="BilineIME logo" src="https://github.com/user-attachments/assets/93da38f4-0a86-4ba3-8c33-29ad3645cc1b" />
-  <h1>BilineIME</h1>
-  <p>
-    <strong>A macOS Chinese input method for bilingual drafting.</strong>
-  </p>
-  <p>
-    Type Chinese. Preview English. Commit the layer you mean.
-  </p>
-  <p>
-    <a href="#development"><img alt="macOS 14+" src="https://img.shields.io/badge/macOS-14%2B-111111?style=for-the-badge&logo=apple&logoColor=white" /></a>
-    <a href="#architecture"><img alt="InputMethodKit" src="https://img.shields.io/badge/InputMethodKit-native-1f6feb?style=for-the-badge" /></a>
-    <a href="#current-capabilities"><img alt="Rime powered" src="https://img.shields.io/badge/Rime-powered-0f766e?style=for-the-badge" /></a>
-    <a href="LICENSE"><img alt="GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-2f2f2f?style=for-the-badge" /></a>
-  </p>
-</div>
+# BilineIME
 
-<table>
-  <tr>
-    <td align="center" width="33%">
-      <strong>Chinese first</strong><br />
-      Rime-backed candidates stay the source of truth.
-    </td>
-    <td align="center" width="33%">
-      <strong>Live preview</strong><br />
-      English suggestions update asynchronously while typing stays responsive.
-    </td>
-    <td align="center" width="33%">
-      <strong>Layer commit</strong><br />
-      Switch between Chinese and English output without leaving composition.
-    </td>
-  </tr>
-</table>
+BilineIME is a macOS Chinese input method focused on **Chinese-first typing with
+optional bilingual preview**.
 
-<p align="center">
-  <strong>Pre-release:</strong> BilineIME is under active stabilization. Core
-  behavior and deployment come before feature expansion.
-</p>
+The project is currently a **developer / tester lane**, not a release-stable
+product. The core typing model, dev lifecycle, tester packaging, and local host
+smoke baseline are all real and actively maintained; formal release packaging
+and notarized distribution are still paused.
 
-<br />
+![BilineIME running in TextEdit](docs/assets/readme-mode1-textedit.png)
 
-<table>
-  <tr>
-    <td align="center">
-      <a href="docs/assets/readme-mode1-textedit.png">
-        <img width="960" alt="BilineIME custom bilingual candidate panel running in TextEdit" src="docs/assets/readme-mode1-textedit.png" />
-      </a>
-      <br />
-      <sub>Real TextEdit smoke screenshot: Chinese candidates above English preview rows.</sub>
-    </td>
-  </tr>
-</table>
+## Product model
 
-## What It Does
+BilineIME has one primary interaction model:
 
-BilineIME has one product model: **composition-time translation preview**.
+- Type Chinese pinyin.
+- Browse Chinese candidates.
+- Optionally preview English for the currently visible Chinese candidates.
+- Commit either the Chinese candidate or its ready English preview.
 
-You type Chinese pinyin in a normal macOS input method flow. Biline shows the
-current Chinese candidates in a custom candidate panel and renders an English
-preview for the same visible candidates. Chinese input remains the source of
-truth: preview text never changes Chinese candidate ranking, paging, or
-composition state.
+The boundary is strict:
 
-The active commit layer can be switched between Chinese and English for the
-selected candidate. Confirming a candidate commits only the active layer and
-then clears the composition.
+- Chinese candidate generation, ranking, paging, and commit state remain the
+  source of truth.
+- English preview is an overlay on top of Chinese IME behavior, never a
+  replacement for it.
+- Turning off bilingual capability makes the IME behave like a plain
+  Chinese-first pinyin input method.
 
-## Current Capabilities
+## What ships today
 
-- Native macOS InputMethodKit app with a custom AppKit bilingual candidate panel.
+- Native macOS `InputMethodKit` input method app (`BilineIMEDev.app`).
+- Native SwiftUI Settings app with four sections:
+  `Translation`, `Input Settings`, `Appearance`, and `Status`.
 - Rime-backed Chinese candidate engine with separate simplified and traditional
-  schemas.
-- Candidate browsing by row and column, including compact and expanded panel
-  presentation.
-- `Shift+Tab` switches the active commit layer without changing the selected
-  candidate.
-- `=` / `]` browse downward or expand the candidate matrix during composition;
-  `-` / `[` browse upward or collapse; `+` is literal input.
-- Async translation preview with debounce, cache, request coalescing, stale
-  result suppression, and failure isolation.
-- Alibaba Cloud Machine Translation provider through user-managed credentials.
-- Native Settings app for translation credentials, target language, character
-  form, punctuation form, and candidate layout.
-- Unified dev lifecycle through `bilinectl`, with Make targets kept as thin
-  wrappers.
+  schemas and user dictionaries.
+- Custom AppKit candidate panel with compact and expanded presentation modes.
+- `Shift+Tab` layer switching between Chinese commit and ready English commit.
+- A “双语能力” toggle in Settings that disables English candidates and English
+  commit behavior for a pure-pinyin workflow.
+- Broker-mediated Settings/IME coordination through `BilineBrokerDev`,
+  `BilineCommunicationHub`, shared configuration storage, and shared credential
+  storage.
+- Alibaba Cloud translation support behind user-managed credentials stored in a
+  shared Keychain-backed vault.
+- Unified dev lifecycle through `bilinectl`, with Make targets as thin wrappers.
+- Local real-host smoke harness for `TextEdit`, with baseline scenarios:
+  `candidate-popup`, `browse`, `commit`, `settings-refresh`, and `full`.
+- Unsigned tester packages for install, safe uninstall, and deep clean.
 
-## Development
+## Current status
 
-New machine setup and credential handoff live in
-[`docs/development-handoff.md`](docs/development-handoff.md).
+The current state is best described as:
 
-Common commands:
+- **Core model is established:** Chinese-first bilingual preview is the fixed
+  product boundary.
+- **Dev lane is usable:** install, remove, reset, diagnose, tester packaging,
+  broker coordination, and local host smoke all exist as supported workflows.
+- **Host smoke baseline is green:** the current `full` local harness covers
+  candidate popup, browsing, commit, and safe-boundary settings refresh in one
+  `TextEdit` session.
+- **Release lane is intentionally paused:** the reserved `BilineIME` release
+  target remains in project configuration, but there is no supported notarized
+  packaging workflow yet.
+
+## Quick start
+
+Full setup and machine handoff live in
+[`docs/development-handoff.md`](docs/development-handoff.md). The shortest path
+for a developer machine is:
 
 ```bash
 make bootstrap
 make project
 make test
 make build-ime
-make build-settings
 make install-ime
+```
+
+Useful day-to-day commands:
+
+```bash
+make build-settings
+make build-broker
 make remove-ime
 make reset-ime
 make prepare-release-env
@@ -107,146 +91,142 @@ make dev-pkg
 make verify
 ```
 
-What matters most day to day:
+Notes:
 
-- `make test` runs Swift Package tests.
-- `make build-ime` builds the developer input method target.
-- `make build-settings` builds the developer Settings app.
-- `make install-ime` runs the intent-first `install` flow for the dev apps.
-- `make remove-ime` removes dev app bundles with user data preserved.
-- `make reset-ime` prints or runs a destructive system-reset plan using the selected `RESET_DEPTH`.
-- `make prepare-release-env` removes dev installs and purges Biline-local data before a future release-style install.
-- `make diagnose-ime` prints the dev lifecycle snapshot.
-- `make dev-pkg` builds unsigned tester packages: one installer pkg plus safe and deep-clean uninstall pkgs.
-- `make verify` runs package tests plus the dev IME and Settings builds.
+- Build products go to `~/Library/Caches/BilineIME/DerivedData`.
+- `BilineIME.xcodeproj` is generated from `project.yml`; regenerate it locally
+  instead of committing it.
+- Do not launch the IME app directly with `open`; let `imklaunchagent` own
+  activation.
 
-Build products are generated under `~/Library/Caches/BilineIME/DerivedData`
-instead of the repo tree. `BilineIME.xcodeproj` is generated from `project.yml`
-and should be regenerated locally, not committed.
+## Install, enrollment, smoke
 
-## Tester Packages
+The repository treats host verification as **three separate phases**:
 
-For prerelease distribution to trusted testers, use:
+1. **Install bundles**
+2. **Manual source enrollment** when macOS requires it
+3. **Source-ready host smoke**
+
+Use these entrypoints:
+
+```bash
+make install-ime
+make smoke-ime-host-check
+make smoke-ime-host-prepare
+make smoke-ime-host SMOKE_SCENARIO=full
+```
+
+What each step means:
+
+- `make install-ime` installs the dev IME, Settings app, broker, and local
+  diagnostics state. It does **not** force-enable the input source.
+- `make smoke-ime-host-check` reports readiness as one of:
+  `bundle-missing`, `source-missing`, `source-disabled`,
+  `source-not-selectable`, `source-not-selected`, or `ready`.
+- `make smoke-ime-host-prepare` only opens System Settings → Keyboard → Input
+  Sources and prints remediation. It never clicks `Allow` or enables the source
+  for the user.
+- `make smoke-ime-host` is the only supported automated real-host entrypoint.
+  It is local-only, never a CI gate, and drives exactly one `TextEdit` session.
+
+The default real-host flow is still manual: the user selects `BilineIME Dev`,
+focuses the host, types, browses, commits, and reports the result. The harness
+exists for explicit local host smoke, not for ordinary CI.
+
+## Storage and coordination
+
+The IME and Settings app no longer behave like two separate processes manually
+editing unrelated files.
+
+The current coordination model is:
+
+- `BilineBrokerDev` is the user-scoped coordination process.
+- `BilineCommunicationHub` is the shared client façade used by both the IME and
+  the Settings app.
+- Shared configuration is persisted through the broker-backed configuration
+  store.
+- Alibaba credentials are persisted through a shared Keychain-backed vault,
+  with legacy file fallback retained only for migration / recovery paths.
+- The IME applies safe settings refreshes at explicit lifecycle boundaries
+  rather than mutating engine-sensitive state mid-composition.
+
+This means the canonical source of truth for runtime configuration is the
+broker-mediated shared configuration snapshot, not ad hoc app-local defaults.
+
+## Tester packages
+
+For prerelease tester distribution:
 
 ```bash
 make dev-pkg
 ```
 
-This writes three unsigned packages to `build/dist`:
+This produces three unsigned packages in `build/dist`:
 
-- `BilineIMEDev-<version>.pkg` installs `BilineIMEDev.app` into `/Library/Input Methods` and `BilineSettingsDev.app` into `/Applications`.
-- `BilineIMEDev-Uninstall-<version>.pkg` removes the packaged dev apps and preserves Biline-local credentials, defaults, and user data.
-- `BilineIMEDev-DeepClean-<version>.pkg` removes the packaged dev apps and clears Biline-local data to prepare for a clean future release install.
+- `BilineIMEDev-<version>.pkg`
+- `BilineIMEDev-Uninstall-<version>.pkg`
+- `BilineIMEDev-DeepClean-<version>.pkg`
 
-Gatekeeper blocks these packages on first use. Testers can right-click the pkg in
-Finder and choose Open, or clear quarantine and run `sudo installer -pkg ... -target /`.
+The tester lane installs:
 
-After install or deep clean, the user logs out and back in, then manually adds or
-re-adds `BilineIME Dev` from System Settings -> Keyboard -> Input Sources.
+- `BilineIMEDev.app`
+- `BilineSettingsDev.app`
+- `BilineBrokerDev`
+- the broker LaunchAgent
 
-## Host Smoke Verification
+into the appropriate system paths for trusted local testing. Gatekeeper will
+still block first launch of these unsigned packages; see
+[`docs/development-handoff.md`](docs/development-handoff.md) for the exact
+install guidance.
 
-IME behavior is not considered verified by tests or build success alone.
+## Documentation map
 
-For any change that affects composition, punctuation, candidate browsing,
-active layer, marked text, candidate panel rendering, install flow, or
-host-facing IME behavior, use this sequence:
+If you are new to the repo, start here:
 
-```bash
-swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests|BilineRimeTests'
-make build-ime
-make install-ime
-```
-
-Then stop and verify in a real host. The default flow is manual:
-
-- The user selects `BilineIME Dev`.
-- The user focuses TextEdit.
-- The user types, browses candidates, switches layers, commits, and reports the
-  result.
-- Codex and project scripts must not switch input sources, focus TextEdit,
-  inject keys, browse candidates, or commit text unless the user explicitly asks
-  for `bilinectl smoke-host dev --confirm` / `make smoke-ime-host` in the
-  moment.
-- The local host harness must drive exactly one `TextEdit` session. If a clean
-  host state is needed, it restarts that one session instead of opening
-  multiple TextEdit windows/documents.
-
-Install, manual source enrollment, and source-ready host smoke are three
-separate phases:
-
-```bash
-make install-ime          # phase 1: install bundles only
-make smoke-ime-host-check # phase 2: read input source readiness
-make smoke-ime-host-prepare # phase 2 helper: open System Settings (no auto-clicks)
-make smoke-ime-host SMOKE_SCENARIO=full # phase 3: drive TextEdit (after readiness)
-```
-
-`make smoke-ime-host-prepare` only opens System Settings → Keyboard → Input
-Sources and prints remediation. It does not click `Allow`, does not enable the
-source, and does not switch input sources for you. Apple's onboarding model
-expects this step to be performed by the user once.
-
-The local host harness is for developer smoke only, never CI. It refuses to
-drive TextEdit unless the input source readiness is `ready` or
-`source-not-selected`, and it always uses exactly one `TextEdit` session.
-
-Candidate-panel screenshots must come from user-prepared host state. If the
-panel may be on another display, capture or request screenshots across displays.
-
-## Architecture
-
-The current architecture is documented in
-[`docs/architecture.md`](docs/architecture.md).
-
-The short version:
-
-- Keep InputMethodKit glue thin.
-- Keep composition state in testable Swift Package modules.
-- Keep Chinese candidate generation behind a `CandidateEngine` boundary.
-- Keep English preview behind `PreviewCoordinator` and `TranslationProvider`.
-- Treat bilingual preview as an add-on to Chinese IME behavior, never as the
-  source of truth.
-
-Operational rules and accepted decisions live in:
-
-- [`AGENTS.md`](AGENTS.md)
-- [`docs/standards/engineering.md`](docs/standards/engineering.md)
-- [`docs/standards/acceptance.md`](docs/standards/acceptance.md)
-- [`docs/adr/`](docs/adr/)
+- [`docs/development-handoff.md`](docs/development-handoff.md): new machine,
+  lifecycle, smoke, credentials, failure recovery
+- [`docs/architecture.md`](docs/architecture.md): product model, module
+  boundaries, broker/storage architecture, verification model
+- [`docs/standards/engineering.md`](docs/standards/engineering.md): coding,
+  testing, and host-smoke engineering rules
+- [`docs/standards/acceptance.md`](docs/standards/acceptance.md): delivery and
+  verification checklist
+- [`docs/ime-engine-bugs.md`](docs/ime-engine-bugs.md): active risks and known
+  bottlenecks
+- [`docs/adr/`](docs/adr/): architectural decision records
 
 ## Roadmap
 
-BilineIME is undergoing high-frequency, intensive updates. Our immediate priority is **core stabilization and deployment**, ensuring the baseline bilingual typing experience is rock-solid before we announce or commit to new features.
+### Now
 
-Active stabilization efforts:
+- Keep simplified and traditional Rime schemas stable.
+- Keep Chinese candidate quality and consumed-span behavior correct.
+- Keep the broker-backed Settings/IME coordination path boring and reliable.
+- Keep the local host smoke baseline green for the current `full` scenario.
+- Keep the unsigned tester lane usable for prerelease installs and clean
+  removals.
 
-- Hardening Rime candidate quality and consumed-span behavior.
-- Stabilizing simplified and traditional schemas with separate user dictionaries.
-- Improving candidate panel layout resilience for long translations and multi-display anchoring.
-- Refining the Settings app for clear credential management and IME lifecycle diagnostics.
-- Keeping formal release packaging paused while the dev lane ships unsigned tester packages for trusted prerelease installs.
+### Next
 
-Done or mostly in place:
+- Expand host smoke beyond the current baseline into harder scenarios:
+  punctuation, raw-buffer behavior, editing keys, `Shift+Tab` persistence,
+  phrase/tail commits, and mixed Chinese/Latin stress cases.
+- Turn the current engine-side “future toggles” into real behavior where
+  appropriate, especially smart spelling and emoji candidates.
+- Tighten docs and diagnostics around source enrollment edge cases after install,
+  reset, and deep clean.
 
-- InputMethodKit shell and dev/release app split.
-- Custom bilingual candidate panel.
-- Async preview scheduling, cache, and stale-result suppression.
-- Alibaba provider integration and native credential storage.
-- Unified dev lifecycle through `bilinectl`.
+### Later
 
-## Open-Source Policy
+- Restore a supported release packaging lane for the reserved `BilineIME`
+  target.
+- Add broader host coverage beyond `TextEdit` once the baseline lane stays
+  stable.
+- Revisit richer release/distribution UX only after the current dev/tester lane
+  no longer needs frequent recovery guidance.
 
-BilineIME is GPL-3.0 licensed. Upstream code, data, and architecture references
-must stay visible in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+## Repository policy
 
-Bundled runtime dependencies and dictionary data are intentionally tracked and
-attributed. Generated project files and local build artifacts are not.
-
-## Status
-
-### Pre-Release / Active Development
-
-BilineIME is an experimental input method. While the core bilingual drafting loop is functional and usable for daily testing, the project is not yet release-stable.
-
-Expect frequent internal refactoring and ongoing stabilization work as we prepare for our first reliable deployment.
+BilineIME is GPL-3.0 licensed. Runtime dependencies, bundled data, and major
+architecture decisions should stay documented and attributable. Generated build
+artifacts and local project files remain untracked.

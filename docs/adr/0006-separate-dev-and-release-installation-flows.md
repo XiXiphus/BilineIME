@@ -22,7 +22,7 @@ The application bundle remains a single-process InputMethodKit app, but both lan
 The installation workflow also changes:
 
 - local dev reinstall copies only the dev bundle into the user Input Methods directory
-- tester packaging may ship an unsigned `.pkg` that installs `BilineIMEDev.app` into `/Library/Input Methods` and `BilineSettingsDev.app` into `/Applications`
+- tester packaging may ship an unsigned `.pkg` that installs `BilineIMEDev.app` into `/Library/Input Methods`, `BilineSettingsDev.app` into `/Applications`, and the broker plus LaunchAgent into their system paths
 - release packaging is paused and has no supported Make or script entrypoint
 - neither flow launches the input method app directly with `open`
 - first install and metadata changes are treated as relogin-required operations

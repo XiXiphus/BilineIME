@@ -49,4 +49,6 @@
 - If the harness needs a clean state, it must restart that one TextEdit session rather than opening multiple TextEdit windows/documents.
 - `bilinectl smoke-host dev --prepare` may open System Settings → Keyboard → Input Sources, but must not click `Allow`, enable the source, or otherwise script the manual enrollment step.
 - Candidate-panel checks use telemetry plus user-provided screenshots across displays when necessary.
+- The local host smoke baseline supports `candidate-popup`, `browse`, `commit`, `settings-refresh`, and `full`.
+- Repository docs (`README`, architecture, handoff, standards, bug notes) describe the current broker-mediated coordination model, phased source enrollment model, and paused release lane without contradicting the implementation.
 - Formal release packaging is intentionally paused; the release target may remain in project configuration, but it has no supported notarized Make/script workflow. The unsigned tester pkg flow stays on the dev lane.

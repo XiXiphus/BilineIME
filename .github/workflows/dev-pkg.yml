@@ -90,35 +90,81 @@ jobs:
           files: |
             build/dist/*.pkg
           body: |
-            BilineIME tester build.
+            First public BilineIME tester beta for the dev lane.
 
-            Packages:
+            ## What is included
 
-            - `BilineIMEDev-<version>.pkg`: install `BilineIMEDev.app` into `/Library/Input Methods`, `BilineSettingsDev.app` into `/Applications`, and `BilineBrokerDev` plus its LaunchAgent into `/Library/Application Support/BilineIME/Broker` and `/Library/LaunchAgents`
-            - `BilineIMEDev-Uninstall-<version>.pkg`: remove the packaged dev apps but preserve Biline user data
-            - `BilineIMEDev-DeepClean-<version>.pkg`: remove the packaged dev apps and clear Biline-local data to prepare for a clean future release install
+            - `BilineIMEDev-<version>.pkg`
+              - installs `BilineIMEDev.app` into `/Library/Input Methods`
+              - installs `BilineSettingsDev.app` into `/Applications`
+              - installs `BilineBrokerDev` plus its LaunchAgent into
+                `/Library/Application Support/BilineIME/Broker` and `/Library/LaunchAgents`
+            - `BilineIMEDev-Uninstall-<version>.pkg`
+              - removes the packaged dev apps
+              - preserves Biline-local user data
+            - `BilineIMEDev-DeepClean-<version>.pkg`
+              - removes the packaged dev apps
+              - clears Biline-local data to prepare for a clean reinstall or a future release install
 
-            This `.pkg` is **unsigned** and ad-hoc-signed at the bundle level.
-            Gatekeeper will block it on first install. Workaround:
+            ## What this build is
 
-            ```
+            - a **prerelease tester build**
+            - based on the active **dev lane**
+            - intended for trusted local testing, not formal App Store / notarized distribution
+            - built as an **unsigned**, ad-hoc-signed package
+
+            ## Verified baseline
+
+            This tester line is shipping after the local TextEdit host-smoke baseline passed for:
+
+            - candidate popup
+            - candidate browsing
+            - candidate commit
+            - safe-boundary settings refresh
+
+            ## Install
+
+            Gatekeeper will block this package on first use because it is unsigned.
+
+            Option 1:
+
+            - right-click the pkg in Finder
+            - choose Open
+            - confirm the install
+
+            Option 2:
+
+            ```bash
             sudo xattr -dr com.apple.quarantine BilineIMEDev-*.pkg
             sudo installer -pkg BilineIMEDev-<version>.pkg -target /
             ```
 
-            Or right-click the pkg in Finder and choose Open, then confirm.
+            ## Important first-use note
+
+            Installing the bundle and making the input source usable are two separate phases.
+            After install or deep clean:
+
+            1. log out and back in if macOS still does not show the source
+            2. open System Settings -> Keyboard -> Input Sources
+            3. add or re-add `BilineIME Dev`
+            4. click any macOS `Allow` prompt manually if one appears
+
+            ## Uninstall
 
             Safe uninstall:
 
-            ```
+            ```bash
             sudo installer -pkg BilineIMEDev-Uninstall-<version>.pkg -target /
             ```
 
-            Deep clean before a future release install:
+            Deep clean:
 
-            ```
+            ```bash
             sudo installer -pkg BilineIMEDev-DeepClean-<version>.pkg -target /
             ```
 
-            After install or deep clean, log out and back in, then add or re-add the input source from
-            System Settings -> Keyboard -> Input Sources.
+            ## Current limits
+
+            - the release lane is still paused; this tag is for the dev/tester lane only
+            - first-use source enrollment may still require a manual step in System Settings
+            - this release is optimized for local tester feedback, not polished consumer distribution

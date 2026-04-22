@@ -10,11 +10,12 @@ The repository now treats input-method lifecycle as explicit intent-first workfl
 
 - `make install-ime`
   - builds `BilineIME Dev`
+  - builds and installs the dev Settings app, broker, and LaunchAgent on the same lane
   - copies it into `~/Library/Input Methods`
   - refreshes local registration state
   - does **not** try to force-select the input source
 - `make remove-ime`
-  - removes the dev IME and dev Settings app bundles
+  - removes the dev IME, dev Settings app, broker, and LaunchAgent
   - unregisters the local dev lane
   - may either preserve or purge Biline-local user data
   - does **not** try to repair system-wide text-input state unless paired with a reset action
@@ -44,6 +45,7 @@ Separating the workflows keeps ordinary install steps conservative while still d
 ## Consequences
 
 - automatic input-source selection success is no longer part of install success
-- developers should use the system UI to add or re-select `BilineIME Dev`
+- developers should use the system UI to add or re-select `BilineIME Dev` when
+  source enrollment is still incomplete after install
 - higher-blast-radius reset steps are now explicit and documented instead of being hidden inside install scripts
 - the primary lifecycle mental model is now `install` / `remove` / `reset`

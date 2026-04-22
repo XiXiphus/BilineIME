@@ -1,36 +1,61 @@
 # BilineIME Development Handoff
 
-This document is the new-Mac checklist for continuing BilineIME development.
-It intentionally keeps operational steps in one place and does not contain any
-real AccessKey, password, or provider secret.
+This document is the operational handoff for continuing BilineIME on a new
+machine or after a long pause. It is intentionally biased toward the **current
+dev lane**, not a hypothetical future release workflow.
 
-## 1. Machine Prerequisites
+It does not contain real secrets.
 
-Install the base macOS developer toolchain first:
+## 1. Current mental model
+
+Before touching the machine, keep these boundaries in mind:
+
+- `BilineIMEDev.app` is the active IME lane for development and trusted tester
+  distribution.
+- `BilineSettingsDev.app` is the companion Settings app.
+- `BilineBrokerDev` is the user-scoped coordination process that mediates
+  configuration, diagnostics, and credential access between the Settings app and
+  the IME.
+- `bilinectl` is the source of truth for lifecycle operations and local host
+  smoke.
+- `Tests/` is for CI-safe Swift Package tests. Real-host smoke lives under
+  `Sources/bilinectl/` because it automates macOS input-source, Accessibility,
+  TextEdit, and telemetry flows that do not belong in `swift test`.
+
+The current product boundary is still:
+
+- Chinese composition is the source of truth.
+- English preview is optional and must never own ranking or paging.
+- Turning bilingual capability off yields a pure pinyin workflow.
+- Formal release packaging is paused.
+
+## 2. Machine prerequisites
+
+Install the base toolchain first:
 
 ```bash
 xcode-select --install
 brew install xcodegen swift-format cmake boost
 ```
 
-Open Xcode once and sign in with the Apple developer account that can sign the
-local IME build. If auto-detection fails later, pass the team explicitly:
+Open Xcode once and sign in with the Apple developer account used for local IME
+signing. If auto-detection fails later, pass the team explicitly:
 
 ```bash
 export BILINE_DEV_TEAM_ID='<APPLE_TEAM_ID>'
 ```
 
-Clone the remote repository and enter the workspace:
+Clone the repo:
 
 ```bash
 git clone <REMOTE_URL> BilineIME
 cd BilineIME
 ```
 
-Generated files such as `BilineIME.xcodeproj` are local artifacts. Regenerate
-them instead of committing them.
+`BilineIME.xcodeproj` is generated from `project.yml`. Regenerate it locally;
+do not treat it as a tracked source artifact.
 
-## 2. First Local Build
+## 3. First local bring-up
 
 Use the repo entrypoints only:
 
@@ -39,205 +64,57 @@ make bootstrap
 make project
 make test
 make build-ime
-make install-ime
-make remove-ime
-make reset-ime
-make dev-pkg
-```
-
-Important constraints:
-
-- Dev build installs to `~/Library/Input Methods/BilineIMEDev.app`.
-- Do not launch the IME app directly with `open`.
-- Do not script System Settings permission dialogs. Click macOS prompts manually.
-- After install, manually add/select `BilineIME Dev` in the target host app.
-- `make dev-pkg` is only for prerelease tester packaging; it does not replace the local dev lifecycle.
-
-If the input source does not appear or looks stale:
-
-```bash
-make diagnose-ime
-make reset-ime
-```
-
-`make reset-ime` is a dry-run plan by default. Use `make reset-ime CONFIRM=1`
-only when ready to execute a destructive reset. The default `RESET_DEPTH` is
-`cache-prune`; use `RESET_DEPTH=launch-services-reset CONFIRM=1` only as a last
-resort because it resets the Launch Services database and requires a reboot.
-
-## 3. Rime Runtime Notes
-
-The app runtime is Rime-only. The dictionary engine remains for tests and
-diagnostics, not as an app fallback.
-
-Build scripts embed `librime` and its dylib dependency closure into the app
-bundle, rewrite install names to `@loader_path`, then re-sign nested dylibs and
-the main app. Homebrew can be a build source, but the installed IME must not
-depend on `/opt/homebrew/...` dylibs at runtime.
-
-Useful checks:
-
-```bash
-APP="$HOME/Library/Input Methods/BilineIMEDev.app"
-codesign --verify --deep --strict "$APP"
-codesign -d --entitlements :- "$APP"
-otool -L "$APP/Contents/Frameworks/librime.1.dylib"
-```
-
-Expected entitlement signals include sandbox, network client, and the dev IMK
-mach-register exception:
-
-```text
-com.apple.security.app-sandbox = true
-com.apple.security.network.client = true
-io.github.xixiphus.inputmethod.BilineIME.dev_Connection
-```
-
-## 4. Alibaba Translation Provider
-
-The translation provider is selected at runtime. The current primary provider
-is Alibaba Cloud Machine Translation through `GetBatchTranslate`.
-
-Provider defaults:
-
-- Region: `cn-hangzhou`
-- Endpoint: `https://mt.cn-hangzhou.aliyuncs.com`
-- Source language: `zh`
-- Target language: `en`
-- Batch path: `GetBatchTranslate`
-- Scheduler profile for Aliyun: high-QPS batch mode behind local rate limiting
-
-Create a RAM user for development rather than using the main account key:
-
-- User name suggestion: `biline-ime-translate`
-- Console access: off
-- Permanent AccessKey: on
-- Permission: start with Aliyun Machine Translation access for development; later
-  tighten to the smallest policy that still allows batch translation.
-
-For normal use, enter credentials in the native settings app. It stores the key
-material in the dev IME container with user-only file permissions, so the IME
-can read it without a cross-process authorization prompt. Do not pass
-secrets as command-line arguments, because shell history and process listings
-are easy to leak from a public project workflow.
-
-```bash
 make build-settings
+make build-broker
 make install-ime
-open "$HOME/Applications/BilineSettingsDev.app"
 ```
 
-The settings app writes key material to:
+Do not:
 
-```text
-~/Library/Containers/io.github.xixiphus.inputmethod.BilineIME.dev/Data/Library/Application Support/BilineIME/alibaba-credentials.json
-```
+- launch the IME app directly with `open`
+- script macOS permission dialogs
+- assume install implies source enrollment
 
-It writes non-secret provider defaults to the dev IME domain:
-
-```text
-BilineTranslationProvider=aliyun
-BilineAlibabaRegionId=cn-hangzhou
-BilineAlibabaEndpoint=https://mt.cn-hangzhou.aliyuncs.com
-```
-
-The CLI helper writes the same local credential file for development:
-
-```bash
-make configure-aliyun-credentials
-```
-
-Do not launch `BilineSettingsDev.app` from DerivedData. A valid dev install has:
+A healthy user-scope dev install should leave these paths present:
 
 ```text
 ~/Library/Input Methods/BilineIMEDev.app
 ~/Applications/BilineSettingsDev.app
+~/Library/Application Support/BilineIME/Broker/BilineBrokerDev
+~/Library/LaunchAgents/io.github.xixiphus.BilineIME.dev.broker.plist
 ```
 
-Use `make diagnose-ime` when app registration, current input source, or
-credential status is unclear.
-
-Check credential presence without printing secrets:
+Useful commands during bring-up:
 
 ```bash
-make aliyun-credentials-status
+make diagnose-ime
+make remove-ime
+make reset-ime
+make prepare-release-env
 ```
 
-Do not commit credentials. Do not paste production secrets into docs, tests, or
-commits. If a key was shared in chat or logs, rotate it after validation.
-The app and IME runtime do not read AccessKey values from environment
-variables, defaults, or system credential stores.
+`make reset-ime` is a dry-run plan unless `CONFIRM=1` is provided. Use
+`RESET_DEPTH=launch-services-reset CONFIRM=1` only as a last resort because it
+resets Launch Services and requires a reboot.
 
-Live API tests are intentionally skipped unless credentials are provided through
-environment variables:
+## 4. Install, source enrollment, host smoke
 
-```bash
-ALIBABA_CLOUD_ACCESS_KEY_ID='<ACCESS_KEY_ID>' \
-ALIBABA_CLOUD_ACCESS_KEY_SECRET='<ACCESS_KEY_SECRET>' \
-swift test --filter AlibabaMachineTranslationLiveTests
-```
+Treat these as **three separate phases**:
 
-## 5. Normal Verification Flow
+1. install bundles
+2. complete source enrollment if macOS still needs it
+3. run source-ready host smoke
 
-For non-host-facing package changes:
+### Install
 
 ```bash
-swift test --filter '<FocusedTests>'
-```
-
-For IME-facing changes, use the full layered flow:
-
-```bash
-swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests|BilineRimeTests'
-make build-ime
 make install-ime
 ```
 
-Then validate in the target host app, usually TextEdit. The default flow is
-manual: the user selects `BilineIME Dev`, focuses TextEdit, types, browses,
-commits, and reports the result.
+This installs the dev IME, Settings app, broker, and lifecycle metadata. It
+does **not** guarantee the source is already enabled or selected.
 
-```bash
-./scripts/select-input-source.sh current
-```
-
-Formal release packaging is paused. The release target remains in `project.yml`,
-but there is still no supported Make or script entrypoint for notarized release
-distribution until the dev lifecycle and first-use flow are stable.
-
-The supported tester distribution path is:
-
-```bash
-make dev-pkg
-```
-
-It writes three unsigned packages to `build/dist`:
-
-- `BilineIMEDev-<version>.pkg` installs the dev IME into `/Library/Input Methods`
-  and the dev Settings app into `/Applications`.
-- `BilineIMEDev-Uninstall-<version>.pkg` removes the packaged dev apps while
-  preserving Biline-local data.
-- `BilineIMEDev-DeepClean-<version>.pkg` removes the packaged dev apps and clears
-  Biline-local data before a future formal release install.
-
-After install or deep clean, testers should log out and back in, then manually
-add or re-add `BilineIME Dev` from System Settings.
-
-Ad hoc automated probes and key-injection scripts remain out of bounds. Use only
-the supported `bilinectl smoke-host dev --confirm` / `make smoke-ime-host`
-entrypoint for explicit local host smoke.
-
-## 6. Smoke-Test Rules
-
-Smoke testing is layered and evidence-first. Treat install, manual source
-enrollment, and source-ready host smoke as three separate phases — never mix
-them in a single command path.
-
-- CI-safe tests cover session, router, settings, and anchor ordering without a
-  host app.
-- The default real-host flow is manual: the user switches TextEdit to
-  `BilineIME Dev`, types, browses candidates, commits, and reports host text.
-- Inspect input source readiness without driving the host:
+### Check readiness
 
 ```bash
 make smoke-ime-host-check
@@ -245,9 +122,16 @@ make smoke-ime-host-check
 bilinectl smoke-host dev --check
 ```
 
-- Open System Settings → Keyboard → Input Sources to finish manual onboarding
-  (this helper does NOT click `Allow`, does NOT enable the source, and does NOT
-  switch sources):
+Readiness is classified as one of:
+
+- `bundle-missing`
+- `source-missing`
+- `source-disabled`
+- `source-not-selectable`
+- `source-not-selected`
+- `ready`
+
+### Open the right System Settings page
 
 ```bash
 make smoke-ime-host-prepare
@@ -255,8 +139,20 @@ make smoke-ime-host-prepare
 bilinectl smoke-host dev --prepare
 ```
 
-- Once readiness is `ready` or `source-not-selected`, the explicit local
-  harness is available through:
+This helper only:
+
+- checks readiness
+- opens System Settings → Keyboard → Input Sources
+- prints remediation
+- re-checks readiness
+
+It does **not** click `Allow`, enable the source, or step through the system UI
+for the user.
+
+### Run local host smoke
+
+Once readiness is `ready` or `source-not-selected`, use the explicit local
+harness:
 
 ```bash
 make smoke-ime-host SMOKE_SCENARIO=candidate-popup
@@ -266,71 +162,202 @@ make smoke-ime-host SMOKE_SCENARIO=settings-refresh
 make smoke-ime-host SMOKE_SCENARIO=full
 ```
 
-- `bilinectl smoke-host dev --confirm` may switch input sources, focus TextEdit,
-  inject keys, and capture artifacts only when the user asks for that exact
-  automated smoke action in the moment.
-- The harness fails fast if readiness is `bundle-missing`, `source-missing`,
-  `source-disabled`, or `source-not-selectable`, and prints a remediation hint
-  pointing back to install / manual onboarding rather than continuing into host
-  automation.
-- The `--install` flag has been removed from `smoke-host`. Run
-  `bilinectl install dev --confirm` (or `make install-ime`) explicitly when you
-  need to (re)install bundles before running the harness.
-- The harness is local-only and must not become a CI gate.
-- The harness must keep exactly one `TextEdit` session alive. If the document or
-  focus state is dirty, restart that single session instead of opening multiple
-  `TextEdit` windows/documents.
-- Candidate panel visibility is proven by host-smoke telemetry plus
-  all-display screenshots when needed.
-- `Computer Use` is a visual/debugging aid, not the primary smoke runner.
+Current local baseline:
 
-If a macOS prompt asks whether to allow an input method or `swift-frontend`, the
-human should click it. Do not automate that prompt in scripts.
+- the `full` scenario covers
+  `candidate-popup`, `browse`, `commit`, and `settings-refresh`
+- the harness drives exactly one `TextEdit` session
+- the harness may temporarily switch the current input source and restore it
+  afterwards
+- the harness is local-only and must never become a CI gate
 
-## 7. Common Failure Modes
+Outside an explicit request to run the harness, the default real-host flow is
+still manual: the user selects `BilineIME Dev`, focuses TextEdit, types,
+browses, commits, and reports the result.
 
-Input source is missing or stale:
+## 5. Tests vs host smoke
+
+Use the right verification layer:
+
+### CI-safe / package layer
+
+```bash
+make test
+swift test --filter '<FocusedTests>'
+```
+
+This is for deterministic logic:
+
+- routing
+- session state
+- Rime integration contracts
+- settings serialization
+- lifecycle planning
+
+### IME-facing code path
+
+```bash
+swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests|BilineRimeTests'
+make build-ime
+make install-ime
+```
+
+Then either:
+
+- stop and do manual TextEdit verification, or
+- explicitly run `make smoke-ime-host`
+
+Do not claim an IME-facing change is verified if only package tests passed.
+
+## 6. Broker, settings, and shared storage
+
+The current communication model is broker-mediated.
+
+Canonical path:
+
+- Settings app writes configuration through `BilineCommunicationHub`
+- the broker persists the shared configuration snapshot
+- the IME reloads configuration at safe boundaries
+- diagnostics and lifecycle tools read the same shared state model
+
+Storage model:
+
+- configuration lives in the shared configuration store used by the dev lane
+- Alibaba credentials live in a shared Keychain-backed vault
+- a legacy file store still exists only as fallback / migration support
+
+This means older docs that describe “the Settings app writes the canonical
+credential record directly to a single JSON file” are no longer accurate.
+
+The Status page in the Settings app is now the fastest human-readable place to
+check:
+
+- IME install state
+- broker install / runtime state
+- LaunchAgent presence
+- current input source
+- lifecycle recommendation
+
+## 7. Translation credentials
+
+The production translation path is still Alibaba Cloud Machine Translation.
+
+Provider defaults:
+
+- region: `cn-hangzhou`
+- endpoint: `https://mt.cn-hangzhou.aliyuncs.com`
+- source language: `zh`
+- target language: `en`
+- transport: batch translation through the broker-mediated settings path
+
+For development:
+
+- prefer a dedicated RAM user
+- do not pass secrets as command-line arguments
+- do not paste secrets into docs, commits, or screenshots
+
+Normal local workflow:
+
+```bash
+make build-settings
+make install-ime
+open "$HOME/Applications/BilineSettingsDev.app"
+```
+
+Non-secret defaults are still part of the shared configuration snapshot. Secret
+material is expected to land in the shared Keychain-backed vault.
+
+Check status without printing secrets:
+
+```bash
+make aliyun-credentials-status
+```
+
+Live API tests remain opt-in and still use environment variables:
+
+```bash
+ALIBABA_CLOUD_ACCESS_KEY_ID='<ACCESS_KEY_ID>' \
+ALIBABA_CLOUD_ACCESS_KEY_SECRET='<ACCESS_KEY_SECRET>' \
+swift test --filter AlibabaMachineTranslationLiveTests
+```
+
+Those environment variables are for live tests only; they are **not** the
+runtime credential path used by the product.
+
+## 8. Tester packages and release lane
+
+The supported tester distribution path is:
+
+```bash
+make dev-pkg
+```
+
+It produces three unsigned packages in `build/dist`:
+
+- install
+- safe uninstall
+- deep clean
+
+The tester lane may install:
+
+- `BilineIMEDev.app`
+- `BilineSettingsDev.app`
+- `BilineBrokerDev`
+- the broker LaunchAgent
+
+at system paths.
+
+Release packaging status:
+
+- the reserved `BilineIME` release target still exists
+- notarized / supported release packaging is paused
+- there is no approved Make or script workflow for formal release distribution
+
+## 9. Common failure modes
+
+### Source missing or stale
 
 ```bash
 make diagnose-ime
 make reset-ime
+make smoke-ime-host-check
 ```
 
-IME process exists but no panel appears:
+If this follows a first install or a metadata change, log out and back in once
+before assuming the install is broken.
 
-- Confirm the host app is actually using `BilineIME Dev`.
-- Ask the user to type manually and provide screenshots, host text, telemetry,
-  and system logs as evidence.
+### IME exists but no candidate panel appears
 
-Candidate commits leak raw pinyin:
+- confirm the host app is actually using `BilineIME Dev`
+- use the local harness or ask the user for host text, screenshots, telemetry,
+  and system logs
+- check the broker and LaunchAgent status in the Settings app Status page
 
-- Check Rime consumed-span telemetry.
-- Re-run focused session/Rime tests before changing UI or router behavior.
+### Settings changes do not appear to apply
 
-Alibaba preview always fails:
+- distinguish “saved to shared configuration” from “applied at a safe boundary”
+- use the `settings-refresh` host smoke scenario when the question is about
+  runtime propagation, not just persistence
 
-- Confirm `com.apple.security.network.client` is present in entitlements.
-- Confirm provider defaults are written to the dev domain.
-- Confirm the native settings app has saved both AccessKey fields to the local
-  credential file.
-- Confirm the RAM user has machine translation permission.
-- Run live tests only after explicitly opting in with environment variables.
+### Translation always unavailable
 
-`xattr: Permission denied` during local cleanup:
+- confirm the provider is set to Aliyun
+- confirm credentials are complete in the shared vault status
+- confirm network entitlement and RAM permissions
 
-- Treat it as noise unless build, signing, install, or runtime verification
-  fails.
-- Do not add broad destructive cleanup to the build path. Keep cleanup in
-  install/repair paths where possible.
+### Cleanup/build noise
 
-## 8. Current Product Boundary
+- `xattr` or metadata cleanup warnings are only actionable when they actually
+  break build, signing, install, or runtime verification
 
-Keep this architecture boundary intact:
+## 10. Current boundary you should preserve
 
-- Rime decides Chinese candidates, ranking, paging, and commit state.
-- English is only a translation of the currently selected Chinese candidate.
-- Whole-phrase Chinese candidate commits end the composition.
-- Prefix Chinese candidate commits may leave a proven Rime tail.
-- Translation preview must never block Chinese typing, browsing, or commit.
-- Provider requests must go through the preview scheduler; UI/session code must
-  not call cloud APIs directly.
+Keep these decisions intact unless you are intentionally changing architecture:
+
+- Chinese candidate generation, ranking, paging, and commit state belong to
+  Rime/session logic
+- English remains a preview / alternate commit layer, not the source of truth
+- translation must not block Chinese typing, browsing, or commit
+- broker coordination should stay the single operational path between Settings
+  and the IME for shared runtime state
+- CI-safe tests and real-host smoke should remain separate verification layers

@@ -1,21 +1,51 @@
-# IME Engine Bugs
+# IME Risks And Gaps
 
-## Open
+## 1. Automated host probes operating on the wrong input source
 
-### 1. Automated host probes can operate the wrong input source
-- Severity: blocker
-- Status: mitigated by scoped harness policy and explicit source-readiness gate
-- Decision:
-  - ad hoc automated host probes and key-injection scripts have been removed
-  - real-host validation defaults to manual TextEdit smoke
-  - the only automated host path is the explicit local harness `bilinectl smoke-host dev --confirm`
-  - install, manual source enrollment, and source-ready host smoke are three separate phases; `smoke-host` only runs the third phase and refuses to start if the source is not `enabled + selectable`
-  - readiness can be inspected with `bilinectl smoke-host dev --check`; `--prepare` opens System Settings → Keyboard → Input Sources but never clicks `Allow` or enables the source for the user
-  - the harness drives exactly one TextEdit session and restarts it instead of opening multiple windows/documents
-  - Codex must stop before input-source selection, focus, typing, browsing, or commit operations unless the user asks for that exact harness run in the moment
-- Impact:
-  - scripted host operation is accepted only when it comes from the supported harness, has confirmed source readiness, and exports telemetry/artifacts
+- Severity: high
+- Status: mitigated; current local host smoke baseline is green
+- Current position:
+  - ad hoc automated host probes and key-injection scripts are out of bounds
+  - the only automated host path is `bilinectl smoke-host dev --confirm`
+  - install, source enrollment, and source-ready host smoke are separate phases
+  - the harness fails fast on readiness and restores the original input source
+    when possible
+  - the harness is local-only and never a CI gate
+- What is already verified:
+  - `candidate-popup`
+  - `browse`
+  - `commit`
+  - `settings-refresh`
+  - `full`
+
+## 2. Host smoke coverage is still baseline-only
+
+- Severity: medium
+- Status: open
+- Gap:
+  - the current baseline covers the main happy-path host flows, but not the
+    harder stress set
+- Next high-value cases:
+  - punctuation and raw-buffer behavior (`shi_`, `shi%`, `shi()`, `shi,`,
+    `ni----====+`)
+  - editing and confirmation keys (`Backspace`, `Space`, `Return`, `Esc`)
+  - active-layer persistence (`Shift+Tab`, continued typing, continued browsing)
+  - ambiguous / mixed-input cases (`xi'an`, `lv`, `pingguogs`, inline Latin)
+
+## 3. Release lane remains intentionally paused
+
+- Severity: medium
+- Status: open by design
+- Boundary:
+  - the dev lane and tester pkg flow are active
+  - the reserved release target remains in project configuration
+  - there is still no supported notarized release packaging workflow
 
 ## Notes
-- Install/sign/launch blocker is already cleared.
-- Current bottleneck has moved to layered real-host smoke and candidate quality.
+
+- The immediate risk profile is no longer “can the dev IME install and appear at
+  all?”.
+- The current focus has moved to:
+  - expanding hard-case host smoke coverage
+  - stabilizing candidate quality and consumed-span behavior
+  - keeping broker-backed settings propagation boring and predictable

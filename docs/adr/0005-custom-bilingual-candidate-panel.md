@@ -34,3 +34,10 @@ The panel is also now coupled to a thin host bridge:
 - session state stays free of `NSTextInputClient` and AppKit window geometry
 - anchor resolution prefers the client's line-height rectangle
 - missing fresh geometry may reuse the current session's last valid anchor, but never falls back to mouse position
+
+## Current Status Note
+
+This ADR is still active. The custom panel is the supported candidate UI path
+in the dev lane, and the current local host smoke baseline explicitly verifies
+panel popup, browsing, commit, and safe-boundary settings refresh against that
+panel behavior.

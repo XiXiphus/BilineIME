@@ -11,3 +11,9 @@ The first demo uses a fixture-driven Swift implementation behind `CandidateEngin
 ## Rationale
 
 This keeps the first iteration focused on session state, candidate flow, and preview integration instead of C++ build and packaging complexity.
+
+## Current Status Note
+
+This ADR should now be read as historical bootstrap context. The app runtime has
+since moved to a Rime-backed engine, while fixture-driven and dictionary-backed
+engines remain only for tests, diagnostics, and deterministic examples.

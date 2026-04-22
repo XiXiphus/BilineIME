@@ -29,6 +29,7 @@ Inside that third phase the rules are:
 - Codex must not switch input sources, focus the host, inject keys, or run scripts that do those actions unless the user explicitly asks for that exact automated host-smoke action in the moment
 - the only supported automated real-host entrypoint is `bilinectl smoke-host dev --confirm` / `make smoke-ime-host`; it is local-only, never a CI step, and must export telemetry/artifacts
 - the automated host harness must drive exactly one `TextEdit` session; reuse or restart that single session instead of opening multiple `TextEdit` windows/documents
+- `Tests/` is reserved for CI-safe Swift Package tests; the real-host smoke harness lives under `Sources/bilinectl/` because it automates macOS input-source, Accessibility, TextEdit, and telemetry flows that do not belong in `swift test`
 - `bilinectl smoke-host dev --check` and `--prepare` are read-only / non-destructive helpers; `--prepare` only opens System Settings and prints remediation, it never clicks `Allow` or enables the source
 - `./scripts/select-input-source.sh current` and `./scripts/select-input-source.sh readiness` are read-only and may be used only to report state
 - if candidate UI may render on another monitor, ask the user for screenshots across displays instead of driving the host

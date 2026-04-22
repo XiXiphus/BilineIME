@@ -14,6 +14,7 @@ schema:
 engine:
   processors:
     - ascii_composer
+    - predictor
     - speller
     - selector
     - navigator
@@ -22,6 +23,8 @@ engine:
     - abc_segmentor
     - fallback_segmentor
   translators:
+    - predict_translator
+    - history_translator
     - script_translator
   filters:
     - uniquifier
@@ -41,13 +44,35 @@ translator:
   user_dict: biline_pinyin_simp
   enable_sentence: true
   enable_completion: true
+  enable_word_completion: true
+  enable_correction: true
   enable_user_dict: true
   enable_encoder: true
   encode_commit_history: true
+  contextual_suggestions: true
+  max_homophones: 7
+  max_homographs: 7
+  max_word_length: 4
+  core_word_length: 2
   preedit_format:
     - xform/([nl])v/$1ü/
     - xform/([nl])ue/$1üe/
     - xform/([jqxy])v/$1u/
+
+history:
+  input: vv
+  size: 3
+  initial_quality: 0.5
+
+switches:
+  - name: prediction
+    reset: 1
+    states: [ 关闭预测, 开启预测 ]
+
+predictor:
+  db: predict.db
+  max_candidates: 5
+  max_iterations: 1
 
 ascii_composer:
   good_old_caps_lock: true
@@ -58,3 +83,6 @@ ascii_composer:
     Control_R: noop
     Caps_Lock: clear
     Eisu_toggle: clear
+
+__patch:
+  - grammar:/hans?

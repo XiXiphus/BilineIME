@@ -9,6 +9,10 @@ bin/*
 share/*
 deps/*/*
 plugins/*/
+!plugins/octagram/
+!plugins/octagram/**
+!plugins/predict/
+!plugins/predict/**
 env.bat
 node_modules/
 *~

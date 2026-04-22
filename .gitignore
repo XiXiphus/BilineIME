@@ -71,7 +71,12 @@ Vendor/librime/build*/
 Vendor/librime/build
 Vendor/librime/deps/boost-*/
 Vendor/librime/deps/build/
-Vendor/librime/include/
+Vendor/librime/include/*
+!Vendor/librime/include/COPYING.darts-clone
+!Vendor/librime/include/darts.h
+!Vendor/librime/include/utf8.h
+!Vendor/librime/include/utf8/
+!Vendor/librime/include/utf8/**
 Vendor/librime/lib/
 Vendor/librime/bin/
 Vendor/librime/dist/

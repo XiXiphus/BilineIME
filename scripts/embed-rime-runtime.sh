@@ -46,6 +46,9 @@ collect_non_system_dependencies() {
     | awk '{print $1}' \
     | while IFS= read -r dependency; do
         case "$dependency" in
+          /opt/homebrew/*|/usr/local/*)
+            [[ "$dependency" == *.dylib && -f "$dependency" ]] && printf '%s\n' "$dependency"
+            ;;
           /opt/homebrew/*/*.dylib|/opt/homebrew/*/*/*.dylib)
             printf '%s\n' "$dependency"
             ;;
@@ -162,7 +165,11 @@ fi
 
 for file in \
   "$ROOT_DIR/Vendor/rime-luna-pinyin/pinyin.yaml" \
-  "$ROOT_DIR/Vendor/rime-ice/rime_ice.dict.yaml"; do
+  "$ROOT_DIR/Vendor/rime-ice/rime_ice.dict.yaml" \
+  "$ROOT_DIR/Vendor/rime-octagram-data/grammar.yaml" \
+  "$ROOT_DIR/Vendor/rime-octagram-data/zh-hans-t-essay-bgw.gram" \
+  "$ROOT_DIR/Vendor/rime-octagram-data/zh-hant-t-essay-bgw.gram" \
+  "$RIME_SHARE/predict.db"; do
   if [[ -f "$file" ]]; then
     ditto "$file" "$APP_RIME_DATA/$(basename "$file")"
   fi

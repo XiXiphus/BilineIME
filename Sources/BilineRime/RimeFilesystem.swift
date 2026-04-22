@@ -65,6 +65,15 @@ extension RimePaths {
             RimeDataFile(
                 relativePath: "cn_dicts/others.dict.yaml",
                 repoRelativePath: "rime-ice/cn_dicts/others.dict.yaml"),
+            RimeDataFile(
+                relativePath: "grammar.yaml",
+                repoRelativePath: "rime-octagram-data/grammar.yaml"),
+            RimeDataFile(
+                relativePath: "zh-hans-t-essay-bgw.gram",
+                repoRelativePath: "rime-octagram-data/zh-hans-t-essay-bgw.gram"),
+            RimeDataFile(
+                relativePath: "zh-hant-t-essay-bgw.gram",
+                repoRelativePath: "rime-octagram-data/zh-hant-t-essay-bgw.gram"),
         ]
 
         for file in vendorFiles {
@@ -80,6 +89,20 @@ extension RimePaths {
             try copyItem(
                 at: source, to: sharedDataDir.appendingPathComponent(file.relativePath),
                 using: fileManager)
+        }
+
+        let generatedDataRoot = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent("Library/Caches/BilineIME/RimeVendor/1.16.1/share")
+        let generatedDataFiles = ["predict.db"]
+        for file in generatedDataFiles {
+            let destination = sharedDataDir.appendingPathComponent(file)
+            let appBundleCandidate = vendorDataDir?.appendingPathComponent(file)
+            let generatedCandidate = generatedDataRoot.appendingPathComponent(file)
+            if let appBundleCandidate, fileManager.fileExists(atPath: appBundleCandidate.path) {
+                try copyItem(at: appBundleCandidate, to: destination, using: fileManager)
+            } else if fileManager.fileExists(atPath: generatedCandidate.path) {
+                try copyItem(at: generatedCandidate, to: destination, using: fileManager)
+            }
         }
 
         for (resourceName, ext) in [

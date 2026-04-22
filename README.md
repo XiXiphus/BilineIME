@@ -35,6 +35,9 @@ The boundary is strict:
   `Translation`, `Input Settings`, `Appearance`, and `Status`.
 - Rime-backed Chinese candidate engine with separate simplified and traditional
   schemas and user dictionaries.
+- Rime language-model support through `librime-octagram` with bundled
+  simplified and traditional grammar models; the dev/tester package is roughly
+  20-25 MB larger before compression because of these model assets.
 - Custom AppKit candidate panel with compact and expanded presentation modes.
 - `Shift+Tab` layer switching between Chinese commit and ready English commit.
 - A “双语能力” toggle in Settings that disables English candidates and English

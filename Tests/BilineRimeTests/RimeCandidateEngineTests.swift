@@ -101,6 +101,40 @@ final class RimeCandidateEngineTests: XCTestCase {
         XCTAssertEqual(jianti.candidates.first?.surface, "简体中文")
     }
 
+    func testDailySentenceRanksNaturalPhraseAboveOfficialTitleMisparse() throws {
+        let session = try makeSession()
+        let snapshot = session.updateInput("buzhangzheyang")
+        let surfaces = snapshot.candidates.map(\.surface)
+
+        guard let naturalIndex = surfaces.firstIndex(of: "不长这样") else {
+            XCTFail("Expected 不长这样 in candidates: \(surfaces.prefix(10))")
+            return
+        }
+        if let officialTitleIndex = surfaces.firstIndex(of: "部长这样") {
+            XCTAssertLessThan(naturalIndex, officialTitleIndex)
+        }
+        XCTAssertEqual(surfaces.first, "不长这样")
+    }
+
+    func testOfficialTitlePhrasesStillRankWhenContextSupportsThem() throws {
+        let session = try makeSession()
+
+        let meeting = session.updateInput("buzhanghuiyi")
+        XCTAssertEqual(meeting.candidates.first?.surface, "部长会议")
+
+        let deputy = session.updateInput("fubuzhang")
+        XCTAssertEqual(deputy.candidates.first?.surface, "副部长")
+    }
+
+    func testCorrectionDoesNotDisplaceExactStrongPhrase() throws {
+        let session = try makeSession()
+        let exact = session.updateInput("shuangyu")
+        XCTAssertEqual(exact.candidates.first?.surface, "双语")
+
+        let typo = session.updateInput("shusngyu")
+        XCTAssertFalse(typo.candidates.isEmpty)
+    }
+
     func testTraditionalModeUsesTraditionalSchemaOutput() throws {
         let session = try makeSession(characterForm: .traditional)
         _ = session.updateInput("shuangyu")

@@ -9,6 +9,8 @@ use_preset_vocabulary: false
 ...
 
 双语	shuang yu	5200000
+不长这样	bu zhang zhe yang	5150000
+长这样	zhang zhe yang	5140000
 好苹果	hao ping guo	5000000
 好	hao	4990000
 苹果	ping guo	4900000

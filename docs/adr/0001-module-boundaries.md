@@ -18,3 +18,8 @@ This ADR is still active. The current repo layout continues to follow it:
 host-facing integration stays in `App/`, reusable logic stays in Swift Package
 targets under `Sources/`, and CI-safe tests stay in `Tests/` rather than mixing
 real-host automation into package test targets.
+
+Recent raw-cursor editing work follows the same boundary: `BilineSession` owns
+raw cursor state and editing behavior, `BilineCore` owns shared pinyin
+segmentation, and `App/` only adapts those snapshots into marked text and the
+candidate panel.

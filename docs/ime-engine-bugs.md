@@ -28,11 +28,31 @@
 - Next high-value cases:
   - punctuation and raw-buffer behavior (`shi_`, `shi%`, `shi()`, `shi,`,
     `ni----====+`)
-  - editing and confirmation keys (`Backspace`, `Space`, `Return`, `Esc`)
+  - editing and confirmation keys (`Backspace`, `Option+Backspace`,
+    `Command+Backspace`, `Space`, `Return`, `Esc`)
+  - raw pinyin cursor behavior (`Option+Left/Right`, `Command+Left/Right`,
+    plain `Left/Right` at the end vs. middle of composition)
   - active-layer persistence (`Shift+Tab`, continued typing, continued browsing)
   - ambiguous / mixed-input cases (`xi'an`, `lv`, `pingguogs`, inline Latin)
 
-## 3. Release lane remains intentionally paused
+## 3. Raw-cursor host behavior is unit-covered but host-smoke-light
+
+- Severity: medium
+- Status: mitigated in core; open in real-host coverage
+- Current position:
+  - raw pinyin cursor state lives in `BilingualInputSession`
+  - pinyin block navigation uses shared `PinyinInputSegmenter`
+  - marked text receives the insertion point through `setMarkedText`
+  - candidate mode does not add a duplicate raw pinyin row to the panel
+  - raw-buffer-only mode keeps a panel fallback because no candidate matrix
+    exists
+- Remaining gap:
+  - TextEdit and other hosts still need manual or harness-backed confirmation
+    that they render the insertion caret as expected
+  - host-specific quirks should be handled as explicit fallbacks, not by
+    making the candidate panel a permanent second input field
+
+## 4. Release lane remains intentionally paused
 
 - Severity: medium
 - Status: open by design
@@ -48,4 +68,5 @@
 - The current focus has moved to:
   - expanding hard-case host smoke coverage
   - stabilizing candidate quality and consumed-span behavior
+  - keeping raw cursor editing host-safe
   - keeping broker-backed settings propagation boring and predictable

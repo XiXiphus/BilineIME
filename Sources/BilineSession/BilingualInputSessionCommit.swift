@@ -114,6 +114,7 @@ extension BilingualInputSession {
 
         if engineCommit.snapshot.isComposing {
             rawInput = engineCommit.snapshot.rawInput
+            rawCursorIndex = rawInput.count
             activeLayer = layer
             hasEverExpandedInCurrentComposition = false
             hasExplicitCandidateSelection = false
@@ -125,6 +126,7 @@ extension BilingualInputSession {
 
         if !fallbackTailInput.isEmpty {
             rawInput = fallbackTailInput
+            rawCursorIndex = rawInput.count
             activeLayer = layer
             hasEverExpandedInCurrentComposition = false
             hasExplicitCandidateSelection = false

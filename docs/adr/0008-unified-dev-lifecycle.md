@@ -37,6 +37,10 @@ path or a DerivedData Launch Services record.
 Make targets are thin wrappers around `bilinectl`; shell scripts remain only
 for low-level build, runtime embedding, and read-only diagnostics.
 
+The lifecycle runner must drain subprocess stdout and stderr while waiting for
+exit. `xcodebuild` can emit enough output to fill a pipe, so waiting first and
+reading later can deadlock `install` during `build-settings`.
+
 Real-host validation is layered. The default flow is manual TextEdit smoke. The
 only automated host path is the explicit local harness
 `bilinectl smoke-host dev --confirm` / `make smoke-ime-host`; it is local-only,

@@ -184,6 +184,7 @@ final class BilineTextInputBridge: @unchecked Sendable {
     ) {
         let clientID = clientIdentifier(for: client)
         let markedText = snapshot.markedText
+        let attributedMarkedText = attributedMarkedText(for: snapshot)
         let selection = snapshot.markedSelectionRange
 
         if lastMarkedClientID == clientID,
@@ -195,7 +196,7 @@ final class BilineTextInputBridge: @unchecked Sendable {
         }
 
         client.setMarkedText(
-            markedText,
+            attributedMarkedText,
             selectionRange: selection,
             replacementRange: NSRange(location: NSNotFound, length: NSNotFound)
         )
@@ -214,6 +215,23 @@ final class BilineTextInputBridge: @unchecked Sendable {
         lastMarkedText = markedText
         lastMarkedSelection = selection
         resetAnchorRetryIfNeeded(for: anchorRetryKey(snapshot: snapshot, clientID: clientID))
+    }
+
+    @MainActor
+    private func attributedMarkedText(
+        for snapshot: BilingualCompositionSnapshot
+    ) -> NSAttributedString {
+        let text = snapshot.markedText
+        let attributed = NSMutableAttributedString(
+            string: text,
+            attributes: [
+                .foregroundColor: NSColor.labelColor,
+                .underlineStyle: NSUnderlineStyle.single.rawValue,
+                .underlineColor: NSColor.controlAccentColor.withAlphaComponent(0.72),
+                .markedClauseSegment: 0,
+            ]
+        )
+        return attributed
     }
 
     @MainActor

@@ -55,6 +55,8 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
     public let remainingRawInput: String
     public let displayRawInput: String
     public let markedText: String
+    public let rawCursorIndex: Int
+    public let markedSelectionLocation: Int
     public let items: [BilingualCandidateItem]
     public let showsEnglishCandidates: Bool
     public let pageIndex: Int
@@ -72,6 +74,8 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         remainingRawInput: String,
         displayRawInput: String,
         markedText: String,
+        rawCursorIndex: Int = 0,
+        markedSelectionLocation: Int? = nil,
         items: [BilingualCandidateItem],
         showsEnglishCandidates: Bool,
         pageIndex: Int,
@@ -88,6 +92,11 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         self.remainingRawInput = remainingRawInput
         self.displayRawInput = displayRawInput
         self.markedText = markedText
+        self.rawCursorIndex = min(max(0, rawCursorIndex), rawInput.count)
+        self.markedSelectionLocation = min(
+            max(0, markedSelectionLocation ?? markedText.count),
+            markedText.count
+        )
         self.items = items
         self.showsEnglishCandidates = showsEnglishCandidates
         self.pageIndex = pageIndex
@@ -106,6 +115,8 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
         remainingRawInput: "",
         displayRawInput: "",
         markedText: "",
+        rawCursorIndex: 0,
+        markedSelectionLocation: 0,
         items: [],
         showsEnglishCandidates: false,
         pageIndex: 0,
@@ -125,6 +136,8 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
             remainingRawInput: "",
             displayRawInput: "",
             markedText: "",
+            rawCursorIndex: 0,
+            markedSelectionLocation: 0,
             items: [],
             showsEnglishCandidates: false,
             pageIndex: 0,
@@ -143,7 +156,7 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
     }
 
     public var markedSelectionRange: NSRange {
-        NSRange(location: markedText.count, length: 0)
+        NSRange(location: markedSelectionLocation, length: 0)
     }
 
     public var totalRowCount: Int {
@@ -183,6 +196,8 @@ public struct BilingualCompositionSnapshot: Sendable, Equatable {
             && lhs.remainingRawInput == rhs.remainingRawInput
             && lhs.displayRawInput == rhs.displayRawInput
             && lhs.markedText == rhs.markedText
+            && lhs.rawCursorIndex == rhs.rawCursorIndex
+            && lhs.markedSelectionLocation == rhs.markedSelectionLocation
             && lhs.items == rhs.items
             && lhs.showsEnglishCandidates == rhs.showsEnglishCandidates
             && lhs.pageIndex == rhs.pageIndex

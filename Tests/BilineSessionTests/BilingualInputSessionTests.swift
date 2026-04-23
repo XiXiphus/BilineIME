@@ -41,6 +41,124 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.commitSelection(), "时")
     }
 
+    func testRawCursorMovesByPinyinBlockAndInsertsAtCursor() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "nihao")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 5)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 5)
+
+        session.moveRawCursorByBlock(.previous)
+
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 2)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 2)
+
+        session.append(text: "men")
+
+        XCTAssertEqual(session.snapshot.rawInput, "nimenhao")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 5)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 5)
+    }
+
+    func testRawCursorMovesByCharacterForPlainArrowSemantics() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "nihao")
+        session.moveRawCursorByBlock(.previous)
+        session.moveRawCursorByCharacter(.previous)
+
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 1)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 1)
+
+        session.moveRawCursorByCharacter(.next)
+
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 2)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 2)
+    }
+
+    func testRawCursorMarkedSelectionUsesRenderedPunctuationPrefix() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "%")
+        session.appendLiteral(text: "_")
+        session.appendLiteral(text: "+")
+        session.moveRawCursorByBlock(.previous)
+
+        XCTAssertEqual(session.snapshot.displayRawInput, "shi％＿＋")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 5)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 5)
+    }
+
+    func testRawCursorMovesToEdgesAndBackspaceAtStartDeletesFromEnd() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "nihao")
+        session.moveRawCursorToStart()
+
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 0)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 0)
+
+        session.deleteBackward()
+
+        XCTAssertEqual(session.snapshot.rawInput, "niha")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 4)
+
+        session.moveRawCursorToEnd()
+        session.deleteBackward()
+
+        XCTAssertEqual(session.snapshot.rawInput, "nih")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 3)
+    }
+
+    func testOptionBackspaceDeletesPreviousPinyinBlock() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "haopingguo")
+        session.deleteRawBackwardByBlock()
+
+        XCTAssertEqual(session.snapshot.rawInput, "haoping")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 7)
+
+        session.moveRawCursorByBlock(.previous)
+        XCTAssertEqual(session.snapshot.rawInput, "haoping")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 3)
+
+        session.deleteRawBackwardByBlock()
+
+        XCTAssertEqual(session.snapshot.rawInput, "ping")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 0)
+
+        session.deleteRawBackwardByBlock()
+
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testCommandBackspaceDeletesToRawCursorStart() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "haopingguo")
+        session.moveRawCursorByBlock(.previous)
+        session.deleteRawToStart()
+
+        XCTAssertEqual(session.snapshot.rawInput, "guo")
+        XCTAssertEqual(session.snapshot.rawCursorIndex, 0)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 0)
+    }
+
+    func testRawEditingClearsExplicitCandidateSelection() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.moveColumn(.next)
+        XCTAssertTrue(session.hasExplicitCandidateSelection)
+
+        session.deleteRawBackwardByBlock()
+
+        XCTAssertFalse(session.hasExplicitCandidateSelection)
+        XCTAssertFalse(session.hasEverExpandedInCurrentComposition)
+    }
+
     func testToggleActiveLayerChangesLayerWithoutChangingCell() {
         let session = DemoFixtures.makeBilingualSession()
 

@@ -21,7 +21,19 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             return .passThrough
         }
 
+        if let deletionAction = deletionAction(for: event, state: state) {
+            return deletionAction
+        }
+
+        if let rawCursorAction = rawCursorAction(for: event, state: state) {
+            return rawCursorAction
+        }
+
         if event.modifierFlags.contains(.command) {
+            return .passThrough
+        }
+
+        if event.modifierFlags.contains(.option) {
             return .passThrough
         }
 
@@ -54,9 +66,9 @@ public final class InputControllerEventRouter: @unchecked Sendable {
         case InputControllerKeyBinding.escape:
             return state.isComposing ? .cancel : .passThrough
         case InputControllerKeyBinding.leftArrow:
-            return state.isComposing && state.hasCandidates ? .moveColumn(.previous) : .passThrough
+            return plainHorizontalArrowAction(direction: .previous, state: state)
         case InputControllerKeyBinding.rightArrow:
-            return state.isComposing && state.hasCandidates ? .moveColumn(.next) : .passThrough
+            return plainHorizontalArrowAction(direction: .next, state: state)
         case InputControllerKeyBinding.upArrow:
             guard state.isComposing, state.hasCandidates else {
                 return .passThrough
@@ -116,5 +128,80 @@ public final class InputControllerEventRouter: @unchecked Sendable {
 
         let normalized = pinyinInput(from: characters)
         return normalized.isEmpty ? .passThrough : .append(normalized)
+    }
+
+    private func plainHorizontalArrowAction(
+        direction: SelectionDirection,
+        state: InputControllerState
+    ) -> InputControllerAction {
+        guard state.isComposing else {
+            return .passThrough
+        }
+
+        if state.compositionMode == .rawBufferOnly || !state.isRawCursorAtEnd {
+            return .moveRawCursorByCharacter(direction)
+        }
+
+        return state.hasCandidates ? .moveColumn(direction) : .consume
+    }
+
+    private func deletionAction(
+        for event: InputControllerEvent,
+        state: InputControllerState
+    ) -> InputControllerAction? {
+        guard event.keyCode == InputControllerKeyBinding.deleteBackward else {
+            return nil
+        }
+        guard state.isComposing, state.canDeleteBackward else {
+            return nil
+        }
+
+        let hasCommand = event.modifierFlags.contains(.command)
+        let hasOption = event.modifierFlags.contains(.option)
+        if hasCommand {
+            return .deleteRawToStart
+        }
+        if hasOption {
+            return .deleteRawBackwardByBlock
+        }
+        return .deleteBackward
+    }
+
+    private func rawCursorAction(
+        for event: InputControllerEvent,
+        state: InputControllerState
+    ) -> InputControllerAction? {
+        guard state.isComposing else {
+            return nil
+        }
+
+        let hasCommand = event.modifierFlags.contains(.command)
+        let hasOption = event.modifierFlags.contains(.option)
+        guard hasCommand || hasOption else {
+            return nil
+        }
+
+        switch event.keyCode {
+        case InputControllerKeyBinding.leftArrow:
+            guard !state.hasExplicitCandidateSelection,
+                !state.isExpandedPresentation,
+                !event.modifierFlags.contains(.shift),
+                hasCommand != hasOption
+            else {
+                return .consume
+            }
+            return hasCommand ? .moveRawCursorToStart : .moveRawCursorByBlock(.previous)
+        case InputControllerKeyBinding.rightArrow:
+            guard !state.hasExplicitCandidateSelection,
+                !state.isExpandedPresentation,
+                !event.modifierFlags.contains(.shift),
+                hasCommand != hasOption
+            else {
+                return .consume
+            }
+            return hasCommand ? .moveRawCursorToEnd : .moveRawCursorByBlock(.next)
+        default:
+            return nil
+        }
     }
 }

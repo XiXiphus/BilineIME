@@ -39,6 +39,9 @@ extension BilingualInputSession {
         engineSnapshot = newSnapshot
         if rawInput != engineSnapshot.rawInput {
             rawInput = engineSnapshot.rawInput
+            rawCursorIndex = rawInput.count
+        } else {
+            clampRawCursorIndex()
         }
 
         if engineSnapshot.candidates.isEmpty {
@@ -60,22 +63,6 @@ extension BilingualInputSession {
     }
 
     func normalize(_ string: String) -> String {
-        var result = ""
-        result.reserveCapacity(string.count)
-
-        for scalar in string.unicodeScalars {
-            switch scalar.value {
-            case 65...90:
-                result.unicodeScalars.append(UnicodeScalar(scalar.value + 32)!)
-            case 97...122:
-                result.unicodeScalars.append(scalar)
-            case 39:
-                result.append("'")
-            default:
-                continue
-            }
-        }
-
-        return result
+        PinyinInputSegmenter.normalizePinyin(string, keepsSpaces: false)
     }
 }

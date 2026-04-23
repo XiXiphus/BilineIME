@@ -17,6 +17,10 @@
 - The custom candidate panel renders up to `5` columns per row and up to `5` rows per page for the current candidate page.
 - Compact mode shows only the first visible row; expanded mode shows all real visible rows on the current page, without padding empty cells or rows.
 - The panel keeps all visible Chinese rows together in the top block and all visible English rows together in the bottom block, with strict left alignment inside the same column.
+- In candidate mode, the panel shows candidates only. It must not add a second
+  raw pinyin input row above the matrix.
+- In raw-buffer-only composition, the panel may show the rendered raw buffer
+  with a visible cursor because no candidate matrix is available.
 - The custom candidate panel anchors to the host-provided line-height rectangle.
 - When the host does not provide a fresh valid caret rect, the candidate panel may reuse the current session's last valid rect, but never falls back to mouse position.
 - `Shift+Tab` switches the active layer for the current highlighted candidate cell without changing the selected row or column.
@@ -25,6 +29,19 @@
 - `-` or `[` browse upward by row; when already on the first expanded row, they collapse to compact mode and reset the selection to the first item; before any expansion, they may enter raw-buffer-only composition.
 - `+` is treated as an ordinary input character and has no IME-specific behavior.
 - Chinese-mode punctuation follows a fixed default punctuation policy: common sentence punctuation commits as Chinese punctuation, raw preedit displays rendered Chinese/full-width punctuation, and literal symbol handling no longer depends on one-off router special cases.
+- Raw pinyin composition is edited through marked text, not by moving or
+  deleting host document text. `Option+Left/Right` moves by pinyin block,
+  `Command+Left/Right` moves to the composition edges, `Option+Backspace`
+  deletes one pinyin block, and `Command+Backspace` deletes to the raw cursor
+  start.
+- Plain `Left/Right` browses candidates only when the raw pinyin cursor is at
+  the end of the composition. If the cursor is in the middle, it moves the raw
+  cursor by character. In raw-buffer-only composition, `Left/Right` stays inside
+  the IME.
+- Modified arrows and modified backspace must not pass through to the host while
+  Biline is composing.
+- Raw cursor edits reset explicit candidate selection and return presentation to
+  compact mode before refreshing candidates.
 - Committing a candidate inserts the active layer text and clears composition.
 - English preview state never changes Chinese candidate order or paging.
 - `Backspace`, arrows, paging keys, and digits pass through to the host when Biline is not composing.

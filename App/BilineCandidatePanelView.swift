@@ -25,11 +25,18 @@ final class BilineCandidatePanelView: NSView {
     let segmentBreathingRoom: CGFloat = 2
     private let baseChineseFontSize: CGFloat = 16
     private let baseEnglishFontSize: CGFloat = 13
+    private let baseRawBufferFontSize: CGFloat = 13
     var chineseFont: NSFont {
         NSFont.systemFont(ofSize: baseChineseFontSize * theme.clampedFontScale, weight: .semibold)
     }
     var englishFont: NSFont {
         NSFont.systemFont(ofSize: baseEnglishFontSize * theme.clampedFontScale, weight: .regular)
+    }
+    var rawBufferFont: NSFont {
+        NSFont.monospacedSystemFont(
+            ofSize: baseRawBufferFontSize * theme.clampedFontScale,
+            weight: .regular
+        )
     }
     let fallbackFontResolver = SystemFallbackFontResolver()
     private var lineSizeCache: [CandidatePanelLineSizeKey: NSSize] = [:]
@@ -58,6 +65,8 @@ final class BilineCandidatePanelView: NSView {
         newValue: BilingualCompositionSnapshot
     ) -> Bool {
         if oldValue.rawInput != newValue.rawInput { return true }
+        if oldValue.rawCursorIndex != newValue.rawCursorIndex { return true }
+        if oldValue.markedSelectionLocation != newValue.markedSelectionLocation { return true }
         if oldValue.items.count != newValue.items.count { return true }
         for index in 0..<newValue.items.count {
             if oldValue.items[index].candidate.id != newValue.items[index].candidate.id {
@@ -65,6 +74,10 @@ final class BilineCandidatePanelView: NSView {
             }
         }
         return false
+    }
+
+    func rawBufferLineSize(active: Bool) -> NSSize {
+        rawBufferLine(active: active).size()
     }
 
     func candidateLineSize(column: Int, item: BilingualCandidateItem) -> NSSize {

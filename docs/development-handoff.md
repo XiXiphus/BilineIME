@@ -26,6 +26,8 @@ The current product boundary is still:
 
 - Chinese composition is the source of truth.
 - English preview is optional and must never own ranking or paging.
+- Raw pinyin cursor editing belongs to the IME composition state and is rendered
+  through host marked text.
 - Turning bilingual capability off yields a pure pinyin workflow.
 - Formal release packaging is paused.
 
@@ -190,6 +192,7 @@ This is for deterministic logic:
 
 - routing
 - session state
+- raw pinyin cursor movement and deletion
 - Rime integration contracts
 - settings serialization
 - lifecycle planning
@@ -197,7 +200,7 @@ This is for deterministic logic:
 ### IME-facing code path
 
 ```bash
-swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests|BilineRimeTests'
+swift test --filter 'InputControllerEventRouterTests|BilingualInputSessionTests|PinyinTokenizerTests|RimeCandidateEngineTests|ProcessRunnerTests'
 make build-ime
 make install-ime
 ```
@@ -333,6 +336,26 @@ before assuming the install is broken.
   and system logs
 - check the broker and LaunchAgent status in the Settings app Status page
 
+### Raw cursor or editing keys behave incorrectly
+
+- confirm the host still has marked text, not committed host text
+- check whether the raw cursor is at the end of the pinyin composition:
+  - plain `Left/Right` browse candidates only at the end
+  - plain `Left/Right` move the raw cursor when it is in the middle
+- verify modified editing stays inside composition:
+  - `Option+Left/Right` moves by pinyin block
+  - `Command+Left/Right` jumps to start/end
+  - `Option+Backspace` deletes one pinyin block
+  - `Command+Backspace` deletes to raw cursor start
+- do not diagnose this by injecting keys automatically unless the user has
+  explicitly requested the local host harness
+
+### Install appears to hang during build
+
+The lifecycle runner drains subprocess stdout and stderr while waiting. If a
+future install hangs during a verbose `xcodebuild`, inspect for a runner
+regression before assuming the app build itself is broken.
+
 ### Settings changes do not appear to apply
 
 - distinguish “saved to shared configuration” from “applied at a safe boundary”
@@ -356,6 +379,8 @@ Keep these decisions intact unless you are intentionally changing architecture:
 
 - Chinese candidate generation, ranking, paging, and commit state belong to
   Rime/session logic
+- raw pinyin cursor editing belongs to session state and marked text, not host
+  document text
 - English remains a preview / alternate commit layer, not the source of truth
 - translation must not block Chinese typing, browsing, or commit
 - broker coordination should stay the single operational path between Settings

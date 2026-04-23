@@ -9,6 +9,9 @@
 ## Module boundaries
 
 - `BilineCore` owns composition state, candidates, paging, commit behavior, and engine protocols.
+- `BilineCore` also owns shared pinyin segmentation helpers used by both
+  runtime candidate consumption and raw-cursor navigation. Do not fork pinyin
+  tokenization rules in host code.
 - `BilinePreview` owns translation provider contracts, cache behavior, and stale-result suppression.
 - `BilineSession` owns bilingual composition snapshots, active-layer state, and visible-page preview orchestration.
 - `BilineSettings` owns settings snapshots, defaults wrappers, shared configuration stores, and credential-store abstractions.
@@ -77,10 +80,17 @@ CI-safe tests should cover router/session/anchor ordering for the same critical 
   - `ni----====+`
 - editing and commit:
   - `Backspace`
+  - `Option+Backspace`
+  - `Command+Backspace`
   - `Space`
   - `Return`
   - digit select
   - `Esc`
+- raw cursor editing:
+  - `Option+Left` / `Option+Right`
+  - `Command+Left` / `Command+Right`
+  - plain `Left` / `Right` when the raw cursor is at the end
+  - plain `Left` / `Right` when the raw cursor is in the middle
 - active-layer persistence:
   - `Shift+Tab`
   - continue typing after layer switch
@@ -109,9 +119,16 @@ verification:
   - `ni----====+`
 - editing and confirmation:
   - `Backspace`
+  - `Option+Backspace`
+  - `Command+Backspace`
   - `Space`
   - `Return`
   - `Esc`
+- raw cursor / candidate-boundary behavior:
+  - `nihao`, `Option+Left`, `men`
+  - `haopingguo`, `Option+Backspace`
+  - plain `Left/Right` should browse only when the raw cursor is at the end
+  - plain `Left/Right` should move the raw cursor when it is in the middle
 - active-layer persistence:
   - `Shift+Tab`
   - continue typing after layer switch

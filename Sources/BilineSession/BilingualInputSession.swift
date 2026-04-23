@@ -42,11 +42,13 @@ public final class BilingualInputSession: @unchecked Sendable {
     var currentSnapshot: BilingualCompositionSnapshot = .idle
     var engineSnapshot: CompositionSnapshot = .idle
     var rawInput = ""
+    var rawCursorIndex = 0
     var activeLayer: ActiveLayer = .chinese
     var presentationMode: CandidatePresentationMode = .compact
     var previewStates: [String: BilingualPreviewState] = [:]
     var previewTasks: [String: Task<Void, Never>] = [:]
     let sessionID = UUID()
+    let pinyinSegmenter = PinyinInputSegmenter()
     var compositionRevision = 0
 
     var lockDepth = 0

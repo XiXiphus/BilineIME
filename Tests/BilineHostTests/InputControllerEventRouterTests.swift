@@ -50,6 +50,97 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
+    func testModifiedBackspaceDeletesInsideComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 51,
+                    modifierFlags: [.option]
+                ),
+                state: state
+            ),
+            .deleteRawBackwardByBlock
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 51,
+                    modifierFlags: [.command]
+                ),
+                state: state
+            ),
+            .deleteRawToStart
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 51,
+                    modifierFlags: [.shift, .option]
+                ),
+                state: state
+            ),
+            .deleteRawBackwardByBlock
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 51,
+                    modifierFlags: [.shift, .command]
+                ),
+                state: state
+            ),
+            .deleteRawToStart
+        )
+    }
+
+    func testModifiedBackspaceStillDeletesInsideCompositionAfterCandidateSelection() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            hasExplicitCandidateSelection: true
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 51,
+                    modifierFlags: [.option]
+                ),
+                state: state
+            ),
+            .deleteRawBackwardByBlock
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 51,
+                    modifierFlags: [.command]
+                ),
+                state: state
+            ),
+            .deleteRawToStart
+        )
+    }
+
     func testReturnCommitsRawInputBeforeExpansionOrSelection() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(
@@ -143,6 +234,254 @@ final class InputControllerEventRouterTests: XCTestCase {
         XCTAssertEqual(
             router.route(
                 event: InputControllerEvent(type: .keyDown, keyCode: 124),
+                state: state
+            ),
+            .passThrough
+        )
+    }
+
+    func testPlainHorizontalArrowsBrowseCandidatesOnlyWhenRawCursorIsAtEnd() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            rawCursorIndex: 5,
+            rawInputLength: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 123),
+                state: state
+            ),
+            .moveColumn(.previous)
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 124),
+                state: state
+            ),
+            .moveColumn(.next)
+        )
+    }
+
+    func testPlainHorizontalArrowsMoveRawCursorWhenCursorIsNotAtEnd() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            rawCursorIndex: 2,
+            rawInputLength: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 123),
+                state: state
+            ),
+            .moveRawCursorByCharacter(.previous)
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 124),
+                state: state
+            ),
+            .moveRawCursorByCharacter(.next)
+        )
+    }
+
+    func testPlainHorizontalArrowsStayInsideRawBufferOnlyComposition() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .rawBufferOnly,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: false,
+            compactColumnCount: 5,
+            rawCursorIndex: 5,
+            rawInputLength: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 123),
+                state: state
+            ),
+            .moveRawCursorByCharacter(.previous)
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(type: .keyDown, keyCode: 124),
+                state: state
+            ),
+            .moveRawCursorByCharacter(.next)
+        )
+    }
+
+    func testOptionArrowMovesRawCursorBeforeExplicitCandidateSelection() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            hasExplicitCandidateSelection: false
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 123,
+                    modifierFlags: [.option]
+                ),
+                state: state
+            ),
+            .moveRawCursorByBlock(.previous)
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 124,
+                    modifierFlags: [.option]
+                ),
+                state: state
+            ),
+            .moveRawCursorByBlock(.next)
+        )
+    }
+
+    func testCommandArrowMovesRawCursorToEdgesBeforeExplicitCandidateSelection() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            hasExplicitCandidateSelection: false
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 123,
+                    modifierFlags: [.command]
+                ),
+                state: state
+            ),
+            .moveRawCursorToStart
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 124,
+                    modifierFlags: [.command]
+                ),
+                state: state
+            ),
+            .moveRawCursorToEnd
+        )
+    }
+
+    func testModifiedArrowsAreConsumedAfterExplicitCandidateSelection() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5,
+            hasExplicitCandidateSelection: true
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 123,
+                    modifierFlags: [.option]
+                ),
+                state: state
+            ),
+            .consume
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 124,
+                    modifierFlags: [.command]
+                ),
+                state: state
+            ),
+            .consume
+        )
+    }
+
+    func testShiftModifiedRawCursorShortcutsAreConsumed() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 123,
+                    modifierFlags: [.shift, .option]
+                ),
+                state: state
+            ),
+            .consume
+        )
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 124,
+                    modifierFlags: [.shift, .command]
+                ),
+                state: state
+            ),
+            .consume
+        )
+    }
+
+    func testOptionNonArrowKeysPassThrough() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            compositionMode: .candidateCompact,
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 0,
+                    characters: "å",
+                    charactersIgnoringModifiers: "a",
+                    modifierFlags: [.option]
+                ),
                 state: state
             ),
             .passThrough

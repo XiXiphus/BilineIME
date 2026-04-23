@@ -1,3 +1,4 @@
+import BilineCore
 @testable import BilineRime
 import XCTest
 
@@ -19,6 +20,16 @@ final class PinyinTokenizerTests: XCTestCase {
 
         XCTAssertTrue(segmentations.contains(["xian"]))
         XCTAssertTrue(segmentations.contains(["xi", "an"]))
+    }
+
+    func testSharedSegmenterUsesGreedyBlocksForRawCursorNavigation() {
+        let segmenter = PinyinInputSegmenter()
+
+        XCTAssertEqual(segmenter.blockBoundaries(in: "haopingguo"), [0, 3, 7, 10])
+        XCTAssertEqual(segmenter.blockBoundaries(in: "xian"), [0, 4])
+        XCTAssertEqual(segmenter.blockBoundaries(in: "xi'an"), [0, 3, 5])
+        XCTAssertEqual(segmenter.previousBlockBoundary(in: "haopingguo", from: 10), 7)
+        XCTAssertEqual(segmenter.nextBlockBoundary(in: "haopingguo", from: 3), 7)
     }
 
     func testLexiconConsumptionUsesSurfaceToResolveAmbiguousSegmentation() throws {

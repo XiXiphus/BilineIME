@@ -49,6 +49,12 @@ extension BilingualInputSession {
         PunctuationPolicy.renderPreedit(rawInput, form: settingsStore.punctuationForm)
     }
 
+    var markedSelectionLocation: Int {
+        let cursorIndex = min(max(0, rawCursorIndex), rawInput.count)
+        let rawPrefix = String(rawInput.prefix(cursorIndex))
+        return PunctuationPolicy.renderPreedit(rawPrefix, form: settingsStore.punctuationForm).count
+    }
+
     func makeSnapshot() -> BilingualCompositionSnapshot {
         guard engineSnapshot.isComposing else {
             return .idleSnapshot(revision: compositionRevision)
@@ -61,6 +67,8 @@ extension BilingualInputSession {
                 remainingRawInput: rawInput,
                 displayRawInput: renderedRawInput,
                 markedText: renderedRawInput,
+                rawCursorIndex: rawCursorIndex,
+                markedSelectionLocation: markedSelectionLocation,
                 items: [],
                 showsEnglishCandidates: false,
                 pageIndex: 0,
@@ -89,6 +97,8 @@ extension BilingualInputSession {
             remainingRawInput: engineSnapshot.remainingRawInput,
             displayRawInput: renderedRawInput,
             markedText: renderedRawInput,
+            rawCursorIndex: rawCursorIndex,
+            markedSelectionLocation: markedSelectionLocation,
             items: items,
             showsEnglishCandidates: showsEnglishCandidates,
             pageIndex: engineSnapshot.pageIndex,

@@ -14,6 +14,7 @@ public struct InputModifierFlags: OptionSet, Sendable {
 
     public static let shift = InputModifierFlags(rawValue: 1 << 0)
     public static let command = InputModifierFlags(rawValue: 1 << 1)
+    public static let option = InputModifierFlags(rawValue: 1 << 2)
 }
 
 public struct InputControllerEvent: Sendable, Equatable {

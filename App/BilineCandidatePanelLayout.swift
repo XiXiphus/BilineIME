@@ -57,7 +57,7 @@ extension BilineCandidatePanelView {
     }
 
     var rawBufferRowPreferredWidth: CGFloat {
-        let textWidth = rawBufferLine(active: true).size().width
+        let textWidth = rawBufferLineSize(active: true).width
         return rowInsets.left + textWidth + segmentPadding.left + segmentPadding.right + 4
             + rowInsets.right
     }

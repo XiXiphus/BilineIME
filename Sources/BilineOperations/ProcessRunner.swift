@@ -30,15 +30,33 @@ public struct ProcessCommandRunner: CommandRunning {
         process.standardOutput = outputPipe
         process.standardError = errorPipe
 
-        try process.run()
-        process.waitUntilExit()
+        let outputCapture = PipeOutputCapture(outputPipe.fileHandleForReading)
+        let errorCapture = PipeOutputCapture(errorPipe.fileHandleForReading)
+        let captureGroup = DispatchGroup()
+        captureGroup.enter()
+        DispatchQueue.global(qos: .utility).async {
+            outputCapture.readToEnd()
+            captureGroup.leave()
+        }
+        captureGroup.enter()
+        DispatchQueue.global(qos: .utility).async {
+            errorCapture.readToEnd()
+            captureGroup.leave()
+        }
 
-        let output =
-            String(data: outputPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-            ?? ""
-        let errorOutput =
-            String(data: errorPipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8)
-            ?? ""
+        do {
+            try process.run()
+        } catch {
+            try? outputPipe.fileHandleForReading.close()
+            try? errorPipe.fileHandleForReading.close()
+            captureGroup.wait()
+            throw error
+        }
+        process.waitUntilExit()
+        captureGroup.wait()
+
+        let output = String(data: outputCapture.data, encoding: .utf8) ?? ""
+        let errorOutput = String(data: errorCapture.data, encoding: .utf8) ?? ""
         let result = CommandResult(
             status: process.terminationStatus, output: output, errorOutput: errorOutput)
         if process.terminationStatus != 0 && !allowFailure {
@@ -50,6 +68,29 @@ public struct ProcessCommandRunner: CommandRunning {
     @discardableResult
     public func runShell(_ command: String, allowFailure: Bool = false) throws -> CommandResult {
         try run("/bin/zsh", ["-lc", command], allowFailure: allowFailure)
+    }
+}
+
+private final class PipeOutputCapture: @unchecked Sendable {
+    private let handle: FileHandle
+    private let lock = NSLock()
+    private var capturedData = Data()
+
+    init(_ handle: FileHandle) {
+        self.handle = handle
+    }
+
+    var data: Data {
+        lock.lock()
+        defer { lock.unlock() }
+        return capturedData
+    }
+
+    func readToEnd() {
+        let data = handle.readDataToEndOfFile()
+        lock.lock()
+        capturedData = data
+        lock.unlock()
     }
 }
 

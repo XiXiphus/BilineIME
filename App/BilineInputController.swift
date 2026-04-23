@@ -496,6 +496,9 @@ final class BilineInputController: IMKInputController {
         if event.modifierFlags.contains(.command) {
             flags.insert(.command)
         }
+        if event.modifierFlags.contains(.option) {
+            flags.insert(.option)
+        }
         return flags
     }
 
@@ -507,6 +510,9 @@ final class BilineInputController: IMKInputController {
         }
         if cocoaFlags.contains(.command) {
             flags.insert(.command)
+        }
+        if cocoaFlags.contains(.option) {
+            flags.insert(.option)
         }
         return flags
     }
@@ -554,7 +560,9 @@ final class BilineInputController: IMKInputController {
                 isExpandedPresentation: snapshot.presentationMode == .expanded,
                 hasEverExpandedInCurrentComposition: inputSession
                     .hasEverExpandedInCurrentComposition,
-                hasExplicitCandidateSelection: inputSession.hasExplicitCandidateSelection
+                hasExplicitCandidateSelection: inputSession.hasExplicitCandidateSelection,
+                rawCursorIndex: snapshot.rawCursorIndex,
+                rawInputLength: snapshot.rawInput.count
             )
         )
 
@@ -611,6 +619,10 @@ final class BilineInputController: IMKInputController {
             return true
         case .deleteBackward:
             inputSession.deleteBackward()
+        case .deleteRawBackwardByBlock:
+            inputSession.deleteRawBackwardByBlock()
+        case .deleteRawToStart:
+            inputSession.deleteRawToStart()
         case .commit:
             return commitSelection(using: client)
         case .commitRawInput:
@@ -620,6 +632,14 @@ final class BilineInputController: IMKInputController {
             textInputBridge.clearAnchorCache()
         case .moveColumn(let direction):
             inputSession.moveColumn(direction)
+        case .moveRawCursorByCharacter(let direction):
+            inputSession.moveRawCursorByCharacter(direction)
+        case .moveRawCursorByBlock(let direction):
+            inputSession.moveRawCursorByBlock(direction)
+        case .moveRawCursorToStart:
+            inputSession.moveRawCursorToStart()
+        case .moveRawCursorToEnd:
+            inputSession.moveRawCursorToEnd()
         case .browseNextRow:
             inputSession.browseNextRow()
         case .browsePreviousRow:

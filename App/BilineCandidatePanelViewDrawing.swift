@@ -203,12 +203,24 @@ extension BilineCandidatePanelView {
     }
 
     func rawBufferLine(active: Bool) -> NSAttributedString {
-        NSAttributedString(
-            string: snapshot.displayRawInput,
+        let cursorLocation = min(max(0, snapshot.markedSelectionLocation), snapshot.displayRawInput.count)
+        let prefix = String(snapshot.displayRawInput.prefix(cursorLocation))
+        let suffix = String(snapshot.displayRawInput.dropFirst(cursorLocation))
+        let text = prefix + "|" + suffix
+        let attributed = NSMutableAttributedString(
+            string: text,
             attributes: [
-                .font: chineseFont,
-                .foregroundColor: active ? NSColor.white : NSColor.labelColor,
+                .font: rawBufferFont,
+                .foregroundColor: active ? NSColor.white : NSColor.secondaryLabelColor,
             ]
         )
+        attributed.addAttributes(
+            [
+                .font: rawBufferFont,
+                .foregroundColor: active ? NSColor.white : NSColor.controlAccentColor,
+            ],
+            range: NSRange(location: prefix.count, length: 1)
+        )
+        return attributed
     }
 }

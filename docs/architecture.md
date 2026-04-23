@@ -16,6 +16,7 @@ The non-negotiable rules are:
 The user-facing interaction remains:
 
 - type pinyin
+- edit the live pinyin composition with a raw cursor when needed
 - browse Chinese candidates
 - optionally inspect English preview for visible candidates
 - commit either the Chinese candidate or the ready English preview
@@ -42,7 +43,7 @@ The Swift package targets own the deterministic core:
 
 - `BilineCore`: shared core models and protocols
 - `BilineSession`: composition state machine, active-layer state, snapshot
-  shaping, browsing, commit behavior
+  shaping, raw-cursor editing, browsing, commit behavior
 - `BilinePreview`: request scheduling, debounce, cache, stale-result suppression
 - `BilineRime`: runtime candidate engine integration
 - `BilineSettings`: settings snapshot model, defaults wrappers, shared
@@ -159,6 +160,15 @@ migration and recovery.
 7. Async preview results are ignored when they no longer match the visible-page
    state.
 
+Raw pinyin editing is part of composition, not host text editing. The session
+owns a raw cursor inside `rawInput`; the host layer renders it through marked
+text. `Option+Left/Right` move by pinyin block, `Command+Left/Right` move to
+the composition edges, `Option+Backspace` deletes the previous pinyin block, and
+`Command+Backspace` deletes to the raw cursor start. Plain `Left/Right` browse
+candidate columns only when the raw cursor is at the end of the composition;
+otherwise they move the raw cursor by character and are consumed by the IME.
+Modified arrows/backspace must not leak to the host while composing.
+
 ### Browsing and commit
 
 Browsing changes only selection and presentation state. It must never let
@@ -170,6 +180,11 @@ Commit behavior is explicit:
 - English layer commits only a ready preview.
 - Whole-composition commits clear composition.
 - Prefix commits may leave a proven tail when the engine can justify it.
+
+The custom candidate panel remains a candidate UI: in candidate mode it renders
+the bilingual matrix only. Raw-buffer-only composition is the fallback case where
+the panel renders the raw buffer because no candidate matrix exists. Normal
+pinyin and cursor presentation belong to marked text in the host.
 
 ### Settings refresh
 
@@ -234,10 +249,16 @@ The current baseline `full` scenario exercises:
 - commit
 - safe-boundary settings refresh
 
+The baseline does not yet cover the full raw-cursor editing surface, including
+modified arrows, block deletion, and middle-of-composition insertion. Those are
+covered by package tests and remain high-priority real-host smoke expansion
+targets.
+
 ## Current priorities
 
 - keep Chinese IME behavior as the source of truth
 - keep simplified and traditional Rime schemas stable
+- keep raw pinyin cursor editing host-safe
 - keep broker-backed configuration and credential coordination reliable
 - expand host smoke beyond the current baseline into harder punctuation, editing,
   mixed-input, and layer-persistence scenarios

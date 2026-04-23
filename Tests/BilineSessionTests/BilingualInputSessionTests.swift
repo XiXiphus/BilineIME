@@ -442,6 +442,40 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.markedText, "shi％＿＋")
     }
 
+    func testTrailingUppercaseLatinStaysInCandidateComposition() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "A")
+        session.appendLiteral(text: "A")
+
+        XCTAssertEqual(session.compositionMode, .candidateCompact)
+        XCTAssertEqual(session.snapshot.rawInput, "shiAA")
+        XCTAssertEqual(session.snapshot.markedText, "shiAA")
+        XCTAssertFalse(session.snapshot.items.isEmpty)
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "是AA")
+        XCTAssertEqual(session.commitSelection(), "是AA")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testTrailingUppercaseLatinDoesNotAttachToShortPrefixCandidate() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "haopingguo")
+        session.appendLiteral(text: "A")
+
+        XCTAssertEqual(session.snapshot.rawInput, "haopingguoA")
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "好苹果A")
+        XCTAssertTrue(session.snapshot.items.contains(where: { $0.candidate.surface == "好" }))
+
+        session.moveColumn(.next)
+
+        XCTAssertEqual(session.snapshot.items[1].candidate.surface, "好")
+        XCTAssertEqual(session.commitSelection(), "好")
+        XCTAssertEqual(session.snapshot.rawInput, "pingguoA")
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "苹果A")
+    }
+
     func testDeletingLiteralBufferRestoresCandidateComposition() {
         let session = DemoFixtures.makeBilingualSession()
 

@@ -1093,6 +1093,102 @@ final class InputControllerEventRouterTests: XCTestCase {
         )
     }
 
+    func testShiftLetterInsertsUppercaseLatinWhenIdle() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 0,
+                    characters: "A",
+                    charactersIgnoringModifiers: "a",
+                    modifierFlags: [.shift]
+                ),
+                state: state
+            ),
+            .insertText("A")
+        )
+    }
+
+    func testShiftLetterAppendsUppercaseLatinWhileComposing() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: true,
+            canDeleteBackward: true,
+            hasCandidates: true,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 0,
+                    characters: "A",
+                    charactersIgnoringModifiers: "a",
+                    modifierFlags: [.shift]
+                ),
+                state: state
+            ),
+            .appendLiteral("A")
+        )
+    }
+
+    func testShiftLetterFallsBackToUppercasingIgnoredCharacter() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 0,
+                    characters: nil,
+                    charactersIgnoringModifiers: "a",
+                    modifierFlags: [.shift]
+                ),
+                state: state
+            ),
+            .insertText("A")
+        )
+    }
+
+    func testCommandShiftLetterPassesThrough() {
+        let router = InputControllerEventRouter()
+        let state = InputControllerState(
+            isComposing: false,
+            canDeleteBackward: false,
+            hasCandidates: false,
+            compactColumnCount: 5
+        )
+
+        XCTAssertEqual(
+            router.route(
+                event: InputControllerEvent(
+                    type: .keyDown,
+                    keyCode: 0,
+                    characters: "A",
+                    charactersIgnoringModifiers: "a",
+                    modifierFlags: [.command, .shift]
+                ),
+                state: state
+            ),
+            .passThrough
+        )
+    }
+
     func testNonAsciiLettersDoNotEnterPinyinComposition() {
         let router = InputControllerEventRouter()
         let state = InputControllerState(

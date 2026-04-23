@@ -37,6 +37,12 @@ public final class InputControllerEventRouter: @unchecked Sendable {
             return .passThrough
         }
 
+        if let uppercaseLatinText = shiftedUppercaseLatinText(from: event) {
+            return state.isComposing
+                ? .appendLiteral(uppercaseLatinText)
+                : .insertText(uppercaseLatinText)
+        }
+
         if let candidateAction = candidateChordSelection(for: event, state: state) {
             return candidateAction
         }

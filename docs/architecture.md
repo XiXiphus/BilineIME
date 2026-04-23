@@ -169,6 +169,15 @@ candidate columns only when the raw cursor is at the end of the composition;
 otherwise they move the raw cursor by character and are consumed by the IME.
 Modified arrows/backspace must not leak to the host while composing.
 
+Uppercase Latin follows Apple Chinese input behavior. When the session is idle,
+`Shift+ASCII letter` inserts the uppercase Latin character directly. While the
+session is composing, the uppercase Latin characters remain in marked
+composition as a literal suffix; the Chinese engine query uses the pinyin prefix
+only, and candidates that consume the whole prefix display and commit with that
+uppercase suffix. Prefix candidates do not absorb the suffix; committing a
+prefix candidate leaves the proven pinyin tail plus the uppercase suffix as the
+next composition.
+
 ### Browsing and commit
 
 Browsing changes only selection and presentation state. It must never let
@@ -259,6 +268,7 @@ targets.
 - keep Chinese IME behavior as the source of truth
 - keep simplified and traditional Rime schemas stable
 - keep raw pinyin cursor editing host-safe
+- keep uppercase Latin composition aligned with Apple Chinese input behavior
 - keep broker-backed configuration and credential coordination reliable
 - expand host smoke beyond the current baseline into harder punctuation, editing,
   mixed-input, and layer-persistence scenarios
@@ -275,6 +285,8 @@ Primary platform references:
   <https://developer.apple.com/documentation/inputmethodkit/imkinputcontroller>
 - Apple `NSTextInputClient`:
   <https://developer.apple.com/documentation/appkit/nstextinputclient>
+- Apple Chinese input method Latin character behavior:
+  <https://support.apple.com/en-lk/guide/chinese-input-method/cim11841/mac>
 
 Project and ecosystem references:
 

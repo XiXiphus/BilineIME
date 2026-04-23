@@ -5,6 +5,12 @@
 - Keep the Chinese IME core as the primary system. Treat bilingual preview and English-layer commit as an add-on, never the source of truth for base IME behavior.
 - Treat raw pinyin cursor editing as composition state, not host text editing. Candidate mode renders candidates only; raw pinyin/caret belongs in host marked text. Raw-buffer-only is the only panel fallback that may show raw input.
 - Keep modified cursor/editing keys inside the IME while composing: `Option/Command+Left/Right`, `Option/Command+Backspace`, and their Shift variants must not leak to the host.
+- Match Apple Chinese input behavior for uppercase Latin letters: while idle,
+  `Shift+ASCII letter` inserts the uppercase Latin character directly; while
+  composing, it stays in marked composition as a literal uppercase Latin suffix
+  and participates in candidate display/commit. Do not treat Shift as a mode
+  switch, and do not auto-commit the Chinese candidate before inserting the
+  uppercase Latin letter.
 - Prefer the smallest correct change. Preserve the current state-machine structure unless a broader refactor is required to remove repeated special cases.
 
 ## Verification for IME changes

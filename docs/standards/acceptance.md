@@ -25,6 +25,15 @@
 - When the host does not provide a fresh valid caret rect, the candidate panel may reuse the current session's last valid rect, but never falls back to mouse position.
 - `Shift+Tab` switches the active layer for the current highlighted candidate cell without changing the selected row or column.
 - After switching into the English or Chinese layer with `Shift+Tab`, continued typing and candidate browsing keep that active layer until commit, cancel, or session end.
+- `Shift+ASCII letter` follows Apple Chinese input behavior. When Biline is
+  idle, it inserts the uppercase Latin character directly. When Biline is
+  composing, it stays inside marked composition as a literal uppercase Latin
+  suffix, participates in candidate display/commit, and must not auto-commit
+  the current Chinese candidate before insertion.
+- Whole-prefix candidates append the uppercase Latin suffix to their displayed
+  and committed text. Prefix candidates do not consume that suffix; committing a
+  prefix candidate leaves the remaining pinyin tail plus the uppercase suffix as
+  the next composition.
 - `=` or `]` expand from compact mode and jump to the next candidate row; in expanded mode they continue browsing downward by row, but in raw-buffer-only composition they append literal input.
 - `-` or `[` browse upward by row; when already on the first expanded row, they collapse to compact mode and reset the selection to the first item; before any expansion, they may enter raw-buffer-only composition.
 - `+` is treated as an ordinary input character and has no IME-specific behavior.

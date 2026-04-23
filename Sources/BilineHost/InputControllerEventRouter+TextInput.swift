@@ -21,6 +21,36 @@ extension InputControllerEventRouter {
         return result
     }
 
+    func shiftedUppercaseLatinText(from event: InputControllerEvent) -> String? {
+        guard event.modifierFlags.contains(.shift),
+            !event.modifierFlags.contains(.command),
+            !event.modifierFlags.contains(.option)
+        else {
+            return nil
+        }
+
+        let candidates = [event.characters, event.charactersIgnoringModifiers].compactMap { $0 }
+        for candidate in candidates where candidate.count == 1 {
+            guard candidate.unicodeScalars.count == 1,
+                let scalar = candidate.unicodeScalars.first,
+                scalar.isASCII
+            else {
+                continue
+            }
+            switch scalar.value {
+            case 65...90:
+                return candidate
+            case 97...122:
+                let uppercaseScalar = UnicodeScalar(scalar.value - 32)!
+                return String(uppercaseScalar)
+            default:
+                continue
+            }
+        }
+
+        return nil
+    }
+
     func candidateColumnIndex(
         from event: InputControllerEvent,
         columnCount: Int

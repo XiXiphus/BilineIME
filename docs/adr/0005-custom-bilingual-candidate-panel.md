@@ -26,6 +26,13 @@ pinyin and its insertion caret belong to host marked text. The panel renders
 the candidate matrix only. Raw-buffer-only composition is the exception where
 the panel may render the raw buffer because there is no candidate matrix.
 
+Uppercase Latin follows Apple Chinese input behavior and remains part of marked
+composition while composing. `Shift+ASCII letter` inserts uppercase Latin
+directly only when the IME is idle. During composition, uppercase Latin is a
+literal suffix on the raw input: whole-prefix candidates display and commit with
+that suffix, while prefix candidates leave the suffix with the remaining tail
+instead of forcing an early Chinese commit.
+
 Raw cursor editing follows macOS-style text editing while staying inside the IME
 composition:
 

@@ -95,6 +95,12 @@ CI-safe tests should cover router/session/anchor ordering for the same critical 
   - `Shift+Tab`
   - continue typing after layer switch
   - continue browsing after layer switch
+- uppercase Latin composition:
+  - idle `Shift+A` inserts `A` without opening composition
+  - composing `shi` + `Shift+A` keeps `shiA` in marked text and offers
+    candidate `是A`
+  - prefix commit with uppercase suffix keeps the tail, e.g.
+    `haopingguoA`, select `好`, leaves `pingguoA`
 - bilingual candidate-aligned commit:
   - `haopingguo` defaults to phrase candidate `好苹果`
   - confirming the phrase in English commits `good apple`
@@ -135,6 +141,7 @@ verification:
   - continue browsing after layer switch
 - mixed Chinese / Latin:
   - inline Latin input such as `ipad`
+  - uppercase Latin suffixes such as `shiA` and `haopingguoA`
 
 ## Dependency policy
 

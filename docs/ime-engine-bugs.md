@@ -33,7 +33,8 @@
   - raw pinyin cursor behavior (`Option+Left/Right`, `Command+Left/Right`,
     plain `Left/Right` at the end vs. middle of composition)
   - active-layer persistence (`Shift+Tab`, continued typing, continued browsing)
-  - ambiguous / mixed-input cases (`xi'an`, `lv`, `pingguogs`, inline Latin)
+  - ambiguous / mixed-input cases (`xi'an`, `lv`, `pingguogs`, inline Latin,
+    uppercase Latin suffixes such as `shiA` and `haopingguoA`)
 
 ## 3. Raw-cursor host behavior is unit-covered but host-smoke-light
 

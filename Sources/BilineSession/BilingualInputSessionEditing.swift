@@ -162,7 +162,15 @@ extension BilingualInputSession {
         }
         clampRawCursorIndex()
 
+        if !hasValidQueryInput, let literalTail = trailingUppercaseLatinTail() {
+            literalLatinSuffix = literalTail.suffix
+            presentationMode = .compact
+            updateEngineSnapshot(engineSession.updateInput(literalTail.queryInput))
+            return
+        }
+
         guard hasValidQueryInput else {
+            literalLatinSuffix = ""
             clearPreviews()
             compositionMode = .rawBufferOnly
             presentationMode = .compact
@@ -181,6 +189,7 @@ extension BilingualInputSession {
             return
         }
 
+        literalLatinSuffix = ""
         presentationMode = .compact
         updateEngineSnapshot(engineSession.updateInput(rawInput))
     }
@@ -188,6 +197,7 @@ extension BilingualInputSession {
     func resetCompositionState() {
         rawInput = ""
         rawCursorIndex = 0
+        literalLatinSuffix = ""
         engineSnapshot = engineSession.reset()
         activeLayer = .chinese
         compositionMode = .candidateCompact
@@ -213,5 +223,33 @@ extension BilingualInputSession {
         hasExplicitCandidateSelection = false
         hasEverExpandedInCurrentComposition = false
         presentationMode = .compact
+    }
+
+    func trailingUppercaseLatinTail() -> (queryInput: String, suffix: String)? {
+        guard !rawInput.isEmpty else { return nil }
+
+        var suffixStart = rawInput.endIndex
+        while suffixStart > rawInput.startIndex {
+            let previousIndex = rawInput.index(before: suffixStart)
+            let character = rawInput[previousIndex]
+            guard character.unicodeScalars.count == 1,
+                let scalar = character.unicodeScalars.first,
+                (65...90).contains(scalar.value)
+            else {
+                break
+            }
+            suffixStart = previousIndex
+        }
+
+        let suffix = String(rawInput[suffixStart...])
+        let queryInput = String(rawInput[..<suffixStart])
+        guard !suffix.isEmpty,
+            !queryInput.isEmpty,
+            queryInput == normalize(queryInput)
+        else {
+            return nil
+        }
+
+        return (queryInput, suffix)
     }
 }

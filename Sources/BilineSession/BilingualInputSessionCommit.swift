@@ -112,6 +112,18 @@ extension BilingualInputSession {
             return committedText
         }
 
+        if !literalLatinSuffix.isEmpty, !fallbackTailInput.isEmpty {
+            rawInput = fallbackTailInput
+            rawCursorIndex = rawInput.count
+            activeLayer = layer
+            hasEverExpandedInCurrentComposition = false
+            hasExplicitCandidateSelection = false
+            presentationMode = .compact
+            clearPreviews()
+            refreshCompositionState()
+            return committedText
+        }
+
         if engineCommit.snapshot.isComposing {
             rawInput = engineCommit.snapshot.rawInput
             rawCursorIndex = rawInput.count
@@ -148,7 +160,15 @@ extension BilingualInputSession {
         guard let item = currentItem else { return "" }
         switch layer {
         case .chinese:
-            return engineCommittedText.isEmpty ? item.candidate.surface : engineCommittedText
+            let committedText =
+                engineCommittedText.isEmpty ? item.candidate.surface : engineCommittedText
+            guard !literalLatinSuffix.isEmpty,
+                item.candidate.surface.hasSuffix(literalLatinSuffix),
+                !committedText.hasSuffix(literalLatinSuffix)
+            else {
+                return committedText
+            }
+            return committedText + literalLatinSuffix
         case .english:
             return englishSelection ?? ""
         }

@@ -2,6 +2,7 @@ import BilineCore
 import BilineHost
 import BilineIPC
 import BilineMocks
+import BilinePanelUI
 import BilinePreview
 import BilineRime
 import BilineSession

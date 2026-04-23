@@ -10,6 +10,11 @@ struct AppearanceSettingsView: View {
 
     var body: some View {
         SettingsPage(title: "外观") {
+            CandidatePanelPreview(
+                themeMode: model.panelThemeMode,
+                fontScale: model.panelFontScale
+            )
+
             SettingsCard {
                 SettingsRow(
                     title: "主题模式",

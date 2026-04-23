@@ -59,8 +59,13 @@ public enum BilineAppIdentifier {
     public static let devInputMethodBundle = "io.github.xixiphus.inputmethod.BilineIME.dev"
     public static let devInputSource = "io.github.xixiphus.inputmethod.BilineIME.dev.pinyin"
     public static let devSettingsBundle = "io.github.xixiphus.inputmethod.BilineIME.settings.dev"
+    public static let devSettingsURLScheme = "bilineime-settings-dev"
     public static let releaseInputMethodBundle = "io.github.xixiphus.inputmethod.BilineIME"
     public static let releaseInputSource = "io.github.xixiphus.inputmethod.BilineIME.pinyin"
+
+    public static var devSettingsOpenURL: URL {
+        URL(string: "\(devSettingsURLScheme)://open")!
+    }
 }
 
 public enum BilineSharedIdentifier {

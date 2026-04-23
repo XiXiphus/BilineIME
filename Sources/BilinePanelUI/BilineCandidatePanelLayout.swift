@@ -1,7 +1,15 @@
+import BilineSession
 import Cocoa
 
-struct CandidatePanelLayout {
-    func positionedFrame(size: NSSize, anchorRect: NSRect) -> NSRect {
+enum CandidatePanelLayer {
+    case chinese
+    case english
+}
+
+public struct CandidatePanelLayout {
+    public init() {}
+
+    public func positionedFrame(size: NSSize, anchorRect: NSRect) -> NSRect {
         let spacing: CGFloat = 4
         var origin = NSPoint(x: anchorRect.minX, y: anchorRect.minY - size.height - spacing)
 
@@ -19,82 +27,86 @@ struct CandidatePanelLayout {
 }
 
 extension BilineCandidatePanelView {
-    var preferredSize: NSSize {
+    public var preferredSize: NSSize {
         guard !snapshot.rawInput.isEmpty else {
             return NSSize(width: 360, height: 0)
         }
 
         if snapshot.items.isEmpty {
             let width = contentInsets.left + rawBufferRowPreferredWidth + contentInsets.right
-            let height = contentInsets.top + chineseRowHeight + contentInsets.bottom
+            let height = contentInsets.top + rawBufferRowHeight + contentInsets.bottom
             return NSSize(width: ceil(width), height: ceil(height))
         }
 
         let widths = columnWidths()
         let rowCount = max(1, snapshot.visibleRowCount)
-        let widestRowWidth = blockContentWidth(rowCount: rowCount, columnWidths: widths)
+        let widestRowWidth = stripContentWidth(rowCount: rowCount, columnWidths: widths)
         let width =
             contentInsets.left
             + widestRowWidth
             + contentInsets.right
         let height =
             contentInsets.top
-            + blockHeight(rowHeight: chineseRowHeight, rowCount: rowCount)
+            + stripHeight(rowCount: rowCount)
             + (snapshot.showsEnglishCandidates
-                ? blockSpacing + blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
+                ? blockSpacing + stripHeight(rowCount: rowCount)
                 : 0)
             + contentInsets.bottom
 
         return NSSize(width: ceil(width), height: ceil(height))
     }
 
-    var chineseRowHeight: CGFloat {
-        ceil(chineseFont.ascender - chineseFont.descender) + rowInsets.top + rowInsets.bottom
+    var candidateRowHeight: CGFloat {
+        let chineseHeight = chineseFont.ascender - chineseFont.descender
+        let englishHeight = englishFont.ascender - englishFont.descender
+        return ceil(max(chineseHeight, englishHeight)) + rowInsets.top + rowInsets.bottom
     }
 
-    var englishRowHeight: CGFloat {
-        ceil(englishFont.ascender - englishFont.descender) + rowInsets.top + rowInsets.bottom
+    var rawBufferRowHeight: CGFloat {
+        let rawHeight = rawBufferFont.ascender - rawBufferFont.descender
+        return max(candidateRowHeight, ceil(rawHeight) + rowInsets.top + rowInsets.bottom)
     }
 
     var rawBufferRowPreferredWidth: CGFloat {
         let textWidth = rawBufferLineSize(active: true).width
-        return rowInsets.left + textWidth + segmentPadding.left + segmentPadding.right + 4
+        return rowInsets.left + textWidth + tokenPadding.left + tokenPadding.right
+            + segmentBreathingRoom
             + rowInsets.right
     }
 
-    func blockHeight(rowHeight: CGFloat, rowCount: Int) -> CGFloat {
+    func stripHeight(rowCount: Int) -> CGFloat {
         guard rowCount > 0 else { return 0 }
-        return CGFloat(rowCount) * rowHeight + CGFloat(max(0, rowCount - 1)) * rowSpacing
+        return CGFloat(rowCount) * candidateRowHeight + CGFloat(max(0, rowCount - 1)) * rowSpacing
     }
 
-    func blockContentWidth(rowCount: Int, columnWidths: [CGFloat]) -> CGFloat {
+    func stripContentWidth(rowCount: Int, columnWidths: [CGFloat]) -> CGFloat {
         (0..<rowCount)
             .map { row in totalWidth(forRow: row, columnWidths: columnWidths) }
             .max() ?? 0
     }
 
-    func blockRects(columnWidths: [CGFloat]) -> (chinese: NSRect, english: NSRect?)? {
+    func stripRects(columnWidths: [CGFloat]) -> (chinese: NSRect, english: NSRect?)? {
         let rowCount = snapshot.visibleRowCount
         guard rowCount > 0 else { return nil }
 
-        let containerWidth = blockContentWidth(rowCount: rowCount, columnWidths: columnWidths)
-        let chineseBlockRect = NSRect(
+        let containerWidth = stripContentWidth(rowCount: rowCount, columnWidths: columnWidths)
+        let chineseStripRect = NSRect(
             x: contentInsets.left,
             y: contentInsets.top,
             width: containerWidth,
-            height: blockHeight(rowHeight: chineseRowHeight, rowCount: rowCount)
+            height: stripHeight(rowCount: rowCount)
         )
-        let englishBlockRect: NSRect? =
+        let englishStripRect: NSRect? =
             snapshot.showsEnglishCandidates
             ? NSRect(
                 x: contentInsets.left,
-                y: chineseBlockRect.maxY + blockSpacing,
+                y: chineseStripRect.maxY + blockSpacing,
                 width: containerWidth,
-                height: blockHeight(rowHeight: englishRowHeight, rowCount: rowCount)
+                height: stripHeight(rowCount: rowCount)
             )
             : nil
 
-        return (chineseBlockRect, englishBlockRect)
+        return (chineseStripRect, englishStripRect)
     }
 
     func columnWidths() -> [CGFloat] {
@@ -109,17 +121,16 @@ extension BilineCandidatePanelView {
         for column in 0..<maxVisibleColumns {
             for row in 0..<snapshot.visibleRowCount {
                 guard let item = snapshot.item(row: row, column: column) else { continue }
-                let chineseWidth = candidateLineSize(column: column, item: item).width
-                let englishWidth = snapshot.showsEnglishCandidates
-                    ? englishLineSize(column: column, item: item).width
+                let chineseWidth = candidateTokenWidth(
+                    layer: .chinese,
+                    column: column,
+                    item: item
+                )
+                let englishWidth =
+                    snapshot.showsEnglishCandidates
+                    ? candidateTokenWidth(layer: .english, column: column, item: item)
                     : 0
-                let contentWidth = ceil(max(chineseWidth, englishWidth))
-                let fittedWidth =
-                    contentWidth
-                    + segmentPadding.left
-                    + segmentPadding.right
-                    + segmentBreathingRoom
-                widths[column] = max(widths[column], fittedWidth)
+                widths[column] = max(widths[column], ceil(max(chineseWidth, englishWidth)))
             }
 
             widths[column] = max(widths[column], minimumColumnWidth)
@@ -128,40 +139,59 @@ extension BilineCandidatePanelView {
         return widths
     }
 
-    func rowRect(in blockRect: NSRect, row: Int, rowHeight: CGFloat) -> NSRect {
+    func candidateTokenWidth(
+        layer: CandidatePanelLayer,
+        column: Int,
+        item: BilingualCandidateItem
+    ) -> CGFloat {
+        let lineWidth: CGFloat
+        switch layer {
+        case .chinese:
+            lineWidth = candidateLineSize(column: column, item: item).width
+        case .english:
+            lineWidth = englishLineSize(column: column, item: item).width
+        }
+        return ceil(lineWidth) + tokenPadding.left + tokenPadding.right + segmentBreathingRoom
+    }
+
+    func rowRect(in stripRect: NSRect, row: Int) -> NSRect {
         NSRect(
-            x: blockRect.minX,
-            y: blockRect.minY + CGFloat(row) * (rowHeight + rowSpacing),
-            width: blockRect.width,
-            height: rowHeight
+            x: stripRect.minX,
+            y: stripRect.minY + CGFloat(row) * (candidateRowHeight + rowSpacing),
+            width: stripRect.width,
+            height: candidateRowHeight
         )
     }
 
-    func segmentDrawingRect(
+    func candidateTokenRect(
+        layer: CandidatePanelLayer,
         row: Int,
         column: Int,
-        in blockRect: NSRect,
-        rowHeight: CGFloat,
+        in stripRect: NSRect,
         columnWidths: [CGFloat]
     ) -> NSRect? {
-        let rowColumnCount = snapshot.items(inRow: row).count
-        guard column >= 0, column < rowColumnCount, column < columnWidths.count else {
+        guard
+            column >= 0,
+            column < columnWidths.count,
+            let item = snapshot.item(row: row, column: column)
+        else {
             return nil
         }
 
-        let rowRect = rowRect(in: blockRect, row: row, rowHeight: rowHeight)
+        let rowRect = rowRect(in: stripRect, row: row)
         let originX =
             rowRect.minX
             + rowInsets.left
             + columnWidths.prefix(column).reduce(0, +)
             + CGFloat(column) * columnSpacing
-        let width = columnWidths[column]
+        let width = min(columnWidths[column], candidateTokenWidth(layer: layer, column: column, item: item))
+        let height = max(1, rowRect.height - selectedTokenInset * 2)
 
         return NSRect(
             x: originX,
-            y: rowRect.minY + rowInsets.top / 2,
+            y: rowRect.midY - height / 2,
             width: width,
-            height: rowRect.height - rowInsets.top
+            height: height
         )
     }
 

@@ -1,14 +1,16 @@
 import Cocoa
 import CoreText
 
-struct SystemFallbackFontResolver {
-    struct Run: Equatable {
-        let range: NSRange
-        let font: NSFont
-        let usesFallback: Bool
+public struct SystemFallbackFontResolver {
+    public struct Run: Equatable {
+        public let range: NSRange
+        public let font: NSFont
+        public let usesFallback: Bool
     }
 
-    func runs(for text: String, baseFont: NSFont) -> [Run] {
+    public init() {}
+
+    public func runs(for text: String, baseFont: NSFont) -> [Run] {
         var runs: [Run] = []
         var utf16Offset = 0
 
@@ -29,7 +31,7 @@ struct SystemFallbackFontResolver {
         return coalesced(runs)
     }
 
-    func diagnostics(for text: String, baseFont: NSFont) -> String {
+    public func diagnostics(for text: String, baseFont: NSFont) -> String {
         text.map { character in
             let characterText = String(character)
             let scalars = characterText.unicodeScalars
@@ -61,7 +63,8 @@ struct SystemFallbackFontResolver {
                 continue
             }
             result[result.count - 1] = Run(
-                range: NSRange(location: last.range.location, length: last.range.length + run.range.length),
+                range: NSRange(
+                    location: last.range.location, length: last.range.length + run.range.length),
                 font: last.font,
                 usesFallback: last.usesFallback
             )

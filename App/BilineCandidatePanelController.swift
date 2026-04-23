@@ -1,3 +1,4 @@
+import BilinePanelUI
 import BilineSession
 import Cocoa
 
@@ -8,6 +9,7 @@ final class BilineCandidatePanelController: @unchecked Sendable {
     private let layout = CandidatePanelLayout()
     private var isVisible = false
     private var lastFrame = NSRect.zero
+    private var lastSnapshot: BilingualCompositionSnapshot?
     private var lastWindowLevelRawValue: Int?
 
     init() {
@@ -52,6 +54,7 @@ final class BilineCandidatePanelController: @unchecked Sendable {
                 ]
             )
         #endif
+        let previousSnapshot = lastSnapshot
         if contentView.snapshot != snapshot {
             contentView.snapshot = snapshot
         }
@@ -62,9 +65,18 @@ final class BilineCandidatePanelController: @unchecked Sendable {
             lastWindowLevelRawValue = windowLevel.rawValue
         }
         if panelFrame != lastFrame {
-            panel.setFrame(panelFrame, display: true)
+            setPanelFrame(
+                panelFrame,
+                animated: shouldAnimateFrameTransition(
+                    from: lastFrame,
+                    to: panelFrame,
+                    previousSnapshot: previousSnapshot,
+                    currentSnapshot: snapshot
+                )
+            )
             lastFrame = panelFrame
         }
+        lastSnapshot = snapshot
         if !isVisible {
             panel.orderFrontRegardless()
             isVisible = true
@@ -103,6 +115,7 @@ final class BilineCandidatePanelController: @unchecked Sendable {
         panel.orderOut(nil)
         isVisible = false
         lastFrame = .zero
+        lastSnapshot = nil
         lastWindowLevelRawValue = nil
         #if DEBUG
             BilineHostSmokeReporter.shared.record(
@@ -112,6 +125,35 @@ final class BilineCandidatePanelController: @unchecked Sendable {
                 ]
             )
         #endif
+    }
+
+    private func setPanelFrame(_ frame: NSRect, animated: Bool) {
+        guard animated else {
+            panel.setFrame(frame, display: true)
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.12
+            context.allowsImplicitAnimation = true
+            panel.animator().setFrame(frame, display: true)
+        }
+    }
+
+    private func shouldAnimateFrameTransition(
+        from oldFrame: NSRect,
+        to newFrame: NSRect,
+        previousSnapshot: BilingualCompositionSnapshot?,
+        currentSnapshot: BilingualCompositionSnapshot
+    ) -> Bool {
+        guard isVisible, let previousSnapshot else { return false }
+        guard previousSnapshot.rawInput == currentSnapshot.rawInput else { return false }
+        guard !previousSnapshot.items.isEmpty, !currentSnapshot.items.isEmpty else { return false }
+        guard previousSnapshot.presentationMode != currentSnapshot.presentationMode else {
+            return false
+        }
+
+        return abs(oldFrame.height - newFrame.height) > 0.5
     }
 
     /// Applies a new theme to the contained view. Layout-affecting changes

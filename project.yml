@@ -41,6 +41,8 @@ targetTemplates:
       - package: BilineModules
         product: BilineSession
       - package: BilineModules
+        product: BilinePanelUI
+      - package: BilineModules
         product: BilineMocks
     info:
       path: App/Support/Info.plist
@@ -81,11 +83,17 @@ targetTemplates:
         product: BilineSettings
       - package: BilineModules
         product: BilineOperations
+      - package: BilineModules
+        product: BilinePanelUI
     info:
       path: Companion/Support/Info.plist
       properties:
         CFBundleDisplayName: "$(SETTINGS_DISPLAY_NAME)"
         CFBundleName: "$(SETTINGS_DISPLAY_NAME)"
+        CFBundleURLTypes:
+          - CFBundleURLName: "$(PRODUCT_BUNDLE_IDENTIFIER)"
+            CFBundleURLSchemes:
+              - "$(SETTINGS_URL_SCHEME)"
         LSMinimumSystemVersion: "14.0"
     settings:
       base:
@@ -182,6 +190,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.xixiphus.inputmethod.BilineIME.settings.dev
         PRODUCT_NAME: BilineSettingsDev
         SETTINGS_DISPLAY_NAME: Biline Settings Dev
+        SETTINGS_URL_SCHEME: bilineime-settings-dev
 
   BilineBrokerDev:
     templates:

@@ -15,6 +15,7 @@ let package = Package(
         .library(name: "BilineOperations", targets: ["BilineOperations"]),
         .library(name: "BilineIPC", targets: ["BilineIPC"]),
         .library(name: "BilineSession", targets: ["BilineSession"]),
+        .library(name: "BilinePanelUI", targets: ["BilinePanelUI"]),
         .library(name: "BilineMocks", targets: ["BilineMocks"]),
         .library(name: "BilineTestSupport", targets: ["BilineTestSupport"]),
         .executable(name: "bilinectl", targets: ["bilinectl"]),
@@ -63,6 +64,10 @@ let package = Package(
             name: "BilineIPC",
             dependencies: ["BilineSettings", "BilineOperations"]
         ),
+        .target(
+            name: "BilinePanelUI",
+            dependencies: ["BilineSession", "BilineSettings"]
+        ),
         .executableTarget(
             name: "bilinectl",
             dependencies: ["BilineOperations", "BilineSettings", "BilineIPC"]
@@ -97,6 +102,10 @@ let package = Package(
         .testTarget(
             name: "BilineSessionTests",
             dependencies: ["BilineSession", "BilineMocks", "BilineTestSupport"]
+        ),
+        .testTarget(
+            name: "BilinePanelUITests",
+            dependencies: ["BilinePanelUI", "BilineCore", "BilineSession"]
         ),
         .testTarget(
             name: "BilineSettingsTests",

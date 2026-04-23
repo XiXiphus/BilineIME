@@ -1,8 +1,8 @@
 import BilineSession
 import Cocoa
 
-final class BilineCandidatePanelView: NSView {
-    var snapshot: BilingualCompositionSnapshot = .idle {
+public final class BilineCandidatePanelView: NSView {
+    public var snapshot: BilingualCompositionSnapshot = .idle {
         didSet {
             if shouldInvalidateLineSizeCache(oldValue: oldValue, newValue: snapshot) {
                 lineSizeCache.removeAll()
@@ -11,21 +11,23 @@ final class BilineCandidatePanelView: NSView {
         }
     }
 
-    private(set) var theme: PanelTheme = PanelTheme()
+    public private(set) var theme: PanelTheme = PanelTheme()
 
-    override var isFlipped: Bool { true }
+    public override var isFlipped: Bool { true }
 
-    let contentInsets = NSEdgeInsets(top: 6, left: 6, bottom: 6, right: 6)
-    let blockSpacing: CGFloat = 8
-    let rowSpacing: CGFloat = 4
-    let columnSpacing: CGFloat = 6
-    let rowInsets = NSEdgeInsets(top: 8, left: 8, bottom: 8, right: 8)
-    let segmentPadding = NSEdgeInsets(top: 5, left: 6, bottom: 5, right: 6)
-    let minimumColumnWidth: CGFloat = 28
+    let contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 4)
+    let blockSpacing: CGFloat = 7
+    let rowSpacing: CGFloat = 1
+    let columnSpacing: CGFloat = 18
+    let rowInsets = NSEdgeInsets(top: 2, left: 0, bottom: 2, right: 8)
+    let tokenPadding = NSEdgeInsets(top: 2, left: 7, bottom: 3, right: 9)
+    let selectedTokenInset: CGFloat = 0
+    let minimumColumnWidth: CGFloat = 34
     let segmentBreathingRoom: CGFloat = 2
-    private let baseChineseFontSize: CGFloat = 16
-    private let baseEnglishFontSize: CGFloat = 13
-    private let baseRawBufferFontSize: CGFloat = 13
+    private let baseChineseFontSize: CGFloat = 22
+    private let baseEnglishFontSize: CGFloat = 18
+    private let baseCandidateNumberFontSize: CGFloat = 12
+    private let baseRawBufferFontSize: CGFloat = 17
     var chineseFont: NSFont {
         NSFont.systemFont(ofSize: baseChineseFontSize * theme.clampedFontScale, weight: .semibold)
     }
@@ -38,10 +40,24 @@ final class BilineCandidatePanelView: NSView {
             weight: .regular
         )
     }
+    var candidateNumberFont: NSFont {
+        NSFont.systemFont(
+            ofSize: baseCandidateNumberFontSize * theme.clampedFontScale,
+            weight: .medium
+        )
+    }
     let fallbackFontResolver = SystemFallbackFontResolver()
     private var lineSizeCache: [CandidatePanelLineSizeKey: NSSize] = [:]
 
-    func applyTheme(_ theme: PanelTheme) {
+    public override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+    }
+
+    public required init?(coder: NSCoder) {
+        super.init(coder: coder)
+    }
+
+    public func applyTheme(_ theme: PanelTheme) {
         guard self.theme != theme else { return }
         let fontScaleChanged = self.theme.clampedFontScale != theme.clampedFontScale
         self.theme = theme
@@ -56,7 +72,7 @@ final class BilineCandidatePanelView: NSView {
         needsDisplay = true
     }
 
-    override func draw(_ dirtyRect: NSRect) {
+    public override func draw(_ dirtyRect: NSRect) {
         drawSnapshot()
     }
 
@@ -87,7 +103,7 @@ final class BilineCandidatePanelView: NSView {
             item: item,
             previewKey: ""
         ) {
-            candidateLine(column: column, item: item, active: false).size()
+            candidateLine(column: column, item: item, selected: false, active: false).size()
         }
     }
 
@@ -98,7 +114,7 @@ final class BilineCandidatePanelView: NSView {
             item: item,
             previewKey: item.previewState.cacheKey
         ) {
-            englishLine(column: column, item: item, active: false).size()
+            englishLine(column: column, item: item, selected: false, active: false).size()
         }
     }
 

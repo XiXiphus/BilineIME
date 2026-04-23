@@ -10,107 +10,106 @@ extension BilineCandidatePanelView {
                 x: contentInsets.left,
                 y: contentInsets.top,
                 width: rawBufferRowPreferredWidth,
-                height: chineseRowHeight
+                height: rawBufferRowHeight
             )
-            drawRowContainer(in: rawRect)
             drawRawBufferRow(in: rawRect)
             return
         }
 
         let widths = columnWidths()
-        guard let (chineseBlockRect, englishBlockRect) = blockRects(columnWidths: widths) else { return }
-        let rowCount = snapshot.visibleRowCount
-
-        drawRowContainer(in: chineseBlockRect)
-        if let englishBlockRect {
-            drawRowContainer(in: englishBlockRect)
+        guard let (chineseStripRect, englishStripRect) = stripRects(columnWidths: widths) else {
+            return
         }
 
-        for row in 0..<rowCount {
-            drawChineseRow(row: row, in: chineseBlockRect, columnWidths: widths)
-            if let englishBlockRect {
-                drawEnglishRow(row: row, in: englishBlockRect, columnWidths: widths)
-            }
+        drawCandidateStrip(layer: .chinese, in: chineseStripRect, columnWidths: widths)
+        if let englishStripRect {
+            drawCandidateStrip(layer: .english, in: englishStripRect, columnWidths: widths)
         }
     }
 
-    func drawChineseRow(row: Int, in blockRect: NSRect, columnWidths: [CGFloat]) {
+    func drawCandidateStrip(
+        layer: CandidatePanelLayer,
+        in stripRect: NSRect,
+        columnWidths: [CGFloat]
+    ) {
+        drawStripContainer(in: stripRect)
+        for row in 0..<snapshot.visibleRowCount {
+            drawCandidateRow(layer: layer, row: row, in: stripRect, columnWidths: columnWidths)
+        }
+    }
+
+    func drawCandidateRow(
+        layer: CandidatePanelLayer,
+        row: Int,
+        in stripRect: NSRect,
+        columnWidths: [CGFloat]
+    ) {
         let rowColumnCount = snapshot.items(inRow: row).count
         for column in 0..<rowColumnCount {
             if let item = snapshot.item(row: row, column: column) {
                 let isSelected = row == snapshot.selectedRow && column == snapshot.selectedColumn
-                let isChineseActive = isSelected && snapshot.activeLayer == .chinese
-                guard let segmentDrawingRect = segmentDrawingRect(
-                    row: row,
-                    column: column,
-                    in: blockRect,
-                    rowHeight: chineseRowHeight,
-                    columnWidths: columnWidths
-                ) else {
+                let isActive = isSelected && activeLayer(for: layer) == snapshot.activeLayer
+                guard
+                    let tokenRect = candidateTokenRect(
+                        layer: layer,
+                        row: row,
+                        column: column,
+                        in: stripRect,
+                        columnWidths: columnWidths
+                    )
+                else {
                     continue
                 }
 
                 drawSelectionPill(
-                    in: segmentDrawingRect,
+                    in: tokenRect,
                     selected: isSelected,
-                    active: isChineseActive
+                    active: isActive
                 )
 
-                candidateLine(column: column, item: item, active: isChineseActive).draw(
-                    in: inset(rect: segmentDrawingRect, insets: segmentPadding)
+                drawLine(
+                    candidateLine(
+                        layer: layer,
+                        column: column,
+                        item: item,
+                        selected: isSelected,
+                        active: isActive
+                    ),
+                    in: inset(rect: tokenRect, insets: tokenPadding)
                 )
             }
         }
     }
 
-    func drawEnglishRow(row: Int, in blockRect: NSRect, columnWidths: [CGFloat]) {
-        let rowColumnCount = snapshot.items(inRow: row).count
-        for column in 0..<rowColumnCount {
-            if let item = snapshot.item(row: row, column: column) {
-                let isSelected = row == snapshot.selectedRow && column == snapshot.selectedColumn
-                let isEnglishActive = isSelected && snapshot.activeLayer == .english
-                guard let segmentDrawingRect = segmentDrawingRect(
-                    row: row,
-                    column: column,
-                    in: blockRect,
-                    rowHeight: englishRowHeight,
-                    columnWidths: columnWidths
-                ) else {
-                    continue
-                }
-
-                drawSelectionPill(
-                    in: segmentDrawingRect,
-                    selected: isSelected,
-                    active: isEnglishActive
-                )
-
-                englishLine(column: column, item: item, active: isEnglishActive).draw(
-                    in: inset(rect: segmentDrawingRect, insets: segmentPadding)
-                )
-            }
+    func activeLayer(for layer: CandidatePanelLayer) -> ActiveLayer {
+        switch layer {
+        case .chinese:
+            return .chinese
+        case .english:
+            return .english
         }
     }
 
     func drawRawBufferRow(in rect: NSRect) {
-        let pillRect = NSRect(
+        drawStripContainer(in: rect)
+        let lineSize = rawBufferLineSize(active: true)
+        let tokenRect = NSRect(
             x: rect.minX + rowInsets.left,
-            y: rect.minY + rowInsets.top / 2,
-            width: rect.width - rowInsets.left - rowInsets.right,
-            height: rect.height - rowInsets.top
+            y: rect.minY + selectedTokenInset,
+            width: lineSize.width + tokenPadding.left + tokenPadding.right,
+            height: rect.height - selectedTokenInset * 2
         )
 
-        drawSelectionPill(in: pillRect, selected: true, active: true)
-        rawBufferLine(active: true).draw(in: inset(rect: pillRect, insets: segmentPadding))
+        drawSelectionPill(in: tokenRect, selected: true, active: true)
+        drawLine(rawBufferLine(active: true), in: inset(rect: tokenRect, insets: tokenPadding))
     }
 
-    func drawRowContainer(in rect: NSRect) {
-        let path = NSBezierPath(roundedRect: rect, xRadius: 14, yRadius: 14)
-        NSColor.windowBackgroundColor.withAlphaComponent(0.97).setFill()
+    func drawStripContainer(in rect: NSRect) {
+        guard !rect.isEmpty else { return }
+        let radius = roundedRectangleCornerRadius(for: rect)
+        let path = NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius)
+        NSColor.windowBackgroundColor.withAlphaComponent(0.985).setFill()
         path.fill()
-        NSColor.separatorColor.withAlphaComponent(0.55).setStroke()
-        path.lineWidth = 1
-        path.stroke()
     }
 
     func drawSelectionPill(in rect: NSRect, selected: Bool, active: Bool) {
@@ -122,7 +121,8 @@ extension BilineCandidatePanelView {
             width: rect.width - 4,
             height: rect.height - 4
         )
-        let path = NSBezierPath(roundedRect: pillRect, xRadius: 12, yRadius: 12)
+        let radius = roundedRectangleCornerRadius(for: pillRect)
+        let path = NSBezierPath(roundedRect: pillRect, xRadius: radius, yRadius: radius)
         let fillColor: NSColor
         let strokeColor: NSColor
 
@@ -130,8 +130,8 @@ extension BilineCandidatePanelView {
             fillColor = NSColor.controlAccentColor.withAlphaComponent(0.92)
             strokeColor = NSColor.controlAccentColor.withAlphaComponent(0.98)
         } else {
-            fillColor = NSColor.controlAccentColor.withAlphaComponent(0.10)
-            strokeColor = NSColor.controlAccentColor.withAlphaComponent(0.24)
+            fillColor = NSColor.controlAccentColor.withAlphaComponent(0.12)
+            strokeColor = NSColor.controlAccentColor.withAlphaComponent(0.30)
         }
 
         fillColor.setFill()
@@ -141,12 +141,46 @@ extension BilineCandidatePanelView {
         path.stroke()
     }
 
+    func roundedRectangleCornerRadius(for rect: NSRect) -> CGFloat {
+        let shortestSide = max(1, min(rect.width, rect.height))
+        let scaled = shortestSide * 0.36
+        return min(max(scaled, 8), 16)
+    }
+
+    func drawLine(_ line: NSAttributedString, in rect: NSRect) {
+        let size = line.size()
+        let drawingRect = NSRect(
+            x: rect.minX,
+            y: rect.midY - size.height / 2,
+            width: min(size.width, rect.width),
+            height: size.height
+        )
+        line.draw(in: drawingRect)
+    }
+
+    func candidateLine(
+        layer: CandidatePanelLayer,
+        column: Int,
+        item: BilingualCandidateItem,
+        selected: Bool,
+        active: Bool
+    ) -> NSAttributedString {
+        switch layer {
+        case .chinese:
+            return candidateLine(column: column, item: item, selected: selected, active: active)
+        case .english:
+            return englishLine(column: column, item: item, selected: selected, active: active)
+        }
+    }
+
     func candidateLine(
         column: Int,
         item: BilingualCandidateItem,
+        selected: Bool,
         active: Bool
     ) -> NSAttributedString {
         let text = "\(column + 1) \(item.candidate.surface)"
+        let prefixLength = "\(column + 1) ".count
         let attributed = NSMutableAttributedString(
             string: text,
             attributes: [
@@ -154,12 +188,20 @@ extension BilineCandidatePanelView {
                 .foregroundColor: active ? NSColor.white : NSColor.labelColor,
             ]
         )
-        let prefixLength = "\(column + 1) ".count
+        attributed.addAttributes(
+            [
+                .font: candidateNumberFont,
+                .foregroundColor: numberColor(selected: selected, active: active),
+                .baselineOffset: numberBaselineOffset(for: chineseFont),
+            ],
+            range: NSRange(location: 0, length: prefixLength)
+        )
         for run in fallbackFontResolver.runs(for: item.candidate.surface, baseFont: chineseFont) {
             attributed.addAttribute(
                 .font,
                 value: run.font,
-                range: NSRange(location: prefixLength + run.range.location, length: run.range.length)
+                range: NSRange(
+                    location: prefixLength + run.range.location, length: run.range.length)
             )
         }
         return attributed
@@ -168,25 +210,51 @@ extension BilineCandidatePanelView {
     func englishLine(
         column: Int,
         item: BilingualCandidateItem,
+        selected: Bool,
         active: Bool
     ) -> NSAttributedString {
         let color: NSColor
         switch item.previewState {
         case .ready:
-            color = active ? .white : .secondaryLabelColor
+            color = active ? .white : .labelColor
         case .loading:
-            color = active ? NSColor.white.withAlphaComponent(0.92) : .tertiaryLabelColor
+            color = active ? NSColor.white.withAlphaComponent(0.92) : .secondaryLabelColor
         case .failed, .unavailable:
-            color = active ? NSColor.white.withAlphaComponent(0.85) : .quaternaryLabelColor
+            color = active ? NSColor.white.withAlphaComponent(0.85) : .tertiaryLabelColor
         }
 
-        return NSAttributedString(
-            string: "\(column + 1) \(englishPlaceholder(for: item.previewState))",
+        let text = "\(column + 1) \(englishPlaceholder(for: item.previewState))"
+        let prefixLength = "\(column + 1) ".count
+        let attributed = NSMutableAttributedString(
+            string: text,
             attributes: [
                 .font: englishFont,
                 .foregroundColor: color,
             ]
         )
+        attributed.addAttributes(
+            [
+                .font: candidateNumberFont,
+                .foregroundColor: numberColor(selected: selected, active: active),
+                .baselineOffset: numberBaselineOffset(for: englishFont),
+            ],
+            range: NSRange(location: 0, length: prefixLength)
+        )
+        return attributed
+    }
+
+    func numberBaselineOffset(for contentFont: NSFont) -> CGFloat {
+        max(0, (contentFont.capHeight - candidateNumberFont.capHeight) / 2)
+    }
+
+    func numberColor(selected: Bool, active: Bool) -> NSColor {
+        if active {
+            return NSColor.white.withAlphaComponent(0.9)
+        }
+        if selected {
+            return NSColor.controlAccentColor.withAlphaComponent(0.88)
+        }
+        return NSColor.secondaryLabelColor
     }
 
     func englishPlaceholder(for state: BilingualPreviewState) -> String {
@@ -203,7 +271,8 @@ extension BilineCandidatePanelView {
     }
 
     func rawBufferLine(active: Bool) -> NSAttributedString {
-        let cursorLocation = min(max(0, snapshot.markedSelectionLocation), snapshot.displayRawInput.count)
+        let cursorLocation = min(
+            max(0, snapshot.markedSelectionLocation), snapshot.displayRawInput.count)
         let prefix = String(snapshot.displayRawInput.prefix(cursorLocation))
         let suffix = String(snapshot.displayRawInput.dropFirst(cursorLocation))
         let text = prefix + "|" + suffix

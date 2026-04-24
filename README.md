@@ -1,5 +1,8 @@
 <div align="center">
-  <h1>BilineIME</h1>
+  <h1>
+    <img src="Resources/logo.png" alt="BilineIME logo" width="160"><br>
+    BilineIME
+  </h1>
 
   <p>
     <strong>Type Chinese. Glance at English. Stay in flow.</strong><br>

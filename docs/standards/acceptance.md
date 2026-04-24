@@ -19,6 +19,12 @@
 - The panel keeps all visible Chinese rows together in the top block and all visible English rows together in the bottom block, with strict left alignment inside the same column.
 - In candidate mode, the panel shows candidates only. It must not add a second
   raw pinyin input row above the matrix.
+- Host marked preedit may show parser-derived pinyin syllable spaces, such as
+  `hao ping guo`, while the session's raw keystroke buffer remains
+  `haopingguo`. Abbreviated pinyin displays initial-letter boundaries, such as
+  `h p g` while raw input remains `hpg`. Ambiguous pinyin display follows the
+  selected candidate's parsing, so `xian` may display as `xi an` for `西安` and
+  as `xian` for `先`.
 - In raw-buffer-only composition, the panel may show the rendered raw buffer
   with a visible cursor because no candidate matrix is available.
 - The custom candidate panel anchors to the host-provided line-height rectangle.
@@ -28,13 +34,19 @@
 - `Shift+ASCII letter` follows Apple Chinese input behavior. When Biline is
   idle, it inserts the uppercase Latin character directly. When Biline is
   composing, it stays inside marked composition as a literal uppercase Latin
-  suffix, participates in candidate display/commit, and must not auto-commit
-  the current Chinese candidate before insertion.
-- Whole-prefix candidates append the uppercase Latin suffix to their displayed
-  and committed text. Prefix candidates do not consume that suffix; committing a
-  prefix candidate leaves the remaining pinyin tail plus the uppercase suffix as
-  the next composition.
+  segment, participates in candidate display/commit, and must not auto-commit
+  the current Chinese candidate before insertion. Pinyin typed after the
+  uppercase segment must continue composing inside the same marked composition.
+  Marked preedit shows parser syllable or initial boundaries around the Latin
+  segment, e.g. raw `haopingguoABChaopingguo` displays as
+  `hao ping guo ABC hao ping guo`, raw `hpgABChpg` displays as
+  `h p g ABC h p g`, and candidate text commits without those parser spaces.
+- Whole-prefix candidates append the rendered mixed Chinese/Latin tail to their
+  displayed and committed text. Prefix candidates do not consume that later
+  mixed tail; committing a prefix candidate leaves the remaining pinyin tail
+  plus the later uppercase-Latin/pinyin section as the next composition.
 - `=` or `]` expand from compact mode and jump to the next candidate row; in expanded mode they continue browsing downward by row, but in raw-buffer-only composition they append literal input.
+- Expanded row/page browsing preserves the user's preferred candidate column. Short rows clamp the visible selection to their last item without changing that preferred column; at the last row of the last page, forward browsing is a strict no-op.
 - `-` or `[` browse upward by row; when already on the first expanded row, they collapse to compact mode and reset the selection to the first item; before any expansion, they may enter raw-buffer-only composition.
 - `+` is treated as an ordinary input character and has no IME-specific behavior.
 - Chinese-mode punctuation follows a fixed default punctuation policy: common sentence punctuation commits as Chinese punctuation, raw preedit displays rendered Chinese/full-width punctuation, and literal symbol handling no longer depends on one-off router special cases.

@@ -5,19 +5,24 @@ import BilineTestSupport
 import XCTest
 
 final class BilingualInputSessionTests: XCTestCase {
-    func testSetActiveLayerChangesLayerWithoutChangingCell() {
+    func testActiveLayerChangesKeepSelectionAndPersistAcrossTypingAndBrowsing() {
         let session = DemoFixtures.makeBilingualSession()
 
-        session.append(text: "nihao")
+        session.append(text: "shi")
+        session.moveColumn(.next)
         let before = session.snapshot
 
         session.setActiveLayer(.english)
-        let after = session.snapshot
 
-        XCTAssertEqual(before.selectedRow, after.selectedRow)
-        XCTAssertEqual(before.selectedColumn, after.selectedColumn)
-        XCTAssertEqual(before.selectedFlatIndex, after.selectedFlatIndex)
-        XCTAssertEqual(after.activeLayer, .english)
+        XCTAssertEqual(session.snapshot.selectedRow, before.selectedRow)
+        XCTAssertEqual(session.snapshot.selectedColumn, before.selectedColumn)
+        XCTAssertEqual(session.snapshot.selectedFlatIndex, before.selectedFlatIndex)
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
+
+        session.append(text: "a")
+        session.browseNextRow()
+
+        XCTAssertEqual(session.snapshot.activeLayer, .english)
     }
 
     func testCommitRawInputCommitsPinyinBeforeExplicitCandidateSelection() {
@@ -46,7 +51,7 @@ final class BilingualInputSessionTests: XCTestCase {
 
         session.append(text: "nihao")
         XCTAssertEqual(session.snapshot.rawCursorIndex, 5)
-        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 5)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 6)
 
         session.moveRawCursorByBlock(.previous)
 
@@ -57,7 +62,7 @@ final class BilingualInputSessionTests: XCTestCase {
 
         XCTAssertEqual(session.snapshot.rawInput, "nimenhao")
         XCTAssertEqual(session.snapshot.rawCursorIndex, 5)
-        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 5)
+        XCTAssertEqual(session.snapshot.markedSelectionRange.location, 6)
     }
 
     func testRawCursorMovesByCharacterForPlainArrowSemantics() {
@@ -157,67 +162,6 @@ final class BilingualInputSessionTests: XCTestCase {
 
         XCTAssertFalse(session.hasExplicitCandidateSelection)
         XCTAssertFalse(session.hasEverExpandedInCurrentComposition)
-    }
-
-    func testToggleActiveLayerChangesLayerWithoutChangingCell() {
-        let session = DemoFixtures.makeBilingualSession()
-
-        session.append(text: "nihao")
-        let before = session.snapshot
-
-        session.toggleActiveLayer()
-        let after = session.snapshot
-
-        XCTAssertEqual(before.selectedRow, after.selectedRow)
-        XCTAssertEqual(before.selectedColumn, after.selectedColumn)
-        XCTAssertEqual(before.selectedFlatIndex, after.selectedFlatIndex)
-        XCTAssertEqual(after.activeLayer, .english)
-    }
-
-    func testMovingColumnKeepsEnglishLayerActive() {
-        let session = DemoFixtures.makeBilingualSession()
-
-        session.append(text: "shi")
-        session.setActiveLayer(.english)
-        session.moveColumn(.next)
-
-        XCTAssertEqual(session.snapshot.activeLayer, .english)
-        XCTAssertEqual(session.snapshot.selectedRow, 0)
-        XCTAssertEqual(session.snapshot.selectedColumn, 1)
-        XCTAssertEqual(session.snapshot.selectedFlatIndex, 1)
-    }
-
-    func testAppendingInputKeepsEnglishLayerActive() {
-        let session = DemoFixtures.makeBilingualSession()
-
-        session.append(text: "shi")
-        session.setActiveLayer(.english)
-        session.append(text: "a")
-
-        XCTAssertEqual(session.snapshot.rawInput, "shia")
-        XCTAssertEqual(session.snapshot.activeLayer, .english)
-    }
-
-    func testToggleActiveLayerPersistsAcrossTypingAndBrowsing() {
-        let session = DemoFixtures.makeBilingualSession()
-
-        session.append(text: "shi")
-        session.toggleActiveLayer()
-        session.append(text: "a")
-        session.browseNextRow()
-
-        XCTAssertEqual(session.snapshot.activeLayer, .english)
-    }
-
-    func testBrowsingRowsKeepsEnglishLayerActive() {
-        let session = DemoFixtures.makeBilingualSession()
-
-        session.append(text: "shi")
-        session.setActiveLayer(.english)
-        session.expandAndAdvanceRow()
-
-        XCTAssertEqual(session.snapshot.selectedRow, 1)
-        XCTAssertEqual(session.snapshot.activeLayer, .english)
     }
 
     func testCompactPresentationDoesNotPadCandidatesToFiveColumns() {
@@ -377,17 +321,99 @@ final class BilingualInputSessionTests: XCTestCase {
             session.snapshot.items[session.snapshot.selectedFlatIndex].candidate.surface, "事")
     }
 
-    func testAppendLiteralSwitchesToRawBufferOnlyComposition() {
+    func testExpandedRowBrowsingKeepsPreferredColumnAcrossShortLastPageBoundary() {
+        let session = DemoFixtures.makeBilingualSession(
+            compactColumnCount: 3,
+            expandedRowCount: 2
+        )
+
+        session.append(text: "shi")
+        session.selectColumn(at: 2)
+        session.expandAndAdvanceRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 0)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.selectedColumn, 2)
+
+        session.browseNextRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.selectedRow, 0)
+        XCTAssertEqual(session.snapshot.selectedColumn, 2)
+
+        session.browseNextRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.items.count, 4)
+        XCTAssertEqual(session.snapshot.items(inRow: 1).count, 1)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.selectedColumn, 0)
+
+        let boundarySnapshot = session.snapshot
+        session.browseNextRow()
+        session.browseNextRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, boundarySnapshot.pageIndex)
+        XCTAssertEqual(session.snapshot.selectedRow, boundarySnapshot.selectedRow)
+        XCTAssertEqual(session.snapshot.selectedColumn, boundarySnapshot.selectedColumn)
+        XCTAssertEqual(session.snapshot.selectedFlatIndex, boundarySnapshot.selectedFlatIndex)
+
+        session.browsePreviousRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.selectedRow, 0)
+        XCTAssertEqual(session.snapshot.selectedColumn, 2)
+        XCTAssertEqual(session.snapshot.selectedFlatIndex, 2)
+    }
+
+    func testHorizontalMoveAfterShortRowClampReanchorsPreferredColumn() {
+        let session = DemoFixtures.makeBilingualSession(
+            compactColumnCount: 4,
+            expandedRowCount: 2
+        )
+
+        session.append(text: "shi")
+        session.selectColumn(at: 3)
+        session.expandAndAdvanceRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 0)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.selectedColumn, 3)
+
+        session.browseNextRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.items.count, 2)
+        XCTAssertEqual(session.snapshot.selectedRow, 0)
+        XCTAssertEqual(session.snapshot.selectedColumn, 1)
+
+        session.moveColumn(.previous)
+
+        XCTAssertEqual(session.snapshot.pageIndex, 1)
+        XCTAssertEqual(session.snapshot.selectedRow, 0)
+        XCTAssertEqual(session.snapshot.selectedColumn, 0)
+
+        session.browsePreviousRow()
+
+        XCTAssertEqual(session.snapshot.pageIndex, 0)
+        XCTAssertEqual(session.snapshot.selectedRow, 1)
+        XCTAssertEqual(session.snapshot.selectedColumn, 0)
+    }
+
+    func testRawBufferOnlyLiteralsAccumulateAndUseChinesePunctuationPolicy() {
         let session = DemoFixtures.makeBilingualSession()
 
         session.append(text: "shi")
         session.appendLiteral(text: "-")
+        session.appendLiteral(text: "=")
+        session.appendLiteral(text: "%")
+        session.appendLiteral(text: "+")
 
         XCTAssertTrue(session.snapshot.isComposing)
         XCTAssertEqual(session.compositionMode, .rawBufferOnly)
-        XCTAssertEqual(session.snapshot.rawInput, "shi-")
-        XCTAssertEqual(session.snapshot.displayRawInput, "shi－")
-        XCTAssertEqual(session.snapshot.markedText, "shi－")
+        XCTAssertEqual(session.snapshot.rawInput, "shi-=%+")
+        XCTAssertEqual(session.snapshot.displayRawInput, "shi－＝％＋")
+        XCTAssertEqual(session.snapshot.markedText, "shi－＝％＋")
         XCTAssertTrue(session.snapshot.items.isEmpty)
         XCTAssertEqual(session.snapshot.presentationMode, .compact)
     }
@@ -412,36 +438,6 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.rawInput, "shi")
     }
 
-    func testRawBufferOnlyCanAccumulateMinusEqualAndPlus() {
-        let session = DemoFixtures.makeBilingualSession()
-
-        session.append(text: "ni")
-        session.appendLiteral(text: "-")
-        session.appendLiteral(text: "-")
-        session.appendLiteral(text: "=")
-        session.appendLiteral(text: "=")
-        session.appendLiteral(text: "+")
-
-        XCTAssertEqual(session.compositionMode, .rawBufferOnly)
-        XCTAssertEqual(session.snapshot.rawInput, "ni--==+")
-        XCTAssertEqual(session.snapshot.displayRawInput, "ni－－＝＝＋")
-        XCTAssertTrue(session.snapshot.items.isEmpty)
-    }
-
-    func testRawBufferOnlyDisplayUsesChinesePunctuationPolicy() {
-        let session = DemoFixtures.makeBilingualSession()
-
-        session.append(text: "shi")
-        session.appendLiteral(text: "%")
-        session.appendLiteral(text: "_")
-        session.appendLiteral(text: "+")
-
-        XCTAssertEqual(session.compositionMode, .rawBufferOnly)
-        XCTAssertEqual(session.snapshot.rawInput, "shi%_+")
-        XCTAssertEqual(session.snapshot.displayRawInput, "shi％＿＋")
-        XCTAssertEqual(session.snapshot.markedText, "shi％＿＋")
-    }
-
     func testTrailingUppercaseLatinStaysInCandidateComposition() {
         let session = DemoFixtures.makeBilingualSession()
 
@@ -451,7 +447,7 @@ final class BilingualInputSessionTests: XCTestCase {
 
         XCTAssertEqual(session.compositionMode, .candidateCompact)
         XCTAssertEqual(session.snapshot.rawInput, "shiAA")
-        XCTAssertEqual(session.snapshot.markedText, "shiAA")
+        XCTAssertEqual(session.snapshot.markedText, "shi AA")
         XCTAssertFalse(session.snapshot.items.isEmpty)
         XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "是AA")
         XCTAssertEqual(session.commitSelection(), "是AA")
@@ -474,6 +470,129 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.commitSelection(), "好")
         XCTAssertEqual(session.snapshot.rawInput, "pingguoA")
         XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "苹果A")
+    }
+
+    func testPinyinAfterUppercaseLatinStaysInCandidateComposition() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "shi")
+        session.appendLiteral(text: "A")
+        session.appendLiteral(text: "B")
+        session.appendLiteral(text: "C")
+        session.append(text: "shi")
+
+        XCTAssertEqual(session.compositionMode, .candidateCompact)
+        XCTAssertEqual(session.snapshot.rawInput, "shiABCshi")
+        XCTAssertEqual(session.snapshot.markedText, "shi ABC shi")
+        XCTAssertFalse(session.snapshot.items.isEmpty)
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "是ABC是")
+        XCTAssertEqual(session.commitSelection(), "是ABC是")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testRawCursorDeletionInsideUppercaseLatinMixedCompositionKeepsCandidateMode() {
+        let blockDeleteSession = DemoFixtures.makeBilingualSession()
+
+        blockDeleteSession.append(text: "shi")
+        blockDeleteSession.appendLiteral(text: "A")
+        blockDeleteSession.appendLiteral(text: "B")
+        blockDeleteSession.appendLiteral(text: "C")
+        blockDeleteSession.append(text: "shi")
+        blockDeleteSession.moveRawCursorByBlock(.previous)
+
+        XCTAssertEqual(blockDeleteSession.snapshot.rawCursorIndex, 6)
+
+        blockDeleteSession.deleteRawBackwardByBlock()
+
+        XCTAssertEqual(blockDeleteSession.compositionMode, .candidateCompact)
+        XCTAssertEqual(blockDeleteSession.snapshot.rawInput, "shiABshi")
+        XCTAssertEqual(blockDeleteSession.snapshot.markedText, "shi AB shi")
+        XCTAssertEqual(blockDeleteSession.snapshot.items.first?.candidate.surface, "是AB是")
+
+        let deleteToStartSession = DemoFixtures.makeBilingualSession()
+
+        deleteToStartSession.append(text: "shi")
+        deleteToStartSession.appendLiteral(text: "A")
+        deleteToStartSession.appendLiteral(text: "B")
+        deleteToStartSession.appendLiteral(text: "C")
+        deleteToStartSession.append(text: "shi")
+        deleteToStartSession.moveRawCursorByBlock(.previous)
+
+        XCTAssertEqual(deleteToStartSession.snapshot.rawCursorIndex, 6)
+
+        deleteToStartSession.deleteRawToStart()
+
+        XCTAssertEqual(deleteToStartSession.compositionMode, .candidateCompact)
+        XCTAssertEqual(deleteToStartSession.snapshot.rawInput, "shi")
+        XCTAssertEqual(deleteToStartSession.snapshot.rawCursorIndex, 0)
+        XCTAssertEqual(deleteToStartSession.snapshot.markedText, "shi")
+        XCTAssertEqual(deleteToStartSession.snapshot.items.first?.candidate.surface, "是")
+    }
+
+    func testUppercaseLatinSegmentKeepsFollowingPinyinChunkInCandidateComposition() {
+        let session = DemoFixtures.makeBilingualSession()
+
+        session.append(text: "haopingguo")
+        session.appendLiteral(text: "A")
+        session.appendLiteral(text: "B")
+        session.appendLiteral(text: "C")
+        session.append(text: "haopingguo")
+
+        XCTAssertEqual(session.compositionMode, .candidateCompact)
+        XCTAssertEqual(session.snapshot.rawInput, "haopingguoABChaopingguo")
+        XCTAssertEqual(session.snapshot.markedText, "hao ping guo ABC hao ping guo")
+        XCTAssertFalse(session.snapshot.items.isEmpty)
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "好苹果ABC好苹果")
+        XCTAssertEqual(session.commitSelection(), "好苹果ABC好苹果")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testAbbreviatedPinyinBeforeUppercaseLatinStaysInCandidateComposition() {
+        let session = makeSessionWithEngine(
+            snapshotsByInput: [
+                "hpg": abbreviatedHpgSnapshot()
+            ],
+            commitResult: CommitResult(committedText: "好苹果", snapshot: .idle)
+        )
+
+        session.append(text: "hpg")
+        session.appendLiteral(text: "A")
+        session.appendLiteral(text: "B")
+        session.appendLiteral(text: "C")
+        session.append(text: "hpg")
+
+        XCTAssertEqual(session.compositionMode, .candidateCompact)
+        XCTAssertEqual(session.snapshot.rawInput, "hpgABChpg")
+        XCTAssertEqual(session.snapshot.markedText, "h p g ABC h p g")
+        XCTAssertFalse(session.snapshot.items.isEmpty)
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "好苹果ABC好苹果")
+        XCTAssertEqual(session.commitSelection(), "好苹果ABC好苹果")
+        XCTAssertEqual(session.snapshot, .idle)
+    }
+
+    func testAbbreviatedPinyinPrefixCommitKeepsMixedTail() {
+        let session = makeSessionWithEngine(
+            snapshotsByInput: [
+                "hpg": abbreviatedHpgSnapshot(selectedIndex: 1),
+                "pg": abbreviatedPgSnapshot(),
+            ],
+            commitResult: CommitResult(committedText: "好", snapshot: .idle)
+        )
+
+        session.append(text: "hpg")
+        session.appendLiteral(text: "A")
+        session.appendLiteral(text: "B")
+        session.appendLiteral(text: "C")
+        session.append(text: "hpg")
+
+        XCTAssertEqual(session.snapshot.rawInput, "hpgABChpg")
+        XCTAssertEqual(session.snapshot.markedText, "h p g ABC h p g")
+        XCTAssertEqual(session.snapshot.items[1].candidate.surface, "好")
+
+        XCTAssertEqual(session.commitSelection(), "好")
+        XCTAssertEqual(session.snapshot.rawInput, "pgABChpg")
+        XCTAssertEqual(session.snapshot.markedText, "p g ABC h p g")
+        XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "苹果ABC好苹果")
     }
 
     func testDeletingLiteralBufferRestoresCandidateComposition() {
@@ -620,7 +739,7 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertEqual(session.snapshot.activeLayer, .english)
     }
 
-    func testPurePinyinModeHidesEnglishCandidatesAndSkipsPreview() {
+    func testPurePinyinModeHidesEnglishLayerAndCommitsChinese() {
         let session = DemoFixtures.makeBilingualSession(bilingualModeEnabled: false)
 
         session.append(text: "shi")
@@ -628,16 +747,11 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertFalse(session.snapshot.showsEnglishCandidates)
         XCTAssertEqual(session.snapshot.activeLayer, .chinese)
         XCTAssertTrue(session.snapshot.items.allSatisfy { $0.previewState == .unavailable })
-    }
 
-    func testPurePinyinModeIgnoresEnglishLayerAndCommitsChinese() {
-        let session = DemoFixtures.makeBilingualSession(bilingualModeEnabled: false)
-
-        session.append(text: "nihao")
         session.setActiveLayer(.english)
 
         XCTAssertEqual(session.snapshot.activeLayer, .chinese)
-        XCTAssertEqual(session.commitSelection(), "你好")
+        XCTAssertEqual(session.commitSelection(), "是")
         XCTAssertEqual(session.snapshot, .idle)
     }
 
@@ -648,32 +762,83 @@ final class BilingualInputSessionTests: XCTestCase {
 
         XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "好苹果")
         XCTAssertTrue(session.snapshot.items.contains(where: { $0.candidate.surface == "好" }))
-        XCTAssertEqual(session.snapshot.markedText, "haopingguo")
+        XCTAssertEqual(session.snapshot.markedText, "hao ping guo")
     }
 
-    func testEnglishPhraseCandidateCommitsFullTranslation() async {
-        let session = DemoFixtures.makeBilingualSession()
-        let ready = expectation(description: "english preview ready for 好苹果")
-        var didFulfill = false
+    func testAmbiguousPinyinMarkedTextFollowsSelectedCandidateParsing() {
+        let westernCapitalSession = makeSessionWithEngine(
+            snapshotsByInput: [
+                "xian": CompositionSnapshot(
+                    rawInput: "xian",
+                    markedText: "xian",
+                    candidates: [
+                        Candidate(
+                            id: "stub:xian:xi-an",
+                            surface: "西安",
+                            reading: "xi an",
+                            score: 2,
+                            consumedTokenCount: 2
+                        ),
+                        Candidate(
+                            id: "stub:xian:xian",
+                            surface: "先",
+                            reading: "xian",
+                            score: 1,
+                            consumedTokenCount: 1
+                        ),
+                    ],
+                    selectedIndex: 0,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "xian",
+                    remainingRawInput: "",
+                    consumedTokenCount: 2
+                )
+            ],
+            commitResult: CommitResult(committedText: "西安", snapshot: .idle)
+        )
 
-        session.onSnapshotUpdate = { snapshot in
-            guard !didFulfill else { return }
-            guard snapshot.activeLayer == .english,
-                snapshot.items.first?.candidate.surface == "好苹果",
-                snapshot.items.first?.englishText == "good apple"
-            else {
-                return
-            }
-            didFulfill = true
-            ready.fulfill()
-        }
+        westernCapitalSession.append(text: "xian")
 
-        session.append(text: "haopingguo")
-        session.setActiveLayer(.english)
-        await fulfillment(of: [ready], timeout: 1.0)
+        XCTAssertEqual(westernCapitalSession.snapshot.rawInput, "xian")
+        XCTAssertEqual(westernCapitalSession.snapshot.markedText, "xi an")
 
-        XCTAssertEqual(session.commitSelection(), "good apple")
-        XCTAssertEqual(session.snapshot, .idle)
+        let singleSyllableSession = makeSessionWithEngine(
+            snapshotsByInput: [
+                "xian": CompositionSnapshot(
+                    rawInput: "xian",
+                    markedText: "xian",
+                    candidates: [
+                        Candidate(
+                            id: "stub:xian:xi-an",
+                            surface: "西安",
+                            reading: "xi an",
+                            score: 2,
+                            consumedTokenCount: 2
+                        ),
+                        Candidate(
+                            id: "stub:xian:xian",
+                            surface: "先",
+                            reading: "xian",
+                            score: 1,
+                            consumedTokenCount: 1
+                        ),
+                    ],
+                    selectedIndex: 1,
+                    pageIndex: 0,
+                    isComposing: true,
+                    activeRawInput: "xian",
+                    remainingRawInput: "",
+                    consumedTokenCount: 1
+                )
+            ],
+            commitResult: CommitResult(committedText: "先", snapshot: .idle)
+        )
+
+        singleSyllableSession.append(text: "xian")
+
+        XCTAssertEqual(singleSyllableSession.snapshot.rawInput, "xian")
+        XCTAssertEqual(singleSyllableSession.snapshot.markedText, "xian")
     }
 
     func testEnglishPrefixCandidatePartiallyCommitsAndKeepsTail() async {
@@ -701,7 +866,7 @@ final class BilingualInputSessionTests: XCTestCase {
 
         XCTAssertEqual(session.commitSelection(), "good")
         XCTAssertEqual(session.snapshot.rawInput, "pingguo")
-        XCTAssertEqual(session.snapshot.markedText, "pingguo")
+        XCTAssertEqual(session.snapshot.markedText, "ping guo")
         XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "苹果")
         XCTAssertEqual(session.snapshot.activeLayer, .english)
     }
@@ -714,7 +879,7 @@ final class BilingualInputSessionTests: XCTestCase {
 
         XCTAssertEqual(session.commitSelection(), "好")
         XCTAssertEqual(session.snapshot.rawInput, "pingguo")
-        XCTAssertEqual(session.snapshot.markedText, "pingguo")
+        XCTAssertEqual(session.snapshot.markedText, "ping guo")
         XCTAssertEqual(session.snapshot.items.first?.candidate.surface, "苹果")
         XCTAssertEqual(session.snapshot.activeLayer, .chinese)
     }
@@ -1012,6 +1177,59 @@ final class BilingualInputSessionTests: XCTestCase {
         XCTAssertTrue(session.snapshot.isComposing)
         XCTAssertEqual(session.snapshot.rawInput, "pingguo")
         XCTAssertEqual(session.snapshot.markedText, "pingguo")
+    }
+
+    private func abbreviatedHpgSnapshot(selectedIndex: Int = 0) -> CompositionSnapshot {
+        let candidates = [
+            Candidate(
+                id: "stub:hpg:haopingguo",
+                surface: "好苹果",
+                reading: "hao ping guo",
+                score: 2,
+                consumedTokenCount: 3
+            ),
+            Candidate(
+                id: "stub:hpg:hao",
+                surface: "好",
+                reading: "hao",
+                score: 1,
+                consumedTokenCount: 1
+            ),
+        ]
+        let selectedIndex = min(max(0, selectedIndex), candidates.count - 1)
+        return CompositionSnapshot(
+            rawInput: "hpg",
+            markedText: "hpg",
+            candidates: candidates,
+            selectedIndex: selectedIndex,
+            pageIndex: 0,
+            isComposing: true,
+            activeRawInput: selectedIndex == 0 ? "hpg" : "h",
+            remainingRawInput: selectedIndex == 0 ? "" : "pg",
+            consumedTokenCount: selectedIndex == 0 ? 3 : 1
+        )
+    }
+
+    private func abbreviatedPgSnapshot() -> CompositionSnapshot {
+        CompositionSnapshot(
+            rawInput: "pg",
+            markedText: "pg",
+            candidates: [
+                Candidate(
+                    id: "stub:pg:pingguo",
+                    surface: "苹果",
+                    reading: "ping guo",
+                    score: 1,
+                    consumedTokenCount: 2
+                )
+            ],
+            selectedIndex: 0,
+            pageIndex: 0,
+            isComposing: true,
+            activeRawInput: "pg",
+            remainingRawInput: "",
+            consumedTokenCount: 2
+        )
     }
 
 }

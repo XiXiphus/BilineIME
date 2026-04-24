@@ -1,6 +1,7 @@
-@testable import BilineRime
 import BilineCore
 import XCTest
+
+@testable import BilineRime
 
 final class PinyinDictionaryEngineTests: XCTestCase {
     func testTokenizerNormalizesToneMarksAndUmlaut() throws {
@@ -42,5 +43,35 @@ final class PinyinDictionaryEngineTests: XCTestCase {
         XCTAssertEqual(result.committedText, "好")
         XCTAssertEqual(result.snapshot.rawInput, "pingguo")
         XCTAssertEqual(result.snapshot.remainingRawInput, "")
+    }
+
+    func testFallbackDictionaryTurnPageNextAtSinglePageBoundaryPreservesSelection() throws {
+        let factory = try DictionaryPinyinCandidateEngineFactory(characterForm: .simplified)
+        let session = factory.makeSession(config: EngineConfig(pageSize: 1_000))
+
+        _ = session.updateInput("shi")
+        let before = session.moveSelection(.next)
+        XCTAssertGreaterThan(before.selectedIndex, 0)
+
+        let after = session.turnPage(.next)
+
+        XCTAssertEqual(after.pageIndex, before.pageIndex)
+        XCTAssertEqual(after.selectedIndex, before.selectedIndex)
+        XCTAssertEqual(after.candidates, before.candidates)
+    }
+
+    func testFallbackDictionaryTurnPagePreviousAtFirstPageBoundaryPreservesSelection() throws {
+        let factory = try DictionaryPinyinCandidateEngineFactory(characterForm: .simplified)
+        let session = factory.makeSession(config: EngineConfig(pageSize: 1_000))
+
+        _ = session.updateInput("shi")
+        let before = session.moveSelection(.next)
+        XCTAssertGreaterThan(before.selectedIndex, 0)
+
+        let after = session.turnPage(.previous)
+
+        XCTAssertEqual(after.pageIndex, before.pageIndex)
+        XCTAssertEqual(after.selectedIndex, before.selectedIndex)
+        XCTAssertEqual(after.candidates, before.candidates)
     }
 }

@@ -142,6 +142,10 @@ final class FixtureCandidateEngineSession: CandidateEngineSession, @unchecked Se
             targetPage = max(currentPage - 1, 0)
         }
 
+        guard targetPage != currentPage else {
+            return makeSnapshot()
+        }
+
         selectedGlobalIndex = min(targetPage * config.pageSize, allCandidates.count - 1)
         syncSelectionSpan()
         return makeSnapshot()

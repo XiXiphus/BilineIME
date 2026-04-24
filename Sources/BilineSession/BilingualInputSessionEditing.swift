@@ -90,7 +90,8 @@ extension BilingualInputSession {
             let nextIndex: Int
             switch direction {
             case .previous:
-                nextIndex = pinyinSegmenter.previousBlockBoundary(in: rawInput, from: rawCursorIndex)
+                nextIndex = pinyinSegmenter.previousBlockBoundary(
+                    in: rawInput, from: rawCursorIndex)
             case .next:
                 nextIndex = pinyinSegmenter.nextBlockBoundary(in: rawInput, from: rawCursorIndex)
             }
@@ -162,18 +163,22 @@ extension BilingualInputSession {
         }
         clampRawCursorIndex()
 
-        if !hasValidQueryInput, let literalTail = trailingUppercaseLatinTail() {
-            literalLatinSuffix = literalTail.suffix
+        if !hasValidQueryInput, let mixed = mixedUppercaseLatinComposition() {
+            rawSuffixAfterActiveChunk = mixed.rawSuffix
+            displaySuffixForWholeCandidate = mixed.displaySuffix
             presentationMode = .compact
-            updateEngineSnapshot(engineSession.updateInput(literalTail.queryInput))
+            preferredCandidateColumn = 0
+            updateEngineSnapshot(engineSession.updateInput(mixed.queryInput))
             return
         }
 
         guard hasValidQueryInput else {
-            literalLatinSuffix = ""
+            rawSuffixAfterActiveChunk = ""
+            displaySuffixForWholeCandidate = ""
             clearPreviews()
             compositionMode = .rawBufferOnly
             presentationMode = .compact
+            preferredCandidateColumn = 0
             engineSnapshot = CompositionSnapshot(
                 rawInput: rawInput,
                 markedText: renderedRawInput,
@@ -189,21 +194,25 @@ extension BilingualInputSession {
             return
         }
 
-        literalLatinSuffix = ""
+        rawSuffixAfterActiveChunk = ""
+        displaySuffixForWholeCandidate = ""
         presentationMode = .compact
+        preferredCandidateColumn = 0
         updateEngineSnapshot(engineSession.updateInput(rawInput))
     }
 
     func resetCompositionState() {
         rawInput = ""
         rawCursorIndex = 0
-        literalLatinSuffix = ""
+        rawSuffixAfterActiveChunk = ""
+        displaySuffixForWholeCandidate = ""
         engineSnapshot = engineSession.reset()
         activeLayer = .chinese
         compositionMode = .candidateCompact
         hasEverExpandedInCurrentComposition = false
         hasExplicitCandidateSelection = false
         presentationMode = .compact
+        preferredCandidateColumn = 0
         clearPreviews()
         publishSnapshot()
     }
@@ -223,33 +232,77 @@ extension BilingualInputSession {
         hasExplicitCandidateSelection = false
         hasEverExpandedInCurrentComposition = false
         presentationMode = .compact
+        preferredCandidateColumn = 0
     }
 
-    func trailingUppercaseLatinTail() -> (queryInput: String, suffix: String)? {
+    func mixedUppercaseLatinComposition() -> (
+        queryInput: String,
+        rawSuffix: String,
+        displaySuffix: String
+    )? {
         guard !rawInput.isEmpty else { return nil }
 
-        var suffixStart = rawInput.endIndex
-        while suffixStart > rawInput.startIndex {
-            let previousIndex = rawInput.index(before: suffixStart)
-            let character = rawInput[previousIndex]
-            guard character.unicodeScalars.count == 1,
-                let scalar = character.unicodeScalars.first,
-                (65...90).contains(scalar.value)
-            else {
-                break
-            }
-            suffixStart = previousIndex
+        guard
+            let suffixStart = rawInput.firstIndex(where: { character in
+                character.unicodeScalars.count == 1
+                    && character.unicodeScalars.first.map { (65...90).contains($0.value) } == true
+            })
+        else {
+            return nil
         }
 
-        let suffix = String(rawInput[suffixStart...])
+        let rawSuffix = String(rawInput[suffixStart...])
         let queryInput = String(rawInput[..<suffixStart])
-        guard !suffix.isEmpty,
+        guard !rawSuffix.isEmpty,
             !queryInput.isEmpty,
             queryInput == normalize(queryInput)
         else {
             return nil
         }
 
-        return (queryInput, suffix)
+        return (
+            queryInput,
+            rawSuffix,
+            renderDisplaySuffix(from: rawSuffix)
+        )
+    }
+
+    func renderDisplaySuffix(from rawSuffix: String) -> String {
+        guard !rawSuffix.isEmpty else { return "" }
+
+        var rendered = ""
+        var chunk = ""
+        let characters = Array(rawSuffix)
+
+        func flushPinyinChunk() {
+            guard !chunk.isEmpty else { return }
+            let snapshot = engineSession.updateInput(chunk)
+            rendered += snapshot.candidates.first?.surface ?? chunk
+            chunk.removeAll(keepingCapacity: true)
+        }
+
+        for character in characters {
+            guard character.unicodeScalars.count == 1,
+                let scalar = character.unicodeScalars.first
+            else {
+                flushPinyinChunk()
+                rendered.append(character)
+                continue
+            }
+
+            switch scalar.value {
+            case 65...90:
+                flushPinyinChunk()
+                rendered.unicodeScalars.append(scalar)
+            case 97...122, 39:
+                chunk.append(character)
+            default:
+                flushPinyinChunk()
+                rendered.append(character)
+            }
+        }
+
+        flushPinyinChunk()
+        return rendered
     }
 }

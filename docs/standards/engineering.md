@@ -97,10 +97,19 @@ CI-safe tests should cover router/session/anchor ordering for the same critical 
   - continue browsing after layer switch
 - uppercase Latin composition:
   - idle `Shift+A` inserts `A` without opening composition
-  - composing `shi` + `Shift+A` keeps `shiA` in marked text and offers
+  - composing `shi` + `Shift+A` keeps raw `shiA`, shows marked `shi A`, and offers
     candidate `是A`
-  - prefix commit with uppercase suffix keeps the tail, e.g.
-    `haopingguoA`, select `好`, leaves `pingguoA`
+  - composing `shiABCshi` keeps one composition, shows marked `shi ABC shi`,
+    and offers candidate `是ABC是`
+  - composing `haopingguoABChaopingguo` shows marked
+    `hao ping guo ABC hao ping guo` and offers `好苹果ABC好苹果`
+  - composing `hpgABChpg` shows marked `h p g ABC h p g` and offers
+    `好苹果ABC好苹果`
+  - ambiguous marked preedit follows selected parsing, e.g. `xian` may show
+    `xi an` for `西安` and `xian` for `先`
+  - prefix commit with later mixed tail keeps that tail, e.g.
+    `haopingguoA`, select `好`, leaves `pingguoA`; `hpgABChpg`, select `好`,
+    leaves `pgABChpg`
 - bilingual candidate-aligned commit:
   - `haopingguo` defaults to phrase candidate `好苹果`
   - confirming the phrase in English commits `good apple`
@@ -117,6 +126,7 @@ verification:
   - `lv`
 - mixed full/abbreviated pinyin:
   - `pingguogs`
+  - `hpg`
 - punctuation and raw-buffer stress:
   - `shi_`
   - `shi%`
@@ -141,7 +151,8 @@ verification:
   - continue browsing after layer switch
 - mixed Chinese / Latin:
   - inline Latin input such as `ipad`
-  - uppercase Latin suffixes such as `shiA` and `haopingguoA`
+  - uppercase Latin segments such as `shiA`, `haopingguoA`, `shiABCshi`, and
+    `hpgABChpg`
 
 ## Dependency policy
 

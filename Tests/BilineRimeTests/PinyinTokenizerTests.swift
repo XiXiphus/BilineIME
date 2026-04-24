@@ -1,6 +1,7 @@
 import BilineCore
-@testable import BilineRime
 import XCTest
+
+@testable import BilineRime
 
 final class PinyinTokenizerTests: XCTestCase {
     private func writeTemporaryDictionary(_ body: String) throws -> URL {
@@ -49,6 +50,7 @@ final class PinyinTokenizerTests: XCTestCase {
             好\thao\t100
             好苹果\thao ping guo\t300
             苹果\tping guo\t200
+            苹果公司\tping guo gong si\t250
             """
         )
         defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
@@ -57,20 +59,43 @@ final class PinyinTokenizerTests: XCTestCase {
         let lexicon = try RimeLexicon.fromDictionaryFiles(at: [url])
 
         XCTAssertEqual(
-            lexicon.consumption(forSurface: "西安", rawInput: "xian", comment: nil, tokenizer: tokenizer),
+            lexicon.consumption(
+                forSurface: "西安", rawInput: "xian", comment: nil, tokenizer: tokenizer),
             RimeConsumption(tokenCount: 2, tokens: ["xi", "an"])
         )
         XCTAssertEqual(
-            lexicon.consumption(forSurface: "先", rawInput: "xian", comment: nil, tokenizer: tokenizer),
+            lexicon.consumption(
+                forSurface: "先", rawInput: "xian", comment: nil, tokenizer: tokenizer),
             RimeConsumption(tokenCount: 1, tokens: ["xian"])
         )
         XCTAssertEqual(
-            lexicon.consumption(forSurface: "好", rawInput: "haopingguo", comment: nil, tokenizer: tokenizer),
+            lexicon.consumption(
+                forSurface: "好", rawInput: "haopingguo", comment: nil, tokenizer: tokenizer),
             RimeConsumption(tokenCount: 1, tokens: ["hao", "ping", "guo"])
         )
         XCTAssertEqual(
-            lexicon.consumption(forSurface: "好苹果", rawInput: "haopingguo", comment: nil, tokenizer: tokenizer),
+            lexicon.consumption(
+                forSurface: "好苹果", rawInput: "haopingguo", comment: nil, tokenizer: tokenizer),
             RimeConsumption(tokenCount: 3, tokens: ["hao", "ping", "guo"])
+        )
+        XCTAssertEqual(
+            lexicon.consumption(
+                forSurface: "好苹果", rawInput: "hpg", comment: nil, tokenizer: tokenizer),
+            RimeConsumption(tokenCount: 3, tokens: ["h", "p", "g"])
+        )
+        XCTAssertEqual(
+            lexicon.consumption(
+                forSurface: "好", rawInput: "hpg", comment: nil, tokenizer: tokenizer),
+            RimeConsumption(tokenCount: 1, tokens: ["h", "p", "g"])
+        )
+        XCTAssertEqual(
+            lexicon.consumption(
+                forSurface: "苹果公司",
+                rawInput: "pingguogs",
+                comment: nil,
+                tokenizer: tokenizer
+            ),
+            RimeConsumption(tokenCount: 4, tokens: ["ping", "guo", "g", "s"])
         )
     }
 
@@ -103,11 +128,13 @@ final class PinyinTokenizerTests: XCTestCase {
         let lexicon = try RimeLexicon.fromDictionaryFiles(at: [url])
 
         XCTAssertEqual(
-            lexicon.consumption(forSurface: "中國", rawInput: "zhongguo", comment: nil, tokenizer: tokenizer),
+            lexicon.consumption(
+                forSurface: "中國", rawInput: "zhongguo", comment: nil, tokenizer: tokenizer),
             RimeConsumption(tokenCount: 2, tokens: ["zhong", "guo"])
         )
         XCTAssertEqual(
-            lexicon.consumption(forSurface: "輸入法", rawInput: "shurufa", comment: nil, tokenizer: tokenizer),
+            lexicon.consumption(
+                forSurface: "輸入法", rawInput: "shurufa", comment: nil, tokenizer: tokenizer),
             RimeConsumption(tokenCount: 3, tokens: ["shu", "ru", "fa"])
         )
     }

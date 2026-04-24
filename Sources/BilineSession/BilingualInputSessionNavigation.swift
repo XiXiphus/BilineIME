@@ -15,7 +15,8 @@ extension BilingualInputSession {
             selectCandidate(
                 row: currentSelectedRowForSelection,
                 column: targetColumn,
-                clampColumn: false
+                clampColumn: false,
+                updatesPreferredColumn: true
             )
         }
     }
@@ -39,7 +40,7 @@ extension BilingualInputSession {
 
             moveToAdjacentPage(
                 direction: direction,
-                preferredColumn: currentSelectedColumn,
+                preferredColumn: preferredCandidateColumn,
                 preferredRow: currentSelectedRow
             )
         }
@@ -48,7 +49,9 @@ extension BilingualInputSession {
     public func selectCandidate(at localIndex: Int) {
         withStateLock {
             guard localIndex >= 0, localIndex < engineSnapshot.candidates.count else { return }
-            moveEngineSelection(to: localIndex)
+            if moveEngineSelection(to: localIndex) {
+                preferredCandidateColumn = localIndex % compactColumnCount
+            }
         }
     }
 
@@ -58,7 +61,8 @@ extension BilingualInputSession {
             selectCandidate(
                 row: currentSelectedRowForSelection,
                 column: columnIndex,
-                clampColumn: false
+                clampColumn: false,
+                updatesPreferredColumn: true
             )
         }
     }
@@ -68,6 +72,7 @@ extension BilingualInputSession {
             guard engineSnapshot.isComposing, !engineSnapshot.candidates.isEmpty else { return }
 
             let currentColumn = currentSelectedColumn
+            preferredCandidateColumn = currentColumn
             hasEverExpandedInCurrentComposition = true
             compositionMode = .candidateExpanded
             presentationMode = .expanded
@@ -75,7 +80,12 @@ extension BilingualInputSession {
             let nextRow = 1
             if nextRow < currentRowCount {
                 let targetColumn = min(currentColumn, max(0, candidateCount(inRow: nextRow) - 1))
-                selectCandidate(row: nextRow, column: targetColumn, clampColumn: true)
+                selectCandidate(
+                    row: nextRow,
+                    column: targetColumn,
+                    clampColumn: true,
+                    updatesPreferredColumn: false
+                )
                 return
             }
 
@@ -99,13 +109,18 @@ extension BilingualInputSession {
             let targetRow = currentSelectedRow + 1
             if targetRow < currentRowCount {
                 let targetColumn = min(
-                    currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
-                selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
+                    preferredCandidateColumn, max(0, candidateCount(inRow: targetRow) - 1))
+                selectCandidate(
+                    row: targetRow,
+                    column: targetColumn,
+                    clampColumn: true,
+                    updatesPreferredColumn: false
+                )
                 return
             }
 
             moveToAdjacentPage(
-                direction: .next, preferredColumn: currentSelectedColumn, preferredRow: 0)
+                direction: .next, preferredColumn: preferredCandidateColumn, preferredRow: 0)
         }
     }
 
@@ -125,7 +140,7 @@ extension BilingualInputSession {
                 if engineSnapshot.pageIndex > 0 {
                     moveToAdjacentPage(
                         direction: .previous,
-                        preferredColumn: currentSelectedColumn,
+                        preferredColumn: preferredCandidateColumn,
                         preferredRow: nil
                     )
                 } else {
@@ -136,8 +151,13 @@ extension BilingualInputSession {
 
             let targetRow = currentSelectedRow - 1
             let targetColumn = min(
-                currentSelectedColumn, max(0, candidateCount(inRow: targetRow) - 1))
-            selectCandidate(row: targetRow, column: targetColumn, clampColumn: true)
+                preferredCandidateColumn, max(0, candidateCount(inRow: targetRow) - 1))
+            selectCandidate(
+                row: targetRow,
+                column: targetColumn,
+                clampColumn: true,
+                updatesPreferredColumn: false
+            )
         }
     }
 
@@ -150,7 +170,8 @@ extension BilingualInputSession {
 
             compositionMode = .candidateCompact
             presentationMode = .compact
-            selectCandidate(row: 0, column: 0, clampColumn: true)
+            preferredCandidateColumn = 0
+            selectCandidate(row: 0, column: 0, clampColumn: true, updatesPreferredColumn: false)
         }
     }
 
@@ -207,11 +228,12 @@ extension BilingualInputSession {
         }
     }
 
-    func moveEngineSelection(to localIndex: Int) {
+    @discardableResult
+    func moveEngineSelection(to localIndex: Int) -> Bool {
         let delta = localIndex - engineSnapshot.selectedIndex
         guard delta != 0 else {
             publishSnapshot()
-            return
+            return true
         }
 
         hasExplicitCandidateSelection = true
@@ -220,33 +242,43 @@ extension BilingualInputSession {
             engineSnapshot = engineSession.moveSelection(direction)
         }
         updateEngineSnapshot(engineSnapshot)
+        return true
     }
 
-    func selectCandidate(row: Int, column: Int, clampColumn: Bool) {
+    @discardableResult
+    func selectCandidate(
+        row: Int,
+        column: Int,
+        clampColumn: Bool,
+        updatesPreferredColumn: Bool
+    ) -> Bool {
         guard row >= 0, column >= 0 else {
             publishSnapshot()
-            return
+            return false
         }
 
         let count = candidateCount(inRow: row)
         guard count > 0 else {
             publishSnapshot()
-            return
+            return false
         }
 
         guard clampColumn || column < count else {
             publishSnapshot()
-            return
+            return false
         }
 
         let targetColumn = clampColumn ? min(column, count - 1) : column
         let targetIndex = row * compactColumnCount + targetColumn
         guard targetIndex < engineSnapshot.candidates.count else {
             publishSnapshot()
-            return
+            return false
         }
 
-        moveEngineSelection(to: targetIndex)
+        if moveEngineSelection(to: targetIndex), updatesPreferredColumn {
+            preferredCandidateColumn = targetColumn
+        }
+        return true
     }
 
     func moveToAdjacentPage(
@@ -255,10 +287,14 @@ extension BilingualInputSession {
         preferredRow: Int?
     ) {
         let previousPageIndex = engineSnapshot.pageIndex
+        let previousSelectedIndex = engineSnapshot.selectedIndex
         let newSnapshot = engineSession.turnPage(direction)
 
         guard newSnapshot.pageIndex != previousPageIndex else {
-            publishSnapshot()
+            restoreEngineSelectionIfNeeded(
+                from: newSnapshot,
+                targetSelectedIndex: previousSelectedIndex
+            )
             return
         }
 
@@ -274,6 +310,29 @@ extension BilingualInputSession {
 
         let clampedRow = min(max(0, targetRow), max(0, currentRowCount - 1))
         let clampedColumn = min(preferredColumn, max(0, candidateCount(inRow: clampedRow) - 1))
-        selectCandidate(row: clampedRow, column: clampedColumn, clampColumn: true)
+        selectCandidate(
+            row: clampedRow,
+            column: clampedColumn,
+            clampColumn: true,
+            updatesPreferredColumn: false
+        )
+    }
+
+    private func restoreEngineSelectionIfNeeded(
+        from snapshot: CompositionSnapshot,
+        targetSelectedIndex: Int
+    ) {
+        guard snapshot.selectedIndex != targetSelectedIndex else {
+            publishSnapshot()
+            return
+        }
+
+        let direction: SelectionDirection =
+            targetSelectedIndex > snapshot.selectedIndex ? .next : .previous
+        var restoredSnapshot = snapshot
+        for _ in 0..<abs(targetSelectedIndex - snapshot.selectedIndex) {
+            restoredSnapshot = engineSession.moveSelection(direction)
+        }
+        updateEngineSnapshot(restoredSnapshot)
     }
 }

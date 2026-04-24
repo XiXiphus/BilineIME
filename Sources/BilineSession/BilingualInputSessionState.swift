@@ -64,28 +64,31 @@ extension BilingualInputSession {
     }
 
     func applyingLiteralLatinSuffix(to snapshot: CompositionSnapshot) -> CompositionSnapshot {
-        guard !literalLatinSuffix.isEmpty,
-            rawInput.hasSuffix(literalLatinSuffix),
+        guard !rawSuffixAfterActiveChunk.isEmpty,
+            rawInput.hasSuffix(rawSuffixAfterActiveChunk),
             snapshot.isComposing
         else {
             return snapshot
         }
 
-        let queryInput = String(rawInput.dropLast(literalLatinSuffix.count))
+        let queryInput = String(rawInput.dropLast(rawSuffixAfterActiveChunk.count))
         guard snapshot.rawInput == queryInput else {
             return snapshot
         }
 
-        let tokenCount = pinyinSegmenter.tokenizeAll(queryInput, limit: 1).first?.count ?? 0
+        let tokenCount = activeChunkTokenCount(for: snapshot, queryInput: queryInput)
         let candidates = snapshot.candidates.map { candidate in
-            guard tokenCount > 0, candidate.consumedTokenCount >= tokenCount else {
+            guard tokenCount > 0,
+                candidate.consumedTokenCount >= tokenCount,
+                !displaySuffixForWholeCandidate.isEmpty
+            else {
                 return candidate
             }
-            let surface = candidate.surface + literalLatinSuffix
+            let surface = candidate.surface + displaySuffixForWholeCandidate
             return Candidate(
-                id: "\(candidate.id):latin:\(literalLatinSuffix)",
+                id: "\(candidate.id):mixed:\(displaySuffixForWholeCandidate)",
                 surface: surface,
-                reading: candidate.reading + literalLatinSuffix,
+                reading: candidate.reading + rawSuffixAfterActiveChunk,
                 score: candidate.score,
                 consumedTokenCount: candidate.consumedTokenCount
             )
@@ -106,9 +109,21 @@ extension BilingualInputSession {
             activeRawInput: selectedConsumesWholeQuery ? rawInput : snapshot.activeRawInput,
             remainingRawInput: selectedConsumesWholeQuery
                 ? ""
-                : snapshot.remainingRawInput + literalLatinSuffix,
+                : snapshot.remainingRawInput + rawSuffixAfterActiveChunk,
             consumedTokenCount: snapshot.consumedTokenCount
         )
+    }
+
+    private func activeChunkTokenCount(
+        for snapshot: CompositionSnapshot,
+        queryInput: String
+    ) -> Int {
+        let candidateTokenCount = snapshot.candidates.map(\.consumedTokenCount).max() ?? 0
+        let selectedTokenCount = max(snapshot.consumedTokenCount, candidateTokenCount)
+        if selectedTokenCount > 0 {
+            return selectedTokenCount
+        }
+        return pinyinSegmenter.tokenizeAll(queryInput, limit: 1).first?.count ?? 0
     }
 
     func normalize(_ string: String) -> String {

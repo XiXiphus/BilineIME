@@ -56,7 +56,7 @@ The boundary is strict:
   </tr>
   <tr>
     <td>Candidate browsing</td>
-    <td><kbd>=</kbd>/<kbd>]</kbd> expand and move down; <kbd>-</kbd>/<kbd>[</kbd> move up and collapse at the top.</td>
+    <td><kbd>=</kbd>/<kbd>]</kbd> expand and move down while preserving the intended column across short rows; <kbd>-</kbd>/<kbd>[</kbd> move up and collapse at the top.</td>
   </tr>
   <tr>
     <td>Layer switching</td>
@@ -64,7 +64,7 @@ The boundary is strict:
   </tr>
   <tr>
     <td>Uppercase Latin</td>
-    <td><kbd>Shift</kbd>+letter inserts uppercase Latin directly when idle; while composing it stays in marked composition as an uppercase Latin suffix and participates in candidate display/commit.</td>
+    <td><kbd>Shift</kbd>+letter inserts uppercase Latin directly when idle; while composing it stays in marked composition as an uppercase Latin segment, with marked preedit showing parser syllable or initial spaces around it.</td>
   </tr>
   <tr>
     <td>Raw pinyin cursor</td>
@@ -266,8 +266,10 @@ guidance.
 - Keep Chinese candidate quality and consumed-span behavior correct.
 - Keep raw pinyin cursor editing reliable in marked text.
 - Keep `Shift+ASCII letter` aligned with Apple Chinese input behavior: direct
-  uppercase Latin insertion while idle, marked-composition uppercase suffix
-  while composing.
+  uppercase Latin insertion while idle, marked-composition uppercase Latin
+  segments while composing, and continued pinyin composition after those
+  segments. Marked preedit may show parser syllable or abbreviated-initial
+  spaces, but raw input and committed candidate text stay unspaced.
 - Keep broker-backed Settings/IME coordination boring and predictable.
 - Keep the unsigned tester lane usable for prerelease installs and removals.
 </details>
@@ -277,8 +279,8 @@ guidance.
 
 - Expand host smoke beyond the current baseline into punctuation, raw-buffer
   behavior, editing keys, `Shift+Tab` persistence, phrase/tail commits, and
-  mixed Chinese/Latin stress cases, including uppercase Latin suffixes inside
-  composition.
+  mixed Chinese/Latin stress cases, including uppercase Latin segments followed
+  by more pinyin inside composition and marked preedit syllable/initial spacing.
 - Turn current engine-side future toggles into real behavior where appropriate,
   especially smart spelling and emoji candidates.
 - Tighten docs and diagnostics around source enrollment edge cases after

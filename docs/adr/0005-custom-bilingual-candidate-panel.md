@@ -25,13 +25,20 @@ The candidate panel is not a second pinyin input field. In candidate mode, raw
 pinyin and its insertion caret belong to host marked text. The panel renders
 the candidate matrix only. Raw-buffer-only composition is the exception where
 the panel may render the raw buffer because there is no candidate matrix.
+Host marked text may render parser-derived syllable or abbreviated-initial
+spaces in candidate mode; the raw keystroke buffer remains unspaced for editing
+and commit accounting.
 
 Uppercase Latin follows Apple Chinese input behavior and remains part of marked
 composition while composing. `Shift+ASCII letter` inserts uppercase Latin
 directly only when the IME is idle. During composition, uppercase Latin is a
-literal suffix on the raw input: whole-prefix candidates display and commit with
-that suffix, while prefix candidates leave the suffix with the remaining tail
-instead of forcing an early Chinese commit.
+literal segment inside the raw input: later pinyin may continue after it,
+whole-prefix candidates display and commit with the rendered mixed tail, and
+prefix candidates leave the later mixed Chinese/Latin tail with the remaining
+composition instead of forcing an early Chinese commit. The marked preedit
+shows parser boundaries around the Latin segment, including `h p g ABC h p g`
+for abbreviated pinyin, while committed candidate text does not include those
+display-only spaces.
 
 Raw cursor editing follows macOS-style text editing while staying inside the IME
 composition:

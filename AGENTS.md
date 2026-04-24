@@ -3,14 +3,25 @@
 ## Working defaults
 
 - Keep the Chinese IME core as the primary system. Treat bilingual preview and English-layer commit as an add-on, never the source of truth for base IME behavior.
-- Treat raw pinyin cursor editing as composition state, not host text editing. Candidate mode renders candidates only; raw pinyin/caret belongs in host marked text. Raw-buffer-only is the only panel fallback that may show raw input.
+- Treat raw pinyin cursor editing as composition state, not host text editing.
+  Candidate mode renders candidates only; raw pinyin/caret belongs in host
+  marked text. The session may show parser-derived syllable spaces in marked
+  text, including initial-letter spacing for abbreviated pinyin, while keeping
+  raw keystrokes unspaced internally. Raw-buffer-only is the only panel fallback
+  that may show raw input.
 - Keep modified cursor/editing keys inside the IME while composing: `Option/Command+Left/Right`, `Option/Command+Backspace`, and their Shift variants must not leak to the host.
+- Preserve the user's preferred candidate column during expanded row/page
+  browsing. Short rows may clamp the visible selection, but they must not erase
+  the preferred column used when browsing back to fuller rows.
 - Match Apple Chinese input behavior for uppercase Latin letters: while idle,
   `Shift+ASCII letter` inserts the uppercase Latin character directly; while
-  composing, it stays in marked composition as a literal uppercase Latin suffix
-  and participates in candidate display/commit. Do not treat Shift as a mode
-  switch, and do not auto-commit the Chinese candidate before inserting the
-  uppercase Latin letter.
+  composing, it stays in marked composition as a literal uppercase Latin
+  segment and participates in candidate display/commit. Uppercase Latin may be
+  followed by more pinyin inside the same composition; marked preedit should
+  display syllable or abbreviated-initial boundaries around the Latin segment,
+  while candidate text commits without those parser spaces. Do not treat Shift
+  as a mode switch, and do not auto-commit the Chinese candidate before
+  inserting the uppercase Latin letter.
 - Prefer the smallest correct change. Preserve the current state-machine structure unless a broader refactor is required to remove repeated special cases.
 
 ## Verification for IME changes

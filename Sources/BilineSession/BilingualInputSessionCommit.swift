@@ -29,7 +29,8 @@ extension BilingualInputSession {
     }
 
     public func renderCommittedText(_ text: String) -> String {
-        let rendered = PunctuationPolicy.renderCommittedText(text, form: settingsStore.punctuationForm)
+        let rendered = PunctuationPolicy.renderCommittedText(
+            text, form: settingsStore.punctuationForm)
         return applyPostCommitPipeline(to: rendered)
     }
 
@@ -45,7 +46,8 @@ extension BilingualInputSession {
             punctuationForm: settingsStore.punctuationForm,
             commitHistory: commitHistoryForPipeline
         )
-        let result = postCommitPipeline.isEmpty
+        let result =
+            postCommitPipeline.isEmpty
             ? text
             : postCommitPipeline.apply(text, context: context)
         if !result.isEmpty {
@@ -112,13 +114,14 @@ extension BilingualInputSession {
             return committedText
         }
 
-        if !literalLatinSuffix.isEmpty, !fallbackTailInput.isEmpty {
+        if !rawSuffixAfterActiveChunk.isEmpty, !fallbackTailInput.isEmpty {
             rawInput = fallbackTailInput
             rawCursorIndex = rawInput.count
             activeLayer = layer
             hasEverExpandedInCurrentComposition = false
             hasExplicitCandidateSelection = false
             presentationMode = .compact
+            preferredCandidateColumn = 0
             clearPreviews()
             refreshCompositionState()
             return committedText
@@ -131,6 +134,7 @@ extension BilingualInputSession {
             hasEverExpandedInCurrentComposition = false
             hasExplicitCandidateSelection = false
             presentationMode = .compact
+            preferredCandidateColumn = 0
             clearPreviews()
             updateEngineSnapshot(engineCommit.snapshot)
             return committedText
@@ -143,6 +147,7 @@ extension BilingualInputSession {
             hasEverExpandedInCurrentComposition = false
             hasExplicitCandidateSelection = false
             presentationMode = .compact
+            preferredCandidateColumn = 0
             clearPreviews()
             updateEngineSnapshot(engineSession.updateInput(rawInput))
             return committedText
@@ -162,13 +167,13 @@ extension BilingualInputSession {
         case .chinese:
             let committedText =
                 engineCommittedText.isEmpty ? item.candidate.surface : engineCommittedText
-            guard !literalLatinSuffix.isEmpty,
-                item.candidate.surface.hasSuffix(literalLatinSuffix),
-                !committedText.hasSuffix(literalLatinSuffix)
+            guard !displaySuffixForWholeCandidate.isEmpty,
+                item.candidate.surface.hasSuffix(displaySuffixForWholeCandidate),
+                !committedText.hasSuffix(displaySuffixForWholeCandidate)
             else {
                 return committedText
             }
-            return committedText + literalLatinSuffix
+            return committedText + displaySuffixForWholeCandidate
         case .english:
             return englishSelection ?? ""
         }

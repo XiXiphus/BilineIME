@@ -45,7 +45,9 @@ public final class BilingualInputSession: @unchecked Sendable {
     var rawCursorIndex = 0
     var activeLayer: ActiveLayer = .chinese
     var presentationMode: CandidatePresentationMode = .compact
-    var literalLatinSuffix = ""
+    var preferredCandidateColumn = 0
+    var rawSuffixAfterActiveChunk = ""
+    var displaySuffixForWholeCandidate = ""
     var previewStates: [String: BilingualPreviewState] = [:]
     var previewTasks: [String: Task<Void, Never>] = [:]
     let sessionID = UUID()

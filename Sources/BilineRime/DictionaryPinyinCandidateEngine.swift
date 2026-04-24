@@ -110,6 +110,7 @@ private final class DictionaryPinyinCandidateEngineSession: CandidateEngineSessi
     func turnPage(_ direction: PageDirection) -> CompositionSnapshot {
         guard !allCandidates.isEmpty else { return snapshot() }
         let pageCount = max(1, Int(ceil(Double(allCandidates.count) / Double(pageSize))))
+        let currentPageIndex = pageIndex
 
         switch direction {
         case .next:
@@ -117,6 +118,8 @@ private final class DictionaryPinyinCandidateEngineSession: CandidateEngineSessi
         case .previous:
             pageIndex = max(0, pageIndex - 1)
         }
+        guard pageIndex != currentPageIndex else { return snapshot() }
+
         selectedGlobalIndex = min(pageIndex * pageSize, allCandidates.count - 1)
         return snapshot()
     }

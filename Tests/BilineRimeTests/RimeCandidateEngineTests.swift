@@ -30,6 +30,16 @@ final class RimeCandidateEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.consumedTokenCount, 3)
     }
 
+    func testAbbreviatedPhraseCandidateKeepsRawInitialTokenSlices() throws {
+        let session = try makeSession()
+        let snapshot = session.updateInput("hpg")
+
+        XCTAssertFalse(snapshot.candidates.isEmpty)
+        XCTAssertEqual(snapshot.candidates.first?.surface, "好苹果")
+        XCTAssertEqual(snapshot.remainingRawInput, "")
+        XCTAssertEqual(snapshot.consumedTokenCount, 3)
+    }
+
     func testSelectingPrefixCandidateLeavesTailAfterCommit() throws {
         let session = try makeSession()
         _ = session.updateInput("haopingguo")

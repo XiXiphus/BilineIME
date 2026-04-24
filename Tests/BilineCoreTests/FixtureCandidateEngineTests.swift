@@ -48,6 +48,36 @@ final class FixtureCandidateEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.candidates.map(\.surface), ["是", "时"])
     }
 
+    func testTurnPageNextAtLastPagePreservesSelection() {
+        let session = DemoFixtures.makeSession(pageSize: 6)
+
+        _ = session.updateInput("shi")
+        _ = session.turnPage(.next)
+        _ = session.moveSelection(.next)
+        _ = session.moveSelection(.next)
+        let before = session.moveSelection(.next)
+
+        let after = session.turnPage(.next)
+
+        XCTAssertEqual(after.pageIndex, before.pageIndex)
+        XCTAssertEqual(after.selectedIndex, before.selectedIndex)
+        XCTAssertEqual(after.candidates, before.candidates)
+    }
+
+    func testTurnPagePreviousAtFirstPagePreservesSelection() {
+        let session = DemoFixtures.makeSession(pageSize: 25)
+
+        _ = session.updateInput("shi")
+        _ = session.moveSelection(.next)
+        let before = session.moveSelection(.next)
+
+        let after = session.turnPage(.previous)
+
+        XCTAssertEqual(after.pageIndex, before.pageIndex)
+        XCTAssertEqual(after.selectedIndex, before.selectedIndex)
+        XCTAssertEqual(after.candidates, before.candidates)
+    }
+
     func testCommitResetsCompositionState() {
         let session = DemoFixtures.makeSession(pageSize: 5)
 
@@ -79,7 +109,9 @@ final class FixtureCandidateEngineTests: XCTestCase {
         XCTAssertEqual(snapshot.remainingRawInput, "")
         XCTAssertEqual(snapshot.consumedTokenCount, 3)
         XCTAssertEqual(snapshot.candidates.first?.surface, "好苹果")
-        XCTAssertTrue(snapshot.candidates.contains(where: { $0.surface == "好" && $0.consumedTokenCount == 1 }))
+        XCTAssertTrue(
+            snapshot.candidates.contains(where: { $0.surface == "好" && $0.consumedTokenCount == 1 })
+        )
         XCTAssertTrue(snapshot.isComposing)
     }
 }

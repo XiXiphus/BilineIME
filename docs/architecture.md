@@ -172,16 +172,28 @@ Modified arrows/backspace must not leak to the host while composing.
 Uppercase Latin follows Apple Chinese input behavior. When the session is idle,
 `Shift+ASCII letter` inserts the uppercase Latin character directly. While the
 session is composing, the uppercase Latin characters remain in marked
-composition as a literal suffix; the Chinese engine query uses the pinyin prefix
-only, and candidates that consume the whole prefix display and commit with that
-uppercase suffix. Prefix candidates do not absorb the suffix; committing a
-prefix candidate leaves the proven pinyin tail plus the uppercase suffix as the
-next composition.
+composition as literal uppercase Latin segments. The Chinese engine resolves the
+active pinyin chunk while preserving those uppercase segments and may continue
+with later pinyin chunks after them. Candidates that consume the whole active
+chunk display and commit with the rendered mixed Chinese/Latin tail. Prefix
+candidates do not absorb the later mixed tail; committing a prefix candidate
+leaves the proven pinyin tail plus the later uppercase-Latin/pinyin section as
+the next composition.
+
+The raw keystroke buffer and the host marked preedit display are distinct.
+Candidate mode keeps raw input unspaced for editing and engine state, but host
+marked text may render parser-derived syllable or abbreviated-initial
+boundaries. For example, `haopingguoABChaopingguo` remains the raw buffer while
+the host marked preedit can display `hao ping guo ABC hao ping guo`;
+`hpgABChpg` can display `h p g ABC h p g`; ambiguous `xian` display follows
+the selected candidate's parsing.
 
 ### Browsing and commit
 
 Browsing changes only selection and presentation state. It must never let
-preview text reorder Chinese candidates.
+preview text reorder Chinese candidates. Expanded row/page browsing keeps a
+preferred candidate column: short rows may clamp the visible highlight, but
+that clamp must not overwrite the column used when browsing back to fuller rows.
 
 Commit behavior is explicit:
 

@@ -107,11 +107,6 @@ struct RimeLexicon: Sendable {
         tokenizer: PinyinTokenizer,
         tokenizations: [[String]]
     ) -> RimeConsumption {
-        guard !tokenizations.isEmpty else {
-            let tokens = tokenizer.readingTokens(from: comment ?? "") ?? []
-            return RimeConsumption(tokenCount: tokens.count, tokens: tokens)
-        }
-
         if let commentTokens = tokenizer.readingTokens(from: comment ?? ""), !commentTokens.isEmpty
         {
             for tokens in tokenizations where tokens.count >= commentTokens.count {
@@ -122,7 +117,7 @@ struct RimeLexicon: Sendable {
         }
 
         let normalizedSurface = surface.applyingRimeLexiconSimplifiedFallbacks()
-        var best = RimeConsumption(tokenCount: 0, tokens: tokenizations[0])
+        var best = RimeConsumption(tokenCount: 0, tokens: tokenizations.first ?? [])
         for tokens in tokenizations {
             for prefixCount in stride(from: tokens.count, through: 1, by: -1) {
                 let reading = Array(tokens.prefix(prefixCount)).joined(separator: " ")
@@ -135,6 +130,19 @@ struct RimeLexicon: Sendable {
                     break
                 }
             }
+        }
+
+        if best.tokenCount > 0 {
+            return best
+        }
+
+        if let abbreviated = abbreviatedConsumption(
+            forSurface: normalizedSurface,
+            rawInput: rawInput,
+            comment: comment,
+            tokenizer: tokenizer
+        ) {
+            return abbreviated
         }
 
         return best
@@ -220,5 +228,117 @@ struct RimeLexicon: Sendable {
         }
         if lhs.surface.count != rhs.surface.count { return lhs.surface.count > rhs.surface.count }
         return lhs.surface < rhs.surface
+    }
+
+    private func abbreviatedConsumption(
+        forSurface normalizedSurface: String,
+        rawInput: String,
+        comment: String?,
+        tokenizer: PinyinTokenizer
+    ) -> RimeConsumption? {
+        let readingOptions = candidateReadingOptions(
+            forSurface: normalizedSurface,
+            comment: comment,
+            tokenizer: tokenizer
+        )
+        guard !readingOptions.isEmpty else { return nil }
+
+        var best: RimeConsumption?
+        for readingTokens in readingOptions {
+            guard
+                let rawTokens = rawTokensMatching(
+                    readingTokens: readingTokens,
+                    rawInput: rawInput,
+                    tokenizer: tokenizer
+                )
+            else {
+                continue
+            }
+            let consumption = RimeConsumption(tokenCount: readingTokens.count, tokens: rawTokens)
+            guard let currentBest = best else {
+                best = consumption
+                continue
+            }
+            if consumption.tokenCount > currentBest.tokenCount
+                || (consumption.tokenCount == currentBest.tokenCount
+                    && consumption.tokens.count < currentBest.tokens.count)
+            {
+                best = consumption
+            }
+        }
+        return best
+    }
+
+    private func candidateReadingOptions(
+        forSurface normalizedSurface: String,
+        comment: String?,
+        tokenizer: PinyinTokenizer
+    ) -> [[String]] {
+        var options: [[String]] = []
+        var seen = Set<[String]>()
+
+        func append(_ tokens: [String]) {
+            guard !tokens.isEmpty, seen.insert(tokens).inserted else { return }
+            options.append(tokens)
+        }
+
+        if let commentTokens = tokenizer.readingTokens(from: comment ?? "") {
+            append(commentTokens)
+        }
+
+        for entry in entriesBySurface[normalizedSurface] ?? [] {
+            append(entry.readingTokens)
+        }
+
+        return options
+    }
+
+    private func rawTokensMatching(
+        readingTokens: [String],
+        rawInput: String,
+        tokenizer: PinyinTokenizer
+    ) -> [String]? {
+        let normalizedInput = PinyinTokenizer.normalizeInput(rawInput)
+        guard !normalizedInput.isEmpty else { return nil }
+
+        var rawTokens: [String] = []
+        var cursor = normalizedInput.startIndex
+        for readingToken in readingTokens {
+            guard cursor < normalizedInput.endIndex,
+                let firstReadingScalar = readingToken.unicodeScalars.first
+            else {
+                return nil
+            }
+
+            let remaining = normalizedInput[cursor...]
+            if remaining.hasPrefix(readingToken) {
+                rawTokens.append(readingToken)
+                cursor = normalizedInput.index(cursor, offsetBy: readingToken.count)
+                continue
+            }
+
+            let firstRawScalar = normalizedInput[cursor].unicodeScalars.first
+            guard firstRawScalar == firstReadingScalar else {
+                return nil
+            }
+
+            rawTokens.append(String(normalizedInput[cursor]))
+            cursor = normalizedInput.index(after: cursor)
+        }
+
+        if cursor < normalizedInput.endIndex {
+            let remainingRawInput = String(normalizedInput[cursor...])
+            rawTokens.append(
+                contentsOf: fallbackTokens(for: remainingRawInput, tokenizer: tokenizer))
+        }
+
+        return rawTokens
+    }
+
+    private func fallbackTokens(for rawInput: String, tokenizer: PinyinTokenizer) -> [String] {
+        if let tokens = tokenizer.tokenize(rawInput) {
+            return tokens
+        }
+        return rawInput.map(String.init)
     }
 }
